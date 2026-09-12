@@ -44,7 +44,9 @@ Twenty eight to Gate 1 is the floor, not a target I stopped short of. The count 
 
 The slice boundaries are real. Stopping after Slice 6 leaves a system that answers every requirement in Section 3 of the brief. It does not leave a submission, because `README.md` and `REPORT.md` are graded deliverables and the evidence scanner is a safety test the protocol forbids cutting.
 
-So wherever work stops, three things always run before submitting. Slice 8 in full, S7-T07 the desktop stub, and S7-T09 the evidence scanner. Budget two days for them and do not discover that on the last day.
+Stopping after Slice 6 also leaves three requirement rows short. 3.2h needs S7-T08, because that is where an artifact becomes mechanically readable by a calling agent. 3.7b and 3.7c are the two the brief explicitly says may be designed rather than built, so S7-T01 and S7-T03 answer them in code and the report answers the rest.
+
+So wherever work stops, four things always run before submitting. Slice 8 in full, S7-T07 the desktop stub, S7-T08 the generated schema, and S7-T09 the evidence scanner. Budget two days for them and do not discover that on the last day.
 
 ---
 
@@ -385,7 +387,7 @@ Do not start until Slices 0 to 8 are complete and green. The brief says at most 
 
 If effort has to be capped, cut in this order. The ranking comes from the evaluation weighting in `docs/REQUIREMENTS.md`, not from what is most pleasant to build.
 
-**Never cut.** The live discovery run, S5-T12. The business outcome split, S4-T04 and the `MEMBER_NOT_FOUND` run in S5-T15. A real control transfer on the same session, S6-T07. The write capability, S6-T13, because requirement 3.4 is unproven without an irreversible action that actually runs. The artifact schema, S1-T03 and S1-T04. The desktop stub, S7-T07, which is the cheapest proof of requirement 3.7a in the repository. `REPORT.md`, S8-T02.
+**Never cut.** The live discovery run, S5-T12. The business outcome split, S4-T04 and the `MEMBER_NOT_FOUND` run in S5-T15. A real control transfer on the same session, S6-T07. The write capability, S6-T13, because requirement 3.4 is unproven without an irreversible action that actually runs. The artifact schema, S1-T03 and S1-T04. The desktop stub, S7-T07, which is the cheapest proof of requirement 3.7a in the repository. The generated schema, S7-T08, which is the only thing satisfying requirement 3.2h. `REPORT.md`, S8-T02.
 
 **Cut depth first, in this order.**
 
