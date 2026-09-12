@@ -132,7 +132,7 @@ Read `docs/TARGET_APP.md`. It is a fixture, not the deliverable. Timebox it.
 * [ ] **S1-T19** Login, session cookie, redirect for unauthenticated requests.
   * Test: integration, an unauthenticated request to `/servicing` redirects. A valid login sets a cookie.
 * [ ] **S1-T20** Member search, results, and the no records banner, rendered in nested tables with no test IDs and generated IDs.
-  * Accept: includes the two deliberately hostile controls from `docs/TARGET_APP.md` section 3. The submit is a `<td onclick>` with no role, and one label reads `Member  ID:` with two spaces. Assert what is actually true of the accessible name rather than what we wish were true. Chromium may expose a `title` attribute as the name, so if it does, the fixture drops the title and keeps the control hostile.
+  * Accept: includes the two deliberately hostile controls from `docs/TARGET_APP.md` section 3. The submit is a `<td onclick>` carrying inner text only, with no role and no `title`, because Chromium feeds `title` into the accessible name and a named control would never exercise the fallback. One label reads `Member  ID:` with two spaces. The test asserts what is actually true of the accessible name rather than what we wish were true.
   * Test: integration, a known ID returns a row. `00000` returns the banner.
 * [ ] **S1-T21** Member detail with the accounts table and three balance formats across the seed members.
   * Test: integration, balance text matches the documented format per member.
@@ -302,7 +302,7 @@ Read `docs/ESCALATION.md` in full, and ADRs 0014 and 0016.
   * Test: integration, a full claim, act, release cycle completes headlessly and the run finishes.
 * [ ] **S5-T11** Policy `confirm` verdicts routed through the same intervention channel, resolved by a one shot approval grant.
   * Accept: release carries an approval grant bound to run, step and resolved target. Without it the resumed step re authorizes, is told to confirm again, and escalates forever. That loop is the reason ADR 0014 exists.
-  * Test: integration, an irreversible step raises an intervention, proceeds once after approval, and a second attempt on the same step raises again rather than reusing the grant.
+  * Test: integration, a write step raises an intervention, proceeds once after approval, and a second attempt on the same step raises again rather than reusing the grant.
 * [ ] **S5-T12** The write flow in the target app. Sub account form, field level validation, confirmation screen, and the `validation` fault.
   * Test: integration, a valid post reaches confirmation and an invalid post returns a field error.
 * [ ] **S5-T13** `member.openSubAccount`, the write capability. Requirement 3.4 is unproven without it.

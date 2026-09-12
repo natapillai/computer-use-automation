@@ -14,6 +14,8 @@ The agent loop does not hold a `SurfaceDriver`. It holds a `GuardedSurface` that
 
 A unit test asserts that `src/discovery` and `src/replay` do not import the raw driver module. Enforcing an architectural rule with a test is cheaper than enforcing it with a convention.
 
+`authorize` has exactly one call site, inside `GuardedSurface`. The executor does not call it separately and then act, it receives the verdict as a typed value from the guarded call. Two call sites would mean two places to audit and two chances to drift, which is not a single choke point however it is described.
+
 Decisions are three valued, never boolean.
 
 ```ts
@@ -35,32 +37,38 @@ Unknown means deny. If the classifier cannot categorise an action, or the target
 version: 1
 
 origins:
-  - pattern: "http://localhost:4010"
-    description: "Local MERIDIAN Core target app"
-    allowedPaths:
+  - pattern: "http://acme.localhost:4010"
+    description: "Local MERIDIAN Core target app, tenant acme"
+    allowedPaths: &meridianPaths
       - "/servicing/**"
       - "/member/**"
       - "/auth/login"
-    deniedPaths:
+    deniedPaths: &meridianDenied
       - "/admin/**"
+      - "/__control__/**"
       - "/**/delete"
       - "/**/wire/**"
+  - pattern: "http://borealis.localhost:4010"
+    description: "Local MERIDIAN Core target app, tenant borealis. Same product, different tenant"
+    allowedPaths: *meridianPaths
+    deniedPaths: *meridianDenied
+  - pattern: "http://localhost:4010"
+    description: "Local MERIDIAN Core target app, no tenant host"
+    allowedPaths: *meridianPaths
+    deniedPaths: *meridianDenied
 
 actions:
   allowed: [navigate, click, fill, select, press, hover, scroll, waitFor, extract, assert, dismiss]
   denied: [upload, download, execScript, newTab, clipboardRead]
 
+# Risk classification is not in this file. It lives in profiles/<appId>.json as a
+# route plus method table, because effect and idempotency are properties of an
+# application and not of a regex over button text. This file caps what is permitted
+# at all. The profile says what each action actually is.
 risk:
-  irreversible:
-    matchers:
-      - { kind: roleName, role: button, namePattern: "(?i)(submit|confirm|transfer|wire|delete|close account|approve)" }
-      - { kind: httpMethod, methods: [POST, PUT, DELETE, PATCH] }
-    handling: confirm
-  sensitive:
-    matchers:
-      - { kind: roleName, role: textbox, namePattern: "(?i)(ssn|social|tax id|pin|password|card number)" }
-    handling: allow_redacted
-  default: safe
+  unclassified: deny         # an action the profile does not classify never runs
+  writeHandling: confirm     # a write needs a person unless the capability is approved
+  sensitiveHandling: allow_redacted
 
 budgets:
   maxStepsPerRun: 40
@@ -78,19 +86,29 @@ data:
     - { name: accountNumber, pattern: "\\b\\d{9,17}\\b", contextual: true }
 ```
 
-Path matching is glob over the canonicalised path with the query string stripped. Denied wins over allowed. Origin matching is exact scheme, host, and port, with no wildcard hosts, because a wildcard host allowlist in a multitenant system is not an allowlist.
+Path matching is glob over the canonicalised path with the query string stripped. Denied wins over allowed. Origin matching is exact scheme, host, and port, with no wildcard hosts, because a wildcard host allowlist in a multitenant system is not an allowlist. Two tenant hosts of the same product are two entries, which is the honest shape and also what a real deployment would generate per tenant binding.
+
+`/__control__/**` is denied on every origin. The target app mounts its own fault injection there, and an agent that can arm the faults it is being tested against is not being tested. It is a small thing that proves the allowlist constrains something real.
 
 `maxActionsPerMinute` is a rate limit, not a budget. It exists because the brief tells us to respect rate limits on target systems, and because a model in a loop can otherwise hammer a legacy app that was never built for it.
 
 ## 3. Risk classification
 
-Three levels, classified from the action kind plus the target's accessibility metadata plus the HTTP method the action is expected to trigger.
+Two independent properties, both classified from the app profile route and method table, plus a sensitivity flag from the same profile. This is ADR 0014.
 
-| Level | Definition | Discovery | Replay, draft | Replay, approved |
-| --- | --- | --- | --- | --- |
-| `safe` | Read only or trivially reversible. Navigate, click a link, fill a field, extract | allow | allow | allow |
-| `sensitive` | Touches regulated data. Filling an SSN field, reading a full account number | allow, with redaction enforced | allow | allow |
-| `irreversible` | Changes state in the institution's system of record. Submits, transfers, account creation | confirm | confirm | allow, if the capability declares `allowUnattendedReplay` |
+| Property | Question it answers | Decided by | Governs |
+| --- | --- | --- | --- |
+| `effect` | Does this change the institution system of record | Profile route table | Whether a person confirms |
+| `idempotent` | Is repeating this free | Profile route table | Whether a failed attempt is retried |
+| `sensitive` | Does this touch regulated data | Profile field sensitivity map | Redaction and screenshot masking |
+
+| Case | Discovery | Replay, draft | Replay, approved |
+| --- | --- | --- | --- |
+| read | allow | allow | allow |
+| read, sensitive | allow, redaction enforced | allow | allow |
+| write | confirm | confirm | allow, if the capability declares `allowUnattendedReplay` |
+
+The first version of this section had one enum and classified any POST as irreversible. The member search on the target app is a POST. That made the primary read capability require human confirmation on every discovery and every draft replay, and it made the transient retry case unreachable, because the schema forbids retrying an irreversible step. A search is a read that is not idempotent. One enum could not say that, and the regex over button names that sat beside it was the same defect in a different place.
 
 ### Why confirm rather than block
 
@@ -116,7 +134,9 @@ interface Redactor {
 }
 ```
 
-Sinks that must use it, with no exceptions. The structured logger. The artifact writer. The evidence writer. The screenshot writer. The model prompt builder. The operator API responses. The catalog API responses.
+Sinks that must use it, with no exceptions. The structured logger. The artifact writer. The evidence writer. The screenshot writer. The model prompt builder. The operator API responses. The catalog API responses, with one deliberate carve out below.
+
+A result exists in two projections and the difference is explicit. The **caller projection** carries real output values, because an agent that asked for a balance and received `[redacted]` has been handed a system that does not work. The **persisted projection** is redacted, and it is what reaches logs, evidence and the trace. The carve out is narrow, it is named here, and the catalog returns the caller projection only to the invocation that asked for it.
 
 That last one is easy to forget. An intervention payload carries a screenshot and an accessibility snapshot of a member's account, and it is being sent to a browser over HTTP. It gets redacted like everything else.
 
@@ -124,7 +144,7 @@ That last one is easy to forget. An intervention payload carries a screenshot an
 
 1. **Provenance based.** Any value that came from an input declared `pii` or `secret` is tracked by reference. It is never written as a literal anywhere. In artifacts it is always `{{inputs.x}}`. This is exact rather than heuristic, and it is the primary mechanism.
 2. **Pattern based.** The regex set in the allowlist, applied to all free text before it is written. Card numbers are Luhn validated to cut false positives. This is the safety net for data we did not put there ourselves, such as an account number rendered on a page.
-3. **Region masking.** Elements whose accessibility name or nearby label matches a sensitive pattern have their bounding box painted over before the screenshot bytes are written. The unmasked buffer is never persisted and never leaves the process.
+3. **Region masking.** Elements the app profile marks sensitive have their bounding box painted over by Playwright's own screenshot mask option, so an unmasked buffer never exists in the process rather than merely never being written. The profile is what makes this work for a member name. No pattern finds a name, so a mechanism that relied only on regexes would have left one visible in every committed screenshot while the document claimed otherwise.
 
 ### Sensitivity propagation
 
@@ -143,7 +163,7 @@ For `REPORT.md`. Stating the limits is part of the deliverable.
 * **Prompt injection from page content.** A malicious page could contain text instructing the model to navigate elsewhere. The allowlist contains the blast radius, since it cannot leave permitted origins or perform denied actions, but it could still be steered into a permitted but wrong action. Real mitigations are structural output constraints, treating page text as data rather than instruction in the prompt, and an anomaly check on the action sequence. We implement the first two and note the third.
 * **Semantic correctness.** Policy can tell that a click targets a submit button. It cannot tell that the submit is for the wrong member. Checkpoints and typed outputs are the mitigation, and they are partial.
 * **Regex redaction is imperfect.** It will miss unusual account formats and occasionally over redact. Provenance based redaction is the strong mechanism and pattern matching is the net, not the floor.
-* **The operator is trusted.** Their actions during a control window are recorded but not constrained by the allowlist. Prevention here needs input level policy enforcement on the CDP forwarding path, which is designed but not built.
+* **The operator is trusted.** Their actions during a control window are recorded but not authorized action by action. There is one real control. A `context.route` handler refuses any request to an origin or path outside the allowlist, which applies to the human window exactly as it applies to automation, and it is also what keeps either of them out of `/__control__`. Semantic constraint on what an operator does inside a permitted origin is designed and not built.
 * **No egress control.** A compromised dependency could exfiltrate. Out of scope, worth naming.
 * **Screenshot masking depends on correct element detection.** A sensitive value rendered inside a canvas or an image will not be masked. The mitigation is not persisting screenshots at all on steps marked `sensitive` unless evidence capture is explicitly enabled.
 
@@ -155,10 +175,14 @@ Listed here because safety properties are exactly the ones that rot silently.
 * `authorize` denies every action kind not in the allowed set.
 * Denied paths beat allowed paths on overlap.
 * An unknown action kind yields `deny`, proving the default branch.
-* Irreversible matchers yield `confirm` during discovery, and `allow` only when status is approved and the flag is set.
+* A `write` action yields `confirm` during discovery and during a draft replay, and `allow` only when the capability is approved and declares `allowUnattendedReplay`.
+* An action the profile does not classify yields `deny`, proving the fail closed default.
+* An approval grant is accepted exactly once and refused on a second presentation.
 * A secret input value never appears in the serialised artifact, asserted by scanning the JSON for the literal.
 * A secret input value never appears in any log line produced during a run, asserted by capturing the log sink.
 * Screenshot masking covers the declared boxes, asserted on pixel samples.
 * The model prompt contains no unredacted PII, asserted against a fixture observation.
 * `src/discovery` and `src/replay` do not import the unguarded driver, asserted over the import graph.
-* Budgets terminate a run that exceeds max steps, max duration, or the rate limit.
+* Budgets terminate a run that exceeds max steps or max duration. The rate limit throttles through `Clock.delay` rather than failing, because respecting a legacy application is politeness and not an error condition.
+* A request to an origin or path outside the allowlist is refused at the network layer, including while a human holds control.
+* The evidence scanner fails on a planted canary and passes on the committed tree.

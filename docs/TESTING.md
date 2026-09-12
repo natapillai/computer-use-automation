@@ -48,7 +48,7 @@ Returns a scripted sequence of tool calls. Used for testing the agent loop's con
 
 ### `CassetteModelClient`
 
-Replays a real recorded model transcript from `tests/fixtures/cassettes/`. Used in the E2E test so the full discovery thread runs end to end with real model output and zero network. Record once with `npm run discover -- --record-cassette`, commit the redacted transcript, and it runs forever in CI.
+Replays a real recorded model transcript from `tests/fixtures/cassettes/`. Used in the E2E test so the full discovery thread runs end to end with real model output and zero network. Record once with `npm run discover -- --record-cassette`, commit the redacted transcript, and it runs forever in CI. Matching is positional with a shape assertion. Exchange N answers the Nth call, and the client asserts that the tool set and the observation hash match what was recorded, so a prompt edit is free and a change in what the model can see fails loudly. See ADR 0017. The committed cassette is a model transcript in a public repository, so the evidence scanner covers it too.
 
 This is how we get an honest end to end test of a non deterministic system. The model's decisions are real, they are just frozen.
 
@@ -56,7 +56,7 @@ This is how we get an honest end to end test of a non deterministic system. The 
 
 * No network in unit, contract, or integration tests. The local target app on `127.0.0.1:4010` is not the network, it is a fixture. There is one test that asserts no outbound request left the machine during the suite.
 * No real model calls in CI. `ANTHROPIC_API_KEY` is unset in CI and the live script hard fails without it, so a live call cannot happen by accident.
-* No `sleep`. Not in application code, not in tests. Wait on conditions. Vitest fake timers where time genuinely matters, such as backoff and claim timeouts.
+* No raw timers. Not in application code, not in tests. Wait on conditions. The one sanctioned delay is `Clock.delay`, used by retry backoff and the rate limiter, and it is fake under Vitest fake timers. A lint rule refuses `setTimeout`, `setInterval` and `setImmediate` in `core`, `replay`, `discovery` and `control`, which is the enforceable version of a rule that otherwise reads well and decays.
 * Fixed clock. `TimeProvider` is injected. Every timestamp in a test is deterministic, which means artifacts and results can be snapshot compared.
 * Deterministic IDs. `IdProvider` is injected and seeded in tests.
 * Fresh target app state per integration test file, via `/__control__/reset`.
@@ -74,6 +74,8 @@ export function surfaceDriverContract(name: string, factory: () => Promise<Surfa
     it('resolve returns not_found for a bundle matching nothing', ...);
     it('resolve returns ambiguous for a unique policy matching several nodes', ...);
     it('resolve honours framePath', ...);
+    it('observe attaches a derivedLabel to a node with no accessible name', ...);
+    it('resolve honours a geometric relation, sameRow and below', ...);
     it('act rejects a stale control token with ControlLostError', ...);
     it('act on a disabled control returns a typed failure, it does not throw', ...);
     it('waitFor resolves when the condition becomes true', ...);
@@ -88,13 +90,13 @@ Both `WebSurfaceDriver` and `FakeSurfaceDriver` import and run it. This suite is
 
 ## 6. What must be tested, by module
 
-Use this as a checklist when writing the tests for each phase. It maps to `docs/PLAN.md`.
+Use this as a checklist when writing the tests for each phase. It maps to the slices in `docs/PLAN.md`.
 
-**`core/capability`.** Valid artifacts parse. Every invalid shape is rejected with a useful message. Unknown `schemaVersion` is refused. Template resolution across inputs, prior outputs, and env. Unresolved reference is a hard failure. A retry on an irreversible step fails validation. `redactionApplied` cannot be false. Overlay merge for base, vendor, tenant. A tenant overlay cannot change inputs or outputs. Version bump rules over fixture pairs.
+**`core/capability`.** Valid artifacts parse. Every invalid shape is rejected with a useful message. Unknown `schemaVersion` is refused. Template resolution across inputs, prior outputs, and env. Unresolved reference is a hard failure. A retry on a non idempotent step fails validation. `redactionApplied` cannot be false, and the writer refuses an artifact carrying a sensitive literal, which is where the actual enforcement lives. Overlay merge for base, vendor, tenant. An overlay may rebind an output and may not change its contract. An overlay outside its `appliesTo` range refuses to load. Version bump rules over fixture pairs.
 
 **`core/locator`.** Strategy ordering by confidence. First resolving strategy wins. Ambiguity under `unique` rejects the strategy and moves on. All strategies ambiguous yields `LocatorAmbiguous`. Degradation is recorded when a lower ranked strategy wins. Derivation from a `UINode` produces the expected bundle. Anchor relative resolution in a table row. Frame path scoping.
 
-**`core/outcome`.** Each matcher kind. Precedence, step over capability over app profile. Business outcome beats generic failure. Recovery bounds. Retry only on safe steps. Every `FailureClass` constructible with required `expected` and `observed`. The classifier is exhaustive, proven by a type level never check plus a test for the unknown case.
+**`core/outcome`.** Each matcher kind, including the combinators. One total precedence order, step then capability then app profile, with business outcome beating failure inside a tie. The app profile cannot declare a business outcome. Recovery bounds. Retry only on idempotent steps. Every `FailureClass` constructible with required `expected` and `observed`. The classifier is exhaustive, proven by a type level never check plus a test for the unknown case.
 
 **`core/policy`.** The table in `docs/SAFETY.md` section 6.
 
@@ -104,11 +106,11 @@ Use this as a checklist when writing the tests for each phase. It maps to `docs/
 
 **`discovery/agentLoop`.** Stops on done plus a verified success condition. Stops on max steps. Stops on max duration. Escalates on no progress. Escalates on the model calling escalate. Denied actions do not reach the driver. A model tool call with a bad ref produces a corrective observation rather than a crash.
 
-**`replay/executor`.** Every row of the test matrix in `docs/ERROR_TAXONOMY.md` section 8. Plus, the import graph of `src/replay` contains no model client, asserted as a test.
+**`replay/executor`.** Every row of the test matrix in `docs/ERROR_TAXONOMY.md` section 8. The post action wait is a race, proven by a business outcome that classifies well inside the step timeout. The import graph of `src/replay` contains no model client, asserted as a test.
 
 **`control`.** Every legal transition. Every illegal transition throws. Token rotation invalidates the previous holder. Claim timeout releases the session. Concurrent claim, only one wins.
 
-**`escalation`.** Each of the six detectors fires on its condition and does not fire otherwise. Intervention payload carries every required field. Payload is redacted. `MockOperator` completes a full claim, act, release cycle. Resume revalidation covers all five branches. Human actions are recorded and appear as draft steps.
+**`escalation`.** Each of the six detectors fires on its condition and does not fire otherwise. Intervention payload carries every required field. Payload is redacted. `MockOperator` completes a full claim, act, release cycle. Resume revalidation covers every branch including the approval grant. A forwarded click produces a derived `LocatorBundle` through the hit test path, and no typed value is recorded anywhere. An approval grant is consumed exactly once.
 
 ## 7. Coverage gates
 

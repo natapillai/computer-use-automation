@@ -7,7 +7,7 @@ The brief calls this a focal point of the evaluation. Treat this document as the
 1. **It is a capability contract, not a macro recording.** An AI agent must be able to read it and know what it needs, what it returns, and what can go wrong, without reading the steps. That means typed inputs, typed outputs, and declared business outcomes are first class, not metadata.
 2. **It is reviewable by a human.** Every step carries an `intent` in plain language and every locator carries a `describedAs`. A compliance reviewer at a bank must be able to read this and understand what the automation does to a member account.
 3. **It is decoupled from the transcript.** No model messages, no reasoning traces, no token counts. Provenance points at the discovery run by ID, it does not embed it.
-4. **It cannot carry sensitive data.** Values are templates or literals, and the generalizer refuses to emit a literal that came from a sensitive input or that trips the redactor. Schema validation enforces this, so an unsafe artifact cannot be written.
+4. **It cannot carry sensitive data.** Values are templates or literals, and the generalizer refuses to emit a literal that came from a sensitive input or that trips the redactor. Locator text is templated too, because a derived strategy that matches a search result row would otherwise commit a member ID. The enforcement is the writer, which scans for declared input values and redactor matches and refuses to serialise on a hit. A schema cannot know where a literal came from, and `redactionApplied` is a marker that the writer ran, not proof that it worked.
 5. **It versions two things independently.** `schemaVersion` is the shape of this file. `version` is the capability itself. A replay engine checks the former for compatibility and the latter for which behaviour it is invoking.
 6. **Structure is shared, specifics are overridable.** Cross tenant reuse depends on a tenant being able to override a locator without forking the flow.
 
@@ -36,6 +36,8 @@ const Capability = z.object({
   provenance: Provenance,
   lifecycle: Lifecycle,
 });
+
+
 ```
 
 ## 3. Field by field, with the reasoning
@@ -84,7 +86,7 @@ const ParamSpec = z.object({
 });
 ```
 
-`sensitivity` is the mechanism that drives redaction, not a label. A value typed into a field bound to a `pii` or `secret` input is never written to a log, never written to the artifact, and the region of any screenshot containing it is masked before the screenshot is persisted. Sensitivity propagates, so an output extracted from a field fed by a `secret` input inherits the higher classification.
+`sensitivity` is the mechanism that drives redaction, not a label. Field level sensitivity also comes from the app profile, which is how a member name gets masked. No regex finds a name, and pattern redaction alone would have left one in every screenshot and every prompt. A value typed into a field bound to a `pii` or `secret` input is never written to a log, never written to the artifact, and the region of any screenshot containing it is masked before the screenshot is persisted. Sensitivity propagates, so an output extracted from a field fed by a `secret` input inherits the higher classification.
 
 `constraints` are validated before the browser opens. Rejecting a malformed member ID in ten milliseconds is better than discovering it after six page loads, and it keeps garbage input out of the target system.
 
@@ -106,9 +108,9 @@ const OutputSpec = z.object({
 });
 ```
 
-Outputs are declared with their own locator bundle rather than being scraped ad hoc, because reading a balance is exactly as failure prone as clicking a button and deserves the same treatment. A required output that cannot be resolved is a hard failure, not a silent `undefined`. That distinction matters when the caller is an AI agent about to tell a member their balance.
+Outputs are declared with their own locator bundle rather than being scraped ad hoc, because reading a balance is exactly as failure prone as clicking a button and deserves the same treatment. There is no `extract` step kind in an artifact. An output resolves after the step named in `source.stepId` completes, through the same resolution policy as any action target. Carrying the locator in two places, once on an extract step and once on the output, would let them disagree. A required output that cannot be resolved is a hard failure, not a silent `undefined`. That distinction matters when the caller is an AI agent about to tell a member their balance.
 
-`money` is its own type. A balance is not a float and it is not a display string. It carries an amount, a currency, and the raw text it was parsed from, so a downstream mismatch is debuggable.
+`money` is its own type. A balance is not a float and it is not a display string. It carries an amount in minor units, a currency, and the raw text it was parsed from, so a downstream mismatch is debuggable. That raw text is `pii`, so it is present in the value returned to the caller and redacted in every persisted projection.
 
 ### `outcomes`
 
@@ -119,12 +121,13 @@ const BusinessOutcomeSpec = z.object({
   code: z.string(),                  // 'MEMBER_NOT_FOUND'
   description: z.string(),
   terminal: z.boolean(),             // does the flow stop here
-  detect: ConditionMatcher,          // how replay recognises it
+  detect: ConditionMatcher,          // how replay recognises it, derived from a real element
   data: z.array(OutputSpec).optional(),  // structured detail, eg the validation message
+  provenance: z.enum(['model', 'human', 'manual']).default('manual'),
 });
 ```
 
-A declared outcome is a supported answer from the capability, not an error. `MEMBER_NOT_FOUND`, `ACCOUNT_FROZEN`, `INSUFFICIENT_PERMISSIONS`, `DUPLICATE_SUBACCOUNT`. The calling agent branches on `outcome.code`. Anything the system encounters that is not a declared outcome and not a recoverable condition is a failure by definition, which keeps the taxonomy closed and forces new real world conditions to be added deliberately rather than swallowed.
+A declared outcome is a supported answer from the capability, not an error. Outcomes reach the artifact through the negative probe review in ADR 0018, not by hand and not by inference. A single happy path discovery run never sees the not found banner, so without that review step a discovered artifact would declare nothing and its first unhappy replay would report a failure. `MEMBER_NOT_FOUND`, `ACCOUNT_FROZEN`, `INSUFFICIENT_PERMISSIONS`, `DUPLICATE_SUBACCOUNT`. The calling agent branches on `outcome.code`. Anything the system encounters that is not a declared outcome and not a recoverable condition is a failure by definition, which keeps the taxonomy closed and forces new real world conditions to be added deliberately rather than swallowed.
 
 ### `steps`
 
@@ -139,9 +142,11 @@ const Step = z.object({
   value: TemplateExpr.optional(),    // '{{inputs.memberId}}' or a literal
 
   precondition: Checkpoint.optional(),
-  postcondition: Checkpoint.optional(),
+  postcondition: Checkpoint,              // required on every acting step
 
-  risk: z.enum(['safe', 'sensitive', 'irreversible']),
+  effect: z.enum(['read', 'write']),      // drives confirmation
+  idempotent: z.boolean(),                // drives retry
+  sensitive: z.boolean().default(false),  // touches regulated data, drives redaction
   retry: RetryPolicy,
   timeoutMs: z.number().int().default(15000),
 
@@ -153,6 +158,8 @@ const Step = z.object({
 });
 ```
 
+`effect` and `idempotent` are two properties and not one enum, which is ADR 0014. `effect` decides whether a person confirms. `idempotent` decides whether a failed attempt can be retried. The search on the target app is a POST, so it is not idempotent, and it is also a read that nobody should have to approve. A single risk enum could not say both of those things at once, and the version that tried classified the primary read capability as irreversible. Both values are classified from the app profile route table at record time and checked again at replay.
+
 `id` being stable and separate from `index` is what makes overlays and reordering safe. An overlay says "for this tenant, step `searchSubmit` uses this locator", and it survives a step being inserted before it.
 
 `provenance` at the step level records that a human performed this step during an escalation. Those steps land as proposals on a draft revision and require approval before they replay unattended. A step nobody reviewed should not run against a member account at three in the morning.
@@ -163,37 +170,36 @@ const Step = z.object({
 
 ```ts
 const Checkpoint = z.object({
-  description: z.string(),
-  assertions: z.array(Assertion).min(1),
-  mode: z.enum(['all', 'any']).default('all'),
+  description: z.string(),          // appears verbatim in the timeout message
+  condition: ConditionMatcher,      // the same language the detectors use
   timeoutMs: z.number().int().default(10000),
 });
 
-type Assertion =
-  | { kind: 'elementPresent'; target: LocatorBundle }
-  | { kind: 'elementAbsent'; target: LocatorBundle }
-  | { kind: 'textMatches'; target: LocatorBundle; pattern: string }
-  | { kind: 'urlMatches'; pattern: string }
-  | { kind: 'outputResolvable'; outputName: string };
+// There is no separate Assertion union. ConditionMatcher, defined in
+// docs/ERROR_TAXONOMY.md section 5, carries elementPresent, textMatches, urlMatches,
+// httpStatus, dialogPresent, outputResolvable, and the combinators all, any and not.
+// One language, one evaluator, one set of tests. The previous design had two unions
+// that differed by three members and needed two evaluators to agree forever.
 ```
 
-`urlMatches` alone is never sufficient and the schema does not enforce that, but the generalizer will not emit a checkpoint containing only a URL assertion. In a frameset app the URL frequently does not change at all when the state does.
+`urlMatches` alone is never sufficient and the schema does not enforce that, but the generalizer will not emit a checkpoint whose condition is only a URL match. In a frameset app the URL frequently does not change at all when the state does. Composition replaces the old `mode` field. Two assertions that both have to hold are an `all`, and either or is an `any`.
 
 ### `policy`
 
 ```ts
 const CapabilityPolicy = z.object({
-  maxRisk: z.enum(['safe', 'sensitive', 'irreversible']),
+  maxEffect: z.enum(['read', 'write']),
   requiresApproval: z.boolean(),
   allowUnattendedReplay: z.boolean(),
-  allowAssistedRecovery: z.boolean().default(false),
-  allowedOrigins: z.array(z.string()),
+  allowReauth: z.boolean().default(false),
   maxStepDurationMs: z.number().int(),
   maxTotalDurationMs: z.number().int(),
 });
 ```
 
 The capability declares its own ceiling and the global allowlist declares the system ceiling. The effective policy is the intersection, so a capability can be more restrictive than the system but never less. That is the only safe direction for this to compose.
+
+There is no `allowedOrigins` here. An origin is a property of the tenant a capability is invoked against, and baking one into the artifact is the same mistake as baking in `baseUrl`. Origins come from the tenant binding and the global allowlist. `allowReauth` is here because the `SessionExpired` recovery needs a capability level answer to whether re authenticating mid run is acceptable at all.
 
 ### `provenance`
 
@@ -210,7 +216,7 @@ const Provenance = z.object({
 });
 ```
 
-`redactionApplied` as a literal `true` means an artifact that skipped redaction cannot be serialised through the schema. Encoding the safety property in the type is stronger than remembering to call a function.
+`redactionApplied` as a literal `true` records that the writer ran its scan. It is a marker and not the enforcement, because nothing stops a caller setting a boolean. The enforcement is `CapabilityStore`, which scans the serialised artifact for declared input values and redactor matches and refuses to write on a hit. Claiming a type could enforce it would be the kind of safety story that reads well and protects nothing.
 
 `promptVersion` and `generalizerVersion` exist because when an artifact turns out to be badly recorded, the first question is which version of our own pipeline produced it.
 
@@ -221,18 +227,13 @@ const Lifecycle = z.object({
   status: z.enum(['draft', 'approved', 'deprecated']),
   approvedBy: z.string().optional(),
   approvedAt: z.string().datetime().optional(),
-  stability: z.object({
-    replays: z.number().int(),
-    successes: z.number().int(),
-    lastSuccessAt: z.string().datetime().optional(),
-    lastDriftAt: z.string().datetime().optional(),
-    consecutiveFailures: z.number().int(),
-  }),
   supersededBy: z.string().optional(),
 });
 ```
 
-A freshly discovered artifact is `draft`. Unattended replay requires `approved`. This is a three line gate in the executor and it is the difference between a demo and something you would let near a core banking system.
+A freshly discovered artifact is `draft`. Unattended replay requires `approved`. This is a three line gate in the executor and it is the difference between a demo and something you would let near a core banking system. Approval is written by `npm run review` and lands as a commit, so who approved what is answerable from git history.
+
+Stability counters are not here. Replay counts, drift counts, consecutive failures and `needs_review` live in `capabilities/<id>/state.json`, a sidecar beside the artifact. They are operational state that changes on every run, and an artifact is an immutable versioned file. Mixing the two would rewrite a reviewed file every time it executed, which makes its diff useless and its version a lie.
 
 ## 4. Templating
 
@@ -240,12 +241,15 @@ A freshly discovered artifact is `draft`. Unattended replay requires `approved`.
 
 The restriction is deliberate. The moment templates become Turing complete the artifact stops being reviewable, and reviewability is a requirement.
 
+Locator strategies are templated too. A derived `text` strategy that matched a search result row would otherwise commit a member ID into a file that goes to a public repository. The generalizer parameterises any strategy text that equals a declared input value, and drops any strategy whose text trips the redactor and cannot be parameterised.
+
 ## 5. Storage and versioning
 
 ```
 capabilities/<id>/base@<version>.json
 capabilities/<id>/variants/<variant>@<version>.json
 capabilities/<id>/index.json
+capabilities/<id>/state.json          # operational state, not versioned, not a contract
 ```
 
 JSON, pretty printed, stable key order, committed to git. Git gives us history, diffs, and review on a file a compliance team could actually read in a pull request. A database buys nothing at this scale and costs reviewability.
@@ -258,18 +262,44 @@ Version bumping rules, enforced by a unit test over a fixture pair.
 
 Replay checks `schemaVersion` for engine compatibility and refuses to run an artifact from a future schema. Callers pin `id@major` and get patches for free.
 
+### Overlays
+
+```ts
+const Overlay = z.object({
+  schemaVersion: z.literal('1.0.0'),
+  capabilityId: z.string(),
+  variant: z.string(),                 // 'vendorX-v9' | 'tenant-acme'
+  version: z.string().regex(SEMVER),
+  appliesTo: z.string(),               // semver range over base versions, '^1.2.0'
+  extends: z.string().optional(),      // parent variant name, resolved first
+
+  steps: z.record(z.object({           // keyed by step id, never by index
+    target: LocatorBundle.optional(),
+    value: TemplateExpr.optional(),
+    optional: z.boolean().optional(),
+    onCondition: z.array(ConditionRule).optional(),
+  })).default({}),
+
+  outputs: z.record(z.object({ source: OutputSource })).default({}),
+  outcomes: z.record(z.object({ detect: ConditionMatcher })).default({}),
+  app: z.object({ baseUrl: z.string().optional() }).optional(),
+});
+```
+
+An overlay carries bindings and never contracts. It can say where this tenant renders the balance. It cannot say that this tenant returns a different type, a different name, or a different set of steps, because a tenant that changes the contract has a different capability and should be forced to admit it. `appliesTo` is what stops an overlay written against `1.2.x` from silently merging into a `2.0.0` base whose steps moved. See ADR 0015.
+
 ## 6. Worked example
 
-`capabilities/member.readSavingsBalance/base@1.0.0.json`, abbreviated.
+`capabilities/member.readSavingsBalance/base@1.1.0.json`, abbreviated. Version `1.0.0` came from the discovery run. `1.1.0` added the declared outcomes through the negative probe review in ADR 0018.
 
 ```json
 {
   "schemaVersion": "1.0.0",
   "id": "member.readSavingsBalance",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "name": "Read member savings balance",
   "description": "Looks up a member by ID and returns the current balance of their primary savings account.",
-  "app": { "appId": "meridian-core", "vendor": "meridian", "variant": "base", "entryPath": "/servicing/search" },
+  "app": { "appId": "meridian-core", "vendor": "meridian", "variant": "base", "entryPath": "/servicing" },
   "surface": { "kind": "legacy-web", "minDriverVersion": "1.0.0", "capabilitiesRequired": ["frames"] },
   "inputs": [
     { "name": "memberId", "type": "string", "required": true, "sensitivity": "pii",
@@ -278,49 +308,67 @@ Replay checks `schemaVersion` for engine compatibility and refuses to run an art
   "outputs": [
     { "name": "savingsBalance", "type": "money", "required": true, "sensitivity": "pii",
       "description": "Current balance of the primary savings account",
-      "source": { "stepId": "readBalanceCell", "target": { "...": "locator bundle" },
+      "source": { "stepId": "openMemberDetail", "target": { "...": "balance cell bundle" },
                   "attribute": "text", "parse": { "kind": "money", "currency": "USD" } } }
   ],
   "outcomes": [
-    { "code": "MEMBER_NOT_FOUND", "terminal": true,
+    { "code": "MEMBER_NOT_FOUND", "terminal": true, "provenance": "manual",
       "description": "No member exists with the supplied ID.",
-      "detect": { "kind": "textMatches", "target": { "...": "results banner" }, "pattern": "No records found" } },
-    { "code": "ACCOUNT_RESTRICTED", "terminal": true,
+      "detect": { "kind": "textMatches", "target": { "...": "results banner bundle" }, "pattern": "No records found" } },
+    { "code": "ACCOUNT_RESTRICTED", "terminal": true, "provenance": "manual",
       "description": "The member exists but the operator lacks permission to view balances.",
-      "detect": { "kind": "textMatches", "target": { "...": "error region" }, "pattern": "not authorized" } }
+      "detect": { "kind": "textMatches", "target": { "...": "error region bundle" }, "pattern": "not authorized" } }
   ],
   "steps": [
-    { "id": "openSearch", "index": 0, "intent": "Open the member search screen",
-      "action": { "kind": "navigate", "path": "/servicing/search" },
-      "risk": "safe", "retry": { "attempts": 2, "backoffMs": 500 }, "timeoutMs": 15000,
-      "postcondition": { "description": "Search form is present",
-        "assertions": [{ "kind": "elementPresent", "target": { "...": "member id field" } }] } },
+    { "id": "openSearch", "index": 0, "intent": "Open the member search screen inside the content frame",
+      "action": { "kind": "navigate", "path": "/servicing/search", "framePath": ["content"] },
+      "effect": "read", "idempotent": true, "retry": { "attempts": 2, "backoffMs": 500 }, "timeoutMs": 15000,
+      "postcondition": { "description": "Search form is present in the content frame",
+        "condition": { "kind": "elementPresent", "target": { "...": "member id field bundle" } } } },
     { "id": "fillMemberId", "index": 1, "intent": "Enter the member ID",
       "action": { "kind": "fill" }, "value": "{{inputs.memberId}}",
       "target": { "framePath": ["content"], "matchPolicy": "unique", "describedAs": "Member ID input",
         "strategies": [
-          { "kind": "role-name", "role": "textbox", "name": "Member ID", "exact": true, "confidence": 0.95 },
-          { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Member ID", "exact": true, "confidence": 0.8 },
-            "relation": "sameRowInput", "confidence": 0.75 },
+          { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Member ID", "exact": false, "confidence": 0.8 },
+            "relation": "sameRow", "role": "textbox", "confidence": 0.8 },
+          { "kind": "anchor-relative", "anchor": { "kind": "role-name", "role": "heading", "name": "Member Search", "exact": true, "confidence": 0.9 },
+            "relation": "firstTextboxBelow", "role": "textbox", "confidence": 0.6 },
           { "kind": "structural", "path": "form#srch >> tr:nth-child(2) >> input", "confidence": 0.4 }
         ] },
-      "risk": "safe", "retry": { "attempts": 2, "backoffMs": 250 }, "timeoutMs": 10000 }
+      "effect": "read", "idempotent": true, "retry": { "attempts": 2, "backoffMs": 250 }, "timeoutMs": 10000,
+      "postcondition": { "description": "Member ID field holds the supplied value",
+        "condition": { "kind": "textMatches", "target": { "...": "member id field bundle" }, "pattern": "^{{inputs.memberId}}$" } } },
+    { "id": "submitSearch", "index": 2, "intent": "Submit the member search form",
+      "action": { "kind": "click" }, "target": { "...": "search button bundle" },
+      "effect": "read", "idempotent": false, "retry": { "attempts": 0 }, "timeoutMs": 15000,
+      "postcondition": { "description": "A result row for the member is present",
+        "condition": { "kind": "elementPresent", "target": { "...": "result row bundle" } } } }
   ],
   "successCondition": {
     "description": "Member detail screen shows a savings balance",
-    "assertions": [
-      { "kind": "elementPresent", "target": { "...": "balance cell" } },
+    "condition": { "kind": "all", "of": [
+      { "kind": "elementPresent", "target": { "...": "balance cell bundle" } },
       { "kind": "outputResolvable", "outputName": "savingsBalance" }
-    ]
+    ] }
   },
-  "policy": { "maxRisk": "safe", "requiresApproval": true, "allowUnattendedReplay": false,
-              "allowedOrigins": ["http://localhost:4010"], "maxStepDurationMs": 20000, "maxTotalDurationMs": 120000 },
+  "policy": { "maxEffect": "read", "requiresApproval": true, "allowUnattendedReplay": false,
+              "allowReauth": false, "maxStepDurationMs": 20000, "maxTotalDurationMs": 120000 },
   "provenance": { "recordedAt": "2026-09-11T00:00:00Z", "discoveryRunId": "run_01J...",
-                  "model": "claude-sonnet-4-6", "promptVersion": "1.0.0",
+                  "model": "from ANTHROPIC_MODEL at record time", "promptVersion": "1.0.0",
                   "recorderVersion": "1.0.0", "generalizerVersion": "1.0.0", "redactionApplied": true },
-  "lifecycle": { "status": "draft", "stability": { "replays": 0, "successes": 0, "consecutiveFailures": 0 } }
+  "lifecycle": { "status": "draft" }
 }
 ```
+
+Four details in that example are there because the first draft of this document got them wrong.
+
+`entryPath` is `/servicing`, the frameset shell, and the `navigate` step names its `framePath`. Pointing the top level document straight at `/servicing/search` replaces the frameset, after which every `framePath: ["content"]` in the artifact resolves to nothing.
+
+The `anchor-relative` strategy does not anchor on the text `Member ID`. The `relabel` fault renames exactly that label, so anchoring on it means the fallback dies with the thing it was meant to survive. The second strategy anchors on the screen heading instead.
+
+`submitSearch` is `read` and not idempotent. It is a POST, so repeating it is not free, but nobody should have to approve a search.
+
+Every acting step carries a postcondition, because the executor races that postcondition against the outcome detectors and needs both sides of the race to exist.
 
 ## 7. What the schema deliberately does not have
 
@@ -328,3 +376,6 @@ Replay checks `schemaVersion` for engine compatibility and refuses to run an art
 * **Embedded credentials or a login flow.** Authentication is a session concern handled by the `SessionBroker` before replay starts.
 * **The model transcript.** It lives in evidence, referenced by `discoveryRunId`.
 * **Timing data from the recording.** Record time durations are a property of that machine on that day. Waits are conditions, never replayed durations.
+* **Operational state.** Replay counts, drift and `needs_review` live in the state sidecar. A versioned artifact that rewrites itself on every run is not versioned.
+* **A visual locator strategy.** Cut by ADR 0013. Nothing in this system would ever execute one, and a schema field nothing executes is a guess dressed as a design.
+* **An origin or a host.** Those come from the tenant binding. An artifact carrying one institution host cannot be reused by another institution, which is the whole point of the artifact.

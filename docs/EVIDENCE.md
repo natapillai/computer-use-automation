@@ -20,13 +20,16 @@ evidence/
         step-00-initial.png
         step-00-initial.a11y.json
         ...
+  review/
+    <runId>/                             the negative probe run that declared MEMBER_NOT_FOUND
+      artifact.diff.json                 1.0.0 to 1.1.0, the outcome that was added
   replay/
     success/<runId>/
     businessOutcome/<runId>/             MEMBER_NOT_FOUND
     escalated/<runId>/                   surpriseDialog, includes the handoff
       intervention.json
       humanActions.jsonl
-  crossTenant/                           optional, P9-T03
+  crossTenant/                           optional, S6-T05
     withoutOverlay/<runId>/              fails with LocatorNotFound
     withOverlay/<runId>/                 succeeds
 ```
@@ -73,6 +76,7 @@ type TraceEvent =
   | { t: 'authorization'; at: string; action: string; verdict: Verdict; rule?: string; reason?: string }
   | { t: 'resolution'; at: string; stepId: string; attempts: LocatorAttempt[]; winner?: string; degraded: boolean }
   | { t: 'action'; at: string; stepId: string; kind: string; ok: boolean; durationMs: number }
+  | { t: 'derivation'; at: string; stepId: string; bundle: LocatorBundle; dropped: DroppedStrategy[]; neighbourhood: UINode }
   | { t: 'checkpoint'; at: string; stepId: string; passed: boolean; expected: string; observed: string }
   | { t: 'condition'; at: string; matcher: string; classification: string; code: string }
   | { t: 'recovery'; at: string; condition: string; strategy: string; attempt: number; resolved: boolean }
@@ -89,12 +93,14 @@ Two properties make this useful rather than decorative.
 
 `authorization` events are emitted for allow verdicts too, not only denials. An audit trail that only records refusals cannot answer "what was this automation permitted to do against that member account".
 
+`derivation` events carry the acted element and its redacted neighbourhood, which is what makes re deriving a better locator bundle from an old trace a real capability. ADR 0004 claimed that was possible while the capture policy stored only a hash on a successful step, so the claim was false. Storing the neighbourhood rather than the whole tree keeps the trace small and keeps the claim true. `dropped` records the strategies that failed their own record time check, which is the other half of the diagnosis when a bundle turns out to be thin.
+
 ## 4. Capture policy
 
 | Moment | Screenshot | Accessibility snapshot |
 | --- | --- | --- |
 | Run start | yes | yes |
-| Before an `irreversible` action | yes | yes |
+| Before a `write` action | yes | yes |
 | Checkpoint failure | yes | yes |
 | Any failure | yes | yes |
 | Any escalation | yes | yes |
@@ -112,7 +118,8 @@ Evidence is committed to a public GitHub repository. It receives the strictest t
 * Accessibility snapshots pass through the object redactor.
 * The model transcript passes through the redactor before it is written, and again the assistant turns are checked, because a model can echo a value back.
 * URLs are redacted for path segments bound to sensitive inputs. `/member/10001` becomes `/member/{{memberId}}`.
-* P8-T08 is a permanent test in the suite, not a pre commit script. It walks everything under `evidence/` and fails the build on a pattern match. Running it as a one off script means it stops running the day someone forgets.
+* S6-T07 is a permanent test in the suite, not a pre commit script. It walks `evidence/`, `capabilities/` and `tests/fixtures/cassettes/`, and fails the build on a hit. Running it as a one off script means it stops running the day someone forgets.
+* It searches for seeded canaries as well as the redaction patterns. The seed member names, the seed balances, the member IDs and a Luhn valid card number planted in the fixture. A scanner that only knows the redactor's own patterns can only find what the redactor would already have caught, which makes it close to a tautology. Canaries are what turn it into a test of whether every sink actually went through the redactor.
 
 Because the target app is a fixture with obviously synthetic data there is no real PII at risk. We redact anyway. The mechanism is what is being demonstrated, and a reviewer checking whether redaction actually runs will look here first.
 

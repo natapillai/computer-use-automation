@@ -32,7 +32,7 @@ Every one of these exists because it breaks a naive automation approach.
 * **Table layout.** Forms are laid out in nested `<table>` elements. Labels are `<td>` siblings, not `<label for>`. This is what makes `anchor-relative` locators necessary.
 * **No test IDs.** None. Anywhere.
 * **Generated IDs.** Element IDs look like `ctl00_cph_txt_7f3a2` and change per server restart, so an artifact that captured one will break. This is deliberate, and our locator strategy must rank them low.
-* **Non semantic controls.** At least one control is a `<td onclick>` styled as a button, with no role and no accessible name. It carries `title` and inner text only. This is the case where the accessibility tree degrades and we have to fall back, which makes the fallback ladder honest instead of decorative.
+* **Non semantic controls.** At least one control is a `<td onclick>` styled as a button, with no role and no accessible name. It carries inner text only. A `title` attribute would defeat the point, because Chromium feeds `title` into the accessible name computation, so the control would quietly become nameable and the fallback would never be exercised. Its test asserts what is actually true of the accessible name rather than what the document wishes were true. This is the case where the accessibility tree degrades and we have to fall back, which makes the ladder honest instead of decorative.
 * **Server rendered with full page reloads.** No SPA routing. Navigation is real.
 * **Inconsistent casing and whitespace** in labels, because real legacy apps have `Member  ID:` with two spaces.
 
@@ -62,21 +62,21 @@ GET  /__control__/state         inspect state, test only
 
 ## 5. Fault injection
 
-Armed by query parameter for one off use or by `POST /__control__/fault` for persistent arming.
+Armed through `POST /__control__/fault`, always with a route scope and a count. Query parameter arming is gone. Replay controls its own URLs, so a fault that can only be armed by appending a parameter is unreachable from the code path it is supposed to test, and a fault that fires on an unspecified first request is a coin toss rather than a test.
 
 | Fault | Behaviour | Exercises |
 | --- | --- | --- |
-| `slow` | 3 to 6 second response delay | Condition based waiting |
-| `flaky503` | 503 on the first request, succeeds after | `TransientLoad` recovery and retry |
-| `hang` | Never responds | `Timeout` failure with a named condition |
+| `slow` | Fixed configurable delay, default 2000ms, under the step timeout | Condition based waiting |
+| `flaky503` | 503 for N requests on the scoped route, then success | `TransientLoad` recovery and retry |
+| `hang` | Never responds, and the held response is released by `/__control__/reset` | `Timeout` failure with a named condition |
 | `500` | Application error page | `SurfaceUnavailable` |
 | `denied` | Permission denied panel on member detail | `ACCOUNT_RESTRICTED` business outcome |
 | `interstitial` | A known "System maintenance tonight" overlay with a dismiss button | `KnownInterstitial` recovery |
-| `surpriseDialog` | An undeclared modal with two ambiguous buttons | Escalation, must not be clicked through |
+| `surpriseDialog` | An undeclared HTML modal with two ambiguous buttons | Escalation, must not be clicked through |
 | `expireSession` | Clears the session, next request redirects to login | `SessionExpired` and re auth |
 | `validation` | Sub account form rejects with a field level error | Validation error as a typed business outcome |
 | `duplicateIds` | Search returns two members with the same displayed ID | `LocatorAmbiguous` |
-| `relabel` | Renames `Member ID` to `Account Holder ID` | Locator drift and fallback ladder |
+| `relabel` | Renames `Member ID` to `Account Holder ID` | Locator drift and fallback ladder. The drift row of the result matrix depends on this one, so it is not cuttable |
 
 ## 6. Seed data
 
@@ -110,9 +110,9 @@ Differences in `borealis`.
 * The savings balance sits in a different column of the accounts table.
 * An extra confirmation interstitial appears after login.
 
-Selected by `Host` header or by a `?tenant=` parameter. Same routes, same engine, different rendering. That is exactly the real situation the brief describes, hundreds of tenants running the same vendor product configured differently.
+Selected by `Host` header, with `acme.localhost:4010` and `borealis.localhost:4010` both listed in the allowlist so tenant selection never needs a policy exception. Same routes, same engine, different rendering. That is exactly the real situation the brief describes, hundreds of tenants running the same vendor product configured differently.
 
-The demonstration is that an artifact recorded on `acme` replays on `borealis` with a sparse overlay of three locator overrides, rather than being re recorded. Without the overlay it fails with `LocatorNotFound` and names every strategy it tried, which is the honest failure mode and also good evidence.
+The demonstration is that an artifact recorded on `acme` replays on `borealis` with a sparse overlay, rather than being re recorded. The overlay rebinds the member ID locator and the balance output, and declares the post login interstitial as an `onCondition` rule. Rebinding an output is the case ADR 0007 forbade and ADR 0015 permits, and it is the most common real difference between two tenants on one product. Without the overlay it fails with `LocatorNotFound` and names every strategy it tried, which is the honest failure mode and also good evidence.
 
 ## 8. Constraints on building it
 

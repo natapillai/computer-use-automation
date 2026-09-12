@@ -120,7 +120,7 @@ For every task in `docs/PLAN.md`:
 4. Write the smallest implementation that passes.
 5. Refactor with the test green.
 6. Run `npm run test` and `npm run typecheck`.
-7. Tick the box in `docs/PLAN.md`, update `PROGRESS.md`, commit with the task ID in the message, for example `P2-T04 derive locator bundles from AX nodes`.
+7. Tick the box in `docs/PLAN.md`, update `PROGRESS.md`, commit with the task ID in the message, for example `S1-T02 derive locator bundles from AX nodes`.
 
 If a task turns out to be wrong or underspecified, do not silently improvise. Update `docs/PLAN.md`, note it in `PROGRESS.md`, and write an ADR if it changes a design decision.
 
@@ -192,7 +192,7 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Rules
 
 * All five sections are always present. `Metrics` saying `none` is correct. `Metrics` being absent is not, because then a reader cannot tell whether it was considered.
-* The subject starts with the task ID from `docs/PLAN.md`, for example `P5-T06`. Chores with no task ID use `CHORE`.
+* The subject starts with the task ID from `docs/PLAN.md`, for example `S3-T05`. Chores with no task ID use `CHORE`.
 * The subject is imperative mood. `add locator ambiguity rejection`, not `added` or `adds`.
 * One task per commit. If the body has to describe two unrelated things, it is two commits.
 * `Tests` names actual files. `added tests` is not an entry. `src/core/locator/resolve.test.ts covers ambiguity rejection under the unique match policy` is.
@@ -202,7 +202,7 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Example
 
 ```
-P5-T06 add bounded recovery handlers for transient and interstitial conditions
+S3-T05 add bounded recovery handlers for transient and interstitial conditions
 
 Issue
 Replay treated a 503 and a known maintenance overlay as hard failures. Both are
@@ -219,9 +219,9 @@ bounded and every invocation is appended to result.recoveries.
 Why
 The brief separates recoverable conditions from hard failures, and a replay that
 cannot absorb a transient load is not usable in production. Retries are restricted
-to steps marked safe, because retrying a submit risks a double post. The rejected
-alternative was a blanket retry on any failed step, which is simpler but would make
-an irreversible action unsafe.
+to steps declared idempotent, because retrying a submit risks a double post. The
+rejected alternative was a blanket retry on any failed step, which is simpler but
+would make a write unsafe.
 
 Tests
 src/replay/recovery/transient.test.ts asserts backoff timing and the three attempt
