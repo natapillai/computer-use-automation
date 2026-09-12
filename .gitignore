@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+.env
+.env.local
+!.env.example
+evidence/tmp/
+playwright-report/
+test-results/
+*.log
+.DS_Store
+Thumbs.db
+
+# The brief is interface.ai's material and this repository is public.
+# Kept on disk, never committed. See CLAUDE.md section 1.
+docs/ASSIGNMENT.md
