@@ -193,7 +193,7 @@ There is a lint rule refusing the raw timer globals in `core`, `replay`, `discov
 
 ## 8. Test matrix
 
-Every row is an integration test against the local target app using its fault injection, owned by task S3-T09 in `docs/PLAN.md`. Faults are armed through `POST /__control__/fault` with a route scope and a count, not by a query parameter, because replay controls its own URLs and a fault that fires on an unspecified first request is not a test, it is a coin toss.
+Every row is an integration test against the local target app using its fault injection, owned by task S4-T12 in `docs/PLAN.md`, with the four write flow rows owned by S6-T13. Faults are armed through `POST /__control__/fault` with a route scope and a count, not by a query parameter, because replay controls its own URLs and a fault that fires on an unspecified first request is not a test, it is a coin toss.
 
 | Scenario | Injection | Expected result |
 | --- | --- | --- |
@@ -216,6 +216,6 @@ Every row is an integration test against the local target app using its fault in
 | Write, no double post | `flaky503` scoped to the submit route | the submit is never repeated. The postcondition is re evaluated and the run resolves from what actually happened |
 | Write, validation | `validation` | `business_outcome` with the field message captured as structured data |
 
-Two rows live outside this task. `LocatorNotFound` with every attempted strategy listed comes from replaying the base artifact against the second tenant with no overlay, which is S6-T05, and that task is on the cut list. If it is cut, the class is still covered by a unit test and the report says so.
+Two rows live outside this task. `LocatorNotFound` with every attempted strategy listed comes from replaying the base artifact against the second tenant with no overlay, which is S7-T06, and that task is explicitly cuttable. If it is cut, the class is still covered by a unit test and the report says so.
 
 Three runs are committed to `/evidence/`. The success, because it is the thread. `MEMBER_NOT_FOUND`, because it proves the business outcome split, which the brief calls the most common design mistake. And `surpriseDialog`, because it proves the system stops rather than clicking through something it does not understand, and because the committed run carries the full handoff with it.
