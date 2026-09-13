@@ -2,7 +2,7 @@
 description: Record a new architecture decision
 ---
 
-Record a decision in `docs/DECISIONS.md`.
+Record a decision in `docs/DECISIONS.md`, but only if it supersedes an existing ADR or changes an answer in `REPORT.md`. Anything smaller goes in the commit body.
 
 1. Read the existing ADRs first. If this decision contradicts one, the new ADR supersedes it and you must mark the old one `Superseded by ADR NNNN`. Do not leave two live ADRs that disagree.
 2. Use the template at the bottom of `docs/DECISIONS.md`. Context, decision, consequences, rejected alternatives.

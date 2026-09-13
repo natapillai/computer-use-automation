@@ -26,13 +26,14 @@ That file is gitignored and stays local. The brief is interface.ai material and 
 These are not preferences. Violating any of them is a defect.
 
 1. **Test driven development.** No production code is written before a failing test exists for it. Red, green, refactor, one behaviour at a time. The full rules are in `docs/TESTING.md`. If you are about to write an implementation file and no test currently fails because of its absence, stop and write the test.
-2. **The plan is the checklist.** `docs/PLAN.md` holds every task with a stable ID and acceptance criteria. `PROGRESS.md` holds current state. You tick boxes only when the acceptance criteria are met and the suite is green. You update `PROGRESS.md` before ending any session or any time you complete a task.
+2. **The plan is the checklist.** `docs/PLAN.md` holds every task with a stable ID and acceptance criteria. `PROGRESS.md` holds current state. You tick boxes only when the acceptance criteria are met and the suite is green. Boxes tick per task. `PROGRESS.md` updates once per slice, when the slice closes or its forecast changes.
 3. **Policy is a single choke point.** Every action reaching a surface passes through `PolicyEngine.authorize()`. The agent loop never calls a surface driver directly. Fail closed.
 4. **No secrets, no raw PII.** Nothing sensitive is written to artifacts, logs, evidence, screenshots, or model prompts. Redaction happens at the sink, not at the call site. See `docs/SAFETY.md`.
 5. **Locators are derived, never invented.** The model selects an element by reference. The recorder derives the locator bundle from the real element. The model never writes a CSS selector.
 6. **Business outcomes are not failures.** "No such member" is a legitimate typed result. Conflating the two is the single most penalised mistake in this brief. See `docs/ERROR_TAXONOMY.md`.
 7. **Deterministic tests.** No network in unit or integration tests. No real model calls in CI. No `sleep` based waits anywhere, in tests or in production code.
-8. **Decisions get recorded.** Any choice not already covered in `docs/DECISIONS.md` gets a new ADR before the code lands.
+8. **Decisions get recorded, in proportion.** A new ADR only when a decision supersedes an existing ADR or changes an answer in `REPORT.md`. Anything smaller is recorded in the commit body.
+9. **Never read or print credential files.** Not `.npmrc`, `.env`, cloud credentials or key files, not even to check one setting. Use targeted commands such as `npm config get strict-ssl` that return a single value.
 
 ## 3. Stack
 
@@ -80,9 +81,8 @@ src/
   control/             session broker, control tokens, control state machine
   escalation/          intervention store, operator HTTP API, mock console
   evidence/            structured logger, artifact store, screenshot store
-  catalog/             capability catalog and invoke surface
-  cli/                 discover, replay, serve, catalog commands
-apps/target/           the local legacy banking app plus tenant variants
+  cli/                 discover, review and replay commands
+apps/target/           the local legacy banking app, one tenant
 tests/
   contract/            one suite run against every SurfaceDriver implementation
   integration/         replay and escalation against the real local app
@@ -97,17 +97,15 @@ Unit tests are colocated as `*.test.ts` beside the file they cover. Everything e
 Each script lands in `package.json` with the task that makes it work, as listed in S0-T01, and stays working from then on. A script defined before it works is a broken script.
 
 ```
-npm run test            vitest, unit and contract, the fast loop
-npm run test:watch      the TDD loop
+npm run test              vitest, unit and contract, the fast loop
+npm run test:watch        the TDD loop
 npm run test:integration  needs the target app, starts it automatically
-npm run test:e2e        full thread with the recorded model transcript
-npm run test:all        everything plus coverage gates
-npm run typecheck       tsc --noEmit
-npm run lint            eslint
-npm run target          start the local banking app on :4010
-npm run discover        CLI, real model, writes a capability and evidence
-npm run replay          CLI, deterministic, takes an artifact plus inputs
-npm run serve           operator console and capability API on :4020
+npm run test:e2e          full thread with the recorded model transcript
+npm run typecheck         tsc --noEmit
+npm run target            start the local banking app on :4010
+npm run discover          CLI, real model, writes a capability and evidence
+npm run review            CLI, negative probe review and approval
+npm run replay            CLI, deterministic, hosts the operator console on :4020 while it runs
 ```
 
 ## 6. The working loop
@@ -120,7 +118,7 @@ For every task in `docs/PLAN.md`:
 4. Write the smallest implementation that passes.
 5. Refactor with the test green.
 6. Run `npm run test` and `npm run typecheck`.
-7. Tick the box in `docs/PLAN.md`, update `PROGRESS.md`, commit with the task ID in the message, for example `S5-T05 derive locator bundles from AX nodes`.
+7. Tick the box in `docs/PLAN.md` and commit with the task ID in the message, for example `S4-T05 derive locator bundles from AX nodes`. Update `PROGRESS.md` when the slice closes.
 
 If a task turns out to be wrong or underspecified, do not silently improvise. Update `docs/PLAN.md`, note it in `PROGRESS.md`, and write an ADR if it changes a design decision.
 
@@ -130,7 +128,7 @@ If a task turns out to be wrong or underspecified, do not silently improvise. Up
 * Types are explicit at module boundaries. No `any`. No unchecked casts.
 * Errors are typed values in the result contract, not thrown strings.
 * Anything user facing or persisted has passed through the redactor.
-* `docs/PLAN.md` and `PROGRESS.md` reflect reality.
+* `docs/PLAN.md` reflects reality. `PROGRESS.md` does at the end of each slice.
 
 ## 8. Definition of done, whole project
 
@@ -168,7 +166,7 @@ Never add an AI attribution trailer to a commit. No `Co-Authored-By: Claude`, no
 
 ### Format
 
-Every commit uses this structure. The subject line, then a blank line, then five named sections in this order.
+A commit that introduces a design decision, a new mechanism, or a safety property uses the full structure below. Every other commit is a subject line, a one line `Change`, and a `Tests` line naming the files. The full structure is the subject line, then a blank line, then five named sections in this order.
 
 ```
 <TASK-ID> <imperative summary, under 72 characters>
@@ -191,8 +189,8 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 
 ### Rules
 
-* All five sections are always present. `Metrics` saying `none` is correct. `Metrics` being absent is not, because then a reader cannot tell whether it was considered.
-* The subject starts with the task ID from `docs/PLAN.md`, for example `S4-T07`. Chores with no task ID use `CHORE`.
+* When the full structure applies, all five sections are present. `Metrics` saying `none` is correct. `Metrics` being absent is not, because then a reader cannot tell whether it was considered.
+* The subject starts with the task ID from `docs/PLAN.md`, for example `S6-T02`. Chores with no task ID use `CHORE`.
 * The subject is imperative mood. `add locator ambiguity rejection`, not `added` or `adds`.
 * One task per commit. If the body has to describe two unrelated things, it is two commits.
 * `Tests` names actual files. `added tests` is not an entry. `src/core/locator/resolve.test.ts covers ambiguity rejection under the unique match policy` is.
@@ -202,7 +200,7 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Example
 
 ```
-S4-T07 add bounded recovery handlers for transient and interstitial conditions
+S6-T02 add bounded recovery handlers for transient and interstitial conditions
 
 Issue
 Replay treated a 503 and a known maintenance overlay as hard failures. Both are

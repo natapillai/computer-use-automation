@@ -9,8 +9,8 @@ Close out the current task.
 3. Confirm the definition of done in `CLAUDE.md` section 7. Typed boundaries, no `any`, errors as typed values, redaction on anything persisted.
 4. Check any document you touched for em dashes and en dashes, per `CLAUDE.md` section 10. Fix anything you find.
 5. Tick the task box in `docs/PLAN.md`.
-6. Update `PROGRESS.md`. The four header fields, the phase table if the phase status changed, and a session log entry.
+6. If this task closes a slice, update `PROGRESS.md`. Otherwise leave it.
 7. If anything was cut or deferred, record it in `PROGRESS.md` under Deferred and cut, with a reason.
-8. Write the commit message using the exact five section format in `CLAUDE.md` section 11. Issue, Change, Why, Tests, Metrics. All five present. `Metrics` says `none` when there are none. No AI attribution trailer of any kind.
+8. Write the commit message per `CLAUDE.md` section 11. The five section form only for a design decision, a new mechanism, or a safety property. Otherwise a subject, a one line Change, and a Tests line. No AI attribution trailer of any kind.
 
 Report in five lines or fewer. What got done, what the tests prove, what is next.

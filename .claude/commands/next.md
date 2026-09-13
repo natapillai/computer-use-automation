@@ -12,4 +12,4 @@ Start the next task.
 6. Write the failing test first. Run it. Show me the failure and confirm it fails for the intended reason and not because of a missing import or a typo.
 7. Only then write the implementation.
 
-If the task is underspecified or turns out to be wrong, stop and say so. Update `docs/PLAN.md` and note it in `PROGRESS.md`. Write an ADR if it changes a design decision. Do not silently improvise.
+If the task is underspecified or turns out to be wrong, stop and say so. Update `docs/PLAN.md`. Write an ADR only if it supersedes an existing one or changes an answer in `REPORT.md`. Do not silently improvise.

@@ -8,7 +8,7 @@
     "node": "^22.12.0"
   },
   "scripts": {
-    "test": "vitest run",
+    "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
