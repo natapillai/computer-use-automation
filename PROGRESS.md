@@ -4,8 +4,8 @@ Living state. Update this every time a task completes and before ending any sess
 
 **Last updated.** 2026-09-13
 **Current slice.** Slice 0, Foundation
-**Current task.** S0-T01
-**Suite status.** not yet running, no source code exists
+**Current task.** S0-T02
+**Suite status.** 4 tests passing across 2 files, typecheck clean
 **Blocked on.** nothing for S0-T01. A real deadline for the forecast, see Open questions
 
 ---
@@ -16,7 +16,7 @@ Ninety seven tasks, four gates, thirty six focused days through Slice 8 at an un
 
 | Slice | Scope | Tasks | Days | Status | Notes |
 | --- | --- | --- | --- | --- | --- |
-| S0 | Foundation | 4 | 1.5 | not started | S0-T04 is a go or no go on ADR 0012 against five named failures |
+| S0 | Foundation | 4 | 1.5 | in progress | S0-T04 is a go or no go on ADR 0012 against five named failures |
 | S1 | Thread, a real replay against the real app | 24 | 4 | not started | Gate Skeleton 1 at S1-T24, where the forecast is redone |
 | S2 | Live perception spike | 2 | 1 | not started | Gate Perception at S2-T01. Throwaway, lives in `scratch/`, never committed |
 | S3 | Harden, contract suite, lint, CI and guards, redaction, logging, evidence, scanner | 8 | 3 | not started | Nothing is committed before this slice. S3-T08 lifts the rule |
@@ -32,11 +32,11 @@ Ninety seven tasks, four gates, thirty six focused days through Slice 8 at an un
 Append one entry per working session. Newest first. Keep entries to a few lines.
 
 ### 2026-09-13
-Done: the pre Harden rule made enforceable in `.gitignore`. S0-T04 given five named failure conditions and a costed plan B. A full sweep of task ID references. A forecast in days.
-In flight: S0-T01.
-Decisions: no new ADRs. The evidence scanner moved into Harden as S3-T08. Task IDs are frozen from S0-T01 onward.
-Surprises: ADR 0012 cited retired S0-T08 for three commits, and retired S0-T08 was sensitivity propagation. The ID was live, so a dead ID grep would never have caught it. Three more live but wrong references sat in the CLAUDE.md commit examples. The recut also dropped two responsibilities with no owner, the coverage gates and the loopback guard, now in S3-T03. The forecast is thirty six days, which the brief's own framing does not accommodate.
-Next: S0-T01.
+Done: the pre Harden rule made enforceable in `.gitignore`. S0-T04 given five named failure conditions and a costed plan B. A full sweep of task ID references. A forecast in days. S0-T01, the scaffold, with a first test that guards task references and was proven against a planted dead reference.
+In flight: S0-T02.
+Decisions: no new ADRs. The toolchain is pinned in an ADR 0011 amendment, including a vite override that was found rather than chosen. The evidence scanner moved into Harden as S3-T08. Task IDs are frozen from S0-T01 onward.
+Surprises: ADR 0012 cited retired S0-T08 for three commits, and retired S0-T08 was sensitivity propagation. The ID was live, so a dead ID grep would never have caught it. Three more live but wrong references sat in the CLAUDE.md commit examples. The recut also dropped two responsibilities with no owner, the coverage gates and the loopback guard, now in S3-T03. The forecast is thirty six days, which the brief's own framing does not accommodate. npm 10.9.2 crashed installing Vitest 4.1.11, because Vite 8 declares a devtools peer whose wildcard Vitest peer now resolves to Vitest 5.0.0. A vite override fixed it, and that failure depending on the calendar is why the lockfile is committed.
+Next: S0-T02, then S0-T03 and the S0-T04 spike.
 
 ### 2026-09-12
 Done: attribution enforced by a commit-msg hook and the existing commits rewritten clean. Slice 1 recut from forty seven tasks before the first replay to twenty eight.

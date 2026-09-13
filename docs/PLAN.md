@@ -85,7 +85,7 @@ It is enforced rather than remembered. `.gitignore` excludes `/evidence/`, `/cap
 
 Four tasks. Everything else that used to be here waits until something needs it.
 
-* [ ] **S0-T01** Repo skeleton, `package.json`, TypeScript strict, ESM, Node 22, Vitest, and a first test that guards the plan's cross references.
+* [x] **S0-T01** Repo skeleton, `package.json`, TypeScript strict, ESM, Node 22, Vitest, and a first test that guards the plan's cross references.
   * Accept: `npm run typecheck` and `npm run test` both pass. The tree matches `CLAUDE.md` section 4, including `src/core/surfaceModel` and `profiles/`, except `evidence/` and `capabilities/`, which the pre Harden rule keeps out of git until S3-T08. The runner and the skeleton are one task because the first red green cycle needs both.
   * Accept: the first test is not a trivial one. It fails when any document references a task ID that `docs/PLAN.md` does not define. An ID written as `retired` followed by the ID is a deliberate historical reference and is exempt, so correcting the record never breaks the check. It cannot catch a live ID that has come to mean a different task, which is the failure that actually happened in ADR 0012, and the ID freeze in the plan header is what prevents that one. A test that proves only that the runner works would be a wasted first test.
   * Accept: npm scripts land with the task that makes them work, never before. S0-T01 defines `test`, `test:watch` and `typecheck`. `target` lands with S1-T11, `test:integration` with S1-T24, `lint` with S3-T02, `test:all` with S3-T03, `replay` and `test:e2e` with S4-T13, `discover` with S5-T11, `review` with S5-T13, and `serve` with S6-T14. A script defined before it works is a broken script.

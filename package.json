@@ -1,0 +1,24 @@
+{
+  "name": "interface-ai-computer-use",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Computer use automation for back office banking applications with no API. Discovery, capability artifacts, deterministic replay, and human escalation.",
+  "type": "module",
+  "engines": {
+    "node": "^22.12.0"
+  },
+  "scripts": {
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "@types/node": "22.20.2",
+    "typescript": "6.0.3",
+    "vite": "7.3.6",
+    "vitest": "4.1.11"
+  },
+  "overrides": {
+    "vite": "7.3.6"
+  }
+}
