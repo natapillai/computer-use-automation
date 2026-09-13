@@ -14,3 +14,15 @@ Thumbs.db
 # The brief is interface.ai's material and this repository is public.
 # Kept on disk, never committed. See CLAUDE.md section 1.
 docs/ASSIGNMENT.md
+
+# Scratch space for anything worth keeping before it is safe to commit. Spike
+# scripts, spike output, transcripts. Never committed, at any point.
+scratch/
+
+# The pre Harden rule, enforced. Nothing produced by running code or a model is
+# committed before Slice 3 lands. S3-T08 removes these three lines in the same
+# commit that turns on the evidence scanner guarding the same paths.
+# See docs/PLAN.md, Nothing is committed before Harden.
+/evidence/
+/capabilities/
+tests/fixtures/cassettes/

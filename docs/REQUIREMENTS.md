@@ -32,7 +32,7 @@ Walk this end to end as task S8-T03 before declaring the project done. Any row w
 | 3.4a | Configurable allowlist, domains, routes, action types | S1-T10 | Policy table tests |
 | 3.4b | Agent cannot act outside the allowlist | S1-T17, S1-T18 | `GuardedSurface` test, import graph test, network layer refusal |
 | 3.4c | Safe versus risky, handled conservatively | S4-T01, S6-T11, S6-T13 | Effect and idempotency classification, confirm routed to intervention, an approved write running unattended |
-| 3.4d | Never persist secrets or raw sensitive data | S3-T04, S3-T05, S5-T10, S7-T09 | Redaction tests, writer refusal, permanent evidence scanner with canaries |
+| 3.4d | Never persist secrets or raw sensitive data | S3-T04, S3-T05, S5-T10, S3-T08 | Redaction tests, writer refusal, permanent evidence scanner with canaries |
 | 3.5a | Structured log of what the agent did and why | S3-T06, S5-T08 | Logger tests, `RunTrace` including intent and rationale |
 | 3.5b | A richer signal on failure | S3-T07 | Screenshot and snapshot on failure, manifest test |
 | 3.6a | Detect a stuck or blocked state | S6-T02 | One test per detector |
@@ -71,7 +71,7 @@ Weighted in the brief's stated order. This is where to spend remaining effort if
 | Robustness and error handling | S4-T04, S4-T05, S4-T12 | The matrix is the single best evidence of this. Build all of it |
 | Human in the loop escalation | Slice 6 | Explicitly called out as the thing candidates fake. Build S6-T07 for real |
 | Generalisation to the real environment | S7-T01, S7-T06, S7-T07, `REPORT.md` section 4 | Design alone scores here. S7-T06 converts it to demonstrated and is the first thing cut |
-| Safety and data handling | S1-T10, S4-T01, S3-T04, S7-T09 | The permanent evidence scanner is cheap and highly visible |
+| Safety and data handling | S1-T10, S4-T01, S3-T04, S3-T08 | The permanent evidence scanner is cheap and highly visible |
 | Code quality | Whole project, TDD discipline | Coverage gates and the contract suite carry this |
 | Communication | `REPORT.md` | One to three pages. A long report scores worse, not better |
 

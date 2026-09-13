@@ -162,6 +162,8 @@ Format is deliberately short. Context, decision, consequences, alternatives reje
 
 **Rejected.** Node 20, end of life. Fastify for the fixture too, which works but loses the signal that the target is a legacy stack. Express for our own services, which has weaker schema integration than Fastify with Zod.
 
+**Amendment, 2026-09-13. Toolchain versions, pinned exactly before the first line of code.** TypeScript 6.0.3, Vitest 4.1.11 and `@types/node` 22.20.2, written as exact versions in `package.json` with no caret ranges. The newest majors were rejected on evidence rather than caution. TypeScript 7.0.2, the native compiler, sits outside the range typescript-eslint 8.70.0 declares as supported, which stops below 6.1, so choosing it would break S3-T02 before Harden starts. Vitest 5.0.0 was ten days old when this was decided, and a reviewer running a clean clone should not be the first person to find a defect in a new major of the test runner. The cost is that both majors are adopted later as a deliberate upgrade with its own commit rather than for free now. Zod is pinned when it lands at S1-T03.
+
 ---
 
 ## ADR 0012. Perception is the accessibility tree plus geometry plus derived labels
@@ -175,6 +177,8 @@ Format is deliberately short. Context, decision, consequences, alternatives reje
 **Consequences.** `UINode` carries geometry, which is what makes the locator model portable, because UI Automation exposes bounding rectangles too. Derived labels mean the model sees a textbox next to the text "Member ID" instead of an anonymous field, which is the difference between a discovery run that works and one that guesses. The cost is that geometry is viewport dependent, so it is only ever used for relations between nodes and never as an absolute coordinate to click.
 
 **Rejected.** The ARIA snapshot alone, which loses both names and rows on exactly this surface. DOM plus CSS selectors, which is the brittleness the brief warns about. Screenshot plus coordinates, which is viewport dependent, expensive in tokens, and does not survive a font change.
+
+**Amendment, 2026-09-13.** The pass criteria, five named failures and a costed alternative now live in S0-T04. A failure there stops the plan for a design decision and is not worked around. Separately, a correction to the record. From the commit that recorded this ADR until the Slice 1 recut, the decision above cited retired S0-T08, which was sensitivity propagation, while the spike was retired S0-T10. The recut corrected it without saying so. A dead ID check could not have caught it because the ID was live, which is why task IDs are frozen from S0-T01 onward.
 
 ---
 

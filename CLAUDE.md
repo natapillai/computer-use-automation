@@ -94,7 +94,7 @@ Unit tests are colocated as `*.test.ts` beside the file they cover. Everything e
 
 ## 5. Commands
 
-Define these in `package.json` in Phase 0 and keep them working.
+Each script lands in `package.json` with the task that makes it work, as listed in S0-T01, and stays working from then on. A script defined before it works is a broken script.
 
 ```
 npm run test            vitest, unit and contract, the fast loop
@@ -120,7 +120,7 @@ For every task in `docs/PLAN.md`:
 4. Write the smallest implementation that passes.
 5. Refactor with the test green.
 6. Run `npm run test` and `npm run typecheck`.
-7. Tick the box in `docs/PLAN.md`, update `PROGRESS.md`, commit with the task ID in the message, for example `S1-T02 derive locator bundles from AX nodes`.
+7. Tick the box in `docs/PLAN.md`, update `PROGRESS.md`, commit with the task ID in the message, for example `S5-T05 derive locator bundles from AX nodes`.
 
 If a task turns out to be wrong or underspecified, do not silently improvise. Update `docs/PLAN.md`, note it in `PROGRESS.md`, and write an ADR if it changes a design decision.
 
@@ -192,7 +192,7 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Rules
 
 * All five sections are always present. `Metrics` saying `none` is correct. `Metrics` being absent is not, because then a reader cannot tell whether it was considered.
-* The subject starts with the task ID from `docs/PLAN.md`, for example `S3-T05`. Chores with no task ID use `CHORE`.
+* The subject starts with the task ID from `docs/PLAN.md`, for example `S4-T07`. Chores with no task ID use `CHORE`.
 * The subject is imperative mood. `add locator ambiguity rejection`, not `added` or `adds`.
 * One task per commit. If the body has to describe two unrelated things, it is two commits.
 * `Tests` names actual files. `added tests` is not an entry. `src/core/locator/resolve.test.ts covers ambiguity rejection under the unique match policy` is.
@@ -202,7 +202,7 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Example
 
 ```
-S3-T05 add bounded recovery handlers for transient and interstitial conditions
+S4-T07 add bounded recovery handlers for transient and interstitial conditions
 
 Issue
 Replay treated a 503 and a known maintenance overlay as hard failures. Both are

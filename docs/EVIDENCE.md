@@ -118,7 +118,7 @@ Evidence is committed to a public GitHub repository. It receives the strictest t
 * Accessibility snapshots pass through the object redactor.
 * The model transcript passes through the redactor before it is written, and again the assistant turns are checked, because a model can echo a value back.
 * URLs are redacted for path segments bound to sensitive inputs. `/member/10001` becomes `/member/{{memberId}}`.
-* S7-T09 is a permanent test in the suite, not a pre commit script. It walks `evidence/`, `capabilities/` and `tests/fixtures/cassettes/`, and fails the build on a hit. Running it as a one off script means it stops running the day someone forgets.
+* S3-T08 is a permanent test in the suite, not a pre commit script. It walks `evidence/`, `capabilities/` and `tests/fixtures/cassettes/`, and fails the build on a hit. Running it as a one off script means it stops running the day someone forgets.
 * It searches for seeded canaries as well as the redaction patterns. The seed member names, the seed balances, the member IDs and a Luhn valid card number planted in the fixture. A scanner that only knows the redactor's own patterns can only find what the redactor would already have caught, which makes it close to a tautology. Canaries are what turn it into a test of whether every sink actually went through the redactor.
 
 Because the target app is a fixture with obviously synthetic data there is no real PII at risk. We redact anyway. The mechanism is what is being demonstrated, and a reviewer checking whether redaction actually runs will look here first.

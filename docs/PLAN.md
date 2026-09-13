@@ -4,6 +4,8 @@ This is the single source of truth for what is left to build. Tick a box only wh
 
 Task IDs are stable. Use them in commit messages, for example `S1-T15 implement FakeSurfaceDriver`.
 
+From S0-T01 onward, task IDs never change. The plan was renumbered twice before any work started, which is the only time renumbering is free. From here a task that moves keeps its ID, and a task that is removed stays in place, struck through, with a pointer to where its work went. The test in S0-T01 catches a reference to an ID that does not exist. It cannot catch a live ID that has come to mean a different task, which is exactly what happened to ADR 0012, and the freeze is what prevents that.
+
 ## How this plan is sliced
 
 The brief asks for a complete vertical slice touching every core requirement and warns against a polished subset. Two earlier versions of this plan failed that test. The first was ordered by layer and reached its first working replay at task forty six. The second called itself sliced and reached the same point at task forty seven, which was a rename rather than a reslice.
@@ -21,10 +23,30 @@ Two risks drive the order.
 | --- | --- | --- | --- |
 | Skeleton 1 | S1-T24 | 28 from the start | A hand authored artifact replays against the running app and returns a typed money output |
 | Perception | S2-T01 | 1 | A real model drives this surface from our observation format |
-| Skeleton 2 | S5-T15 | 36 | Goal to live discovery to reviewed artifact to replay, including a business outcome |
+| Skeleton 2 | S5-T15 | 37 | Goal to live discovery to reviewed artifact to replay, including a business outcome |
 | Skeleton 3 | S6-T15 | 15 | A human takes the live session, acts, hands back, and the run completes |
 
 Twenty eight to Gate 1 is the floor, not a target I stopped short of. The count is granularity rather than scope. Nine of the twenty eight are under an hour each, and the section below lists what was considered for removal and why it stayed.
+
+### Forecast
+
+Days are focused working days of six hands on hours, and exclude review time between gates. No task has run yet, so there is no measured pace behind a single number here. S1-T24 re-forecasts every remaining slice from the hours Slices 0 and 1 actually took.
+
+| Slice | Days | Cumulative | Gate |
+| --- | --- | --- | --- |
+| S0 Foundation | 1.5 | 1.5 | |
+| S1 Thread | 4 | 5.5 | Skeleton 1 |
+| S2 Live perception spike | 1 | 6.5 | Perception |
+| S3 Harden | 3 | 9.5 | |
+| S4 Errors | 5.5 | 15 | |
+| S5 Discovery | 7.5 | 22.5 | Skeleton 2 |
+| S6 Escalation | 7.5 | 30 | Skeleton 3 |
+| S7 Deepen | 3.5 | 33.5 | |
+| S8 Deliverables | 2.5 | 36 | |
+| S9 Stretch | 0.5 | 36.5 | conditional |
+
+The mandatory tail from the stopping rule is three of those days. The variance sits in three tasks, S1-T16 the web driver, S5-T12 the live run, and S6-T07 CDP forwarding, where integration debugging rather than writing speed sets the pace.
+
 
 ### What Slice 1 does not contain, and where it went
 
@@ -36,7 +58,7 @@ Twenty eight to Gate 1 is the floor, not a target I stopped short of. The count 
 | Tenant binding | S7-T04 | One tenant until the second one exists. The base URL comes from env config |
 | Locator derivation and its record time check | S5-T05, S5-T06 | Derivation serves the recorder. A hand authored bundle needs resolution, not derivation |
 | Input validation | S4-T02 | Its failure class belongs with the taxonomy that tests it |
-| Redaction, logging, evidence | Slice 3 | Nothing is persisted before Slice 3, so there is nothing to leak. Stated again in the time pressure protocol |
+| Redaction, logging, evidence | Slice 3 | Nothing is committed before Slice 3, and that is a rule with enforcement rather than an observation. See Nothing is committed before Harden |
 | The `SurfaceDriver` contract suite | S3-T01 | It proves two drivers agree. Until both exist and the thread runs, it compares one thing to itself |
 | Lint, Prettier and CI | S3-T02, S3-T03 | The raw timer ban first bites when backoff arrives in Slice 4 |
 
@@ -46,7 +68,16 @@ The slice boundaries are real. Stopping after Slice 6 leaves a system that answe
 
 Stopping after Slice 6 also leaves three requirement rows short. 3.2h needs S7-T08, because that is where an artifact becomes mechanically readable by a calling agent. 3.7b and 3.7c are the two the brief explicitly says may be designed rather than built, so S7-T01 and S7-T03 answer them in code and the report answers the rest.
 
-So wherever work stops, four things always run before submitting. Slice 8 in full, S7-T07 the desktop stub, S7-T08 the generated schema, and S7-T09 the evidence scanner. Budget two days for them and do not discover that on the last day.
+So wherever work stops, three things always run before submitting. Slice 8 in full, S7-T07 the desktop stub, and S7-T08 the generated schema. The evidence scanner is no longer on this list because it moved into Harden at S3-T08, where it lands before anything can be committed. Budget three days for the tail. An earlier version of this rule said two, and the hour by hour estimate does not support it.
+
+### Nothing is committed before Harden
+
+A rule, not an observation. Until every task in Slice 3 is ticked, nothing produced by running code or a model is committed. That covers spike scripts and their output, model transcripts, screenshots, sample or generated artifacts, cassettes, and anything under `evidence/`. Anything worth keeping waits in `scratch/`, which is gitignored and stays gitignored for the life of the project.
+
+The line is between inputs and outputs. Source, tests, documents and hand authored fixtures are inputs, and each is committed as its task lands. That includes the S1-T19 fixture artifact and the synthetic seed data in `apps/target`. Both are written by a person, neither has a capture path that could pull in real data, and the fixture carries a template for every input value and no literal copied from a seed member row. If that boundary ever feels ambiguous for a specific file, the file waits.
+
+It is enforced rather than remembered. `.gitignore` excludes `/evidence/`, `/capabilities/` and `tests/fixtures/cassettes/` from now. S3-T08 removes those three exclusions in the same commit that turns on the scanner guarding the same paths, so they become committable at exactly the moment something checks them.
+
 
 ---
 
@@ -54,16 +85,35 @@ So wherever work stops, four things always run before submitting. Slice 8 in ful
 
 Four tasks. Everything else that used to be here waits until something needs it.
 
-* [ ] **S0-T01** Repo skeleton, `package.json`, TypeScript strict, ESM, Node 22, Vitest, one passing test.
-  * Accept: `npm run typecheck` and `npm run test` both pass. The tree matches `CLAUDE.md` section 4, including `src/core/surfaceModel` and `profiles/`. The runner and the skeleton are one task because the first red green cycle needs both, and a repository with no way to run a failing test cannot start.
+* [ ] **S0-T01** Repo skeleton, `package.json`, TypeScript strict, ESM, Node 22, Vitest, and a first test that guards the plan's cross references.
+  * Accept: `npm run typecheck` and `npm run test` both pass. The tree matches `CLAUDE.md` section 4, including `src/core/surfaceModel` and `profiles/`, except `evidence/` and `capabilities/`, which the pre Harden rule keeps out of git until S3-T08. The runner and the skeleton are one task because the first red green cycle needs both.
+  * Accept: the first test is not a trivial one. It fails when any document references a task ID that `docs/PLAN.md` does not define. An ID written as `retired` followed by the ID is a deliberate historical reference and is exempt, so correcting the record never breaks the check. It cannot catch a live ID that has come to mean a different task, which is the failure that actually happened in ADR 0012, and the ID freeze in the plan header is what prevents that one. A test that proves only that the runner works would be a wasted first test.
+  * Accept: npm scripts land with the task that makes them work, never before. S0-T01 defines `test`, `test:watch` and `typecheck`. `target` lands with S1-T11, `test:integration` with S1-T24, `lint` with S3-T02, `test:all` with S3-T03, `replay` and `test:e2e` with S4-T13, `discover` with S5-T11, `review` with S5-T13, and `serve` with S6-T14. A script defined before it works is a broken script.
+  * Test: unit, the reference check reports a planted dead ID in a fixture document and reports nothing for a fixture where every reference is defined. Repo level, the check passes over the committed documents.
+
 * [ ] **S0-T02** `Clock` and `IdProvider`, injected, with deterministic test implementations.
   * Accept: one `Clock` with `now()` and `delay(ms)`, not three overlapping abstractions. `delay` is the only sanctioned delay in the system and is controllable by fake timers.
   * Test: unit, a seeded provider yields the same IDs and timestamps across runs.
 * [ ] **S0-T03** Zod validated environment config and `.env.example`. No secret has a default.
   * Accept: the thread needs two values, the target base URL and the fixture credentials. `ANTHROPIC_MODEL` is declared here too so the model ID never lives in a document, per ADR 0011.
   * Test: unit, a missing required var fails fast with a named message.
-* [ ] **S0-T04** Perception spike, timeboxed to thirty minutes.
-  * Accept: a scratch script against a throwaway frameset file answers one question. Does the installed Playwright expose aria-ref locator resolution, as its MCP server uses. If yes, refs map to handles for free. If no, the driver uses CDP `Accessibility.getFullAXTree` per frame and resolves `backendDOMNodeId` through `DOM.resolveNode`. The answer is written into ADR 0012 as an amendment before S1-T16 starts. No production code lands from this task.
+* [ ] **S0-T04** Perception viability spike. Answers whether ADR 0012 survives the surface this project deliberately built to defeat it. Timeboxed to half a day, of which the first thirty minutes is the mechanism question already agreed.
+  * Accept, the surface. A throwaway replica in `scratch/spike/`, never committed, reproducing every hostile property S1-T11 will have. A `<frameset>` with `nav`, `content` and `status` `<frame>` elements. Inside `content`, a form laid out in nested `<table>` elements. A text input whose only label is a sibling `<td>` reading `Member  ID:` with two spaces, with no `<label for>`, no `aria-label`, no `title` and no `placeholder`. A second input one row below it with a different label, so a wrong row binding is detectable rather than invisible. A `<td onclick>` submit carrying inner text only. Generated element IDs.
+  * Accept, the mechanism. Does the installed Playwright expose aria-ref locator resolution, as its MCP server uses. If yes, use it. If no, CDP `Accessibility.getFullAXTree` per frame, `backendDOMNodeId` resolved through `DOM.resolveNode`, and geometry from `DOM.getBoxModel`.
+  * Accept, what unusable means. Five named failures, checked in order. Any one of them fails the spike.
+    * **F1, no node.** The unlabelled input does not appear in the accessibility tree at all, so there is no ref a model could choose.
+    * **F2, no handle.** A node appears but its ref cannot be resolved to an element inside the `content` frame that accepts a fill. The model could choose it and nothing could act on it.
+    * **F3, no label geometry.** The text `Member  ID:` is absent from the tree, or present without a bounding box, so `derivedLabel` has nothing to compute from. This is the case where Chromium has flattened the layout tables and geometry cannot recover the label.
+    * **F4, wrong label.** Geometry recovers a label, but the nearest text in the same row band is not `Member  ID:`, or the input one row below also claims it. This is the dangerous one, because it passes every smoke test and binds the wrong field.
+    * **F5, invisible control.** The `<td onclick>` submit yields no node carrying both its text and a box, so there is nothing to click by ref.
+  * Accept, what passing means. The input has a node, a handle that fills in the correct frame, a box, and a `derivedLabel` of `Member  ID:` that no other input shares, and the submit has a clickable node. The chosen mechanism and the observed result for each of F1 to F5 are written into ADR 0012 as an amendment.
+  * Accept, what happens on failure. Stop. Record which of F1 to F5 fired, with the raw output, in `PROGRESS.md`. Do not start Slice 1, do not patch around it, and raise it as a design decision. Plan B is a proposal to be decided, not a fallback to execute.
+  * Plan B, DOM primary perception with accessibility enrichment. The web driver builds `UINode` by walking each frame's DOM, takes role and name from the accessibility tree where they exist, and derives labels from table structure as well as geometry, meaning the text of the preceding cell in the same `<tr>`. The `UINode` contract in core does not change.
+    * **Supersedes** ADR 0012 with a new perception ADR. It weakens the answer to the brief's instruction to bias toward an approach that works without a clean DOM, because on the web the driver would be reading the DOM, and `REPORT.md` would have to say so plainly rather than claim accessibility first.
+    * **Reworks** nothing already built, because nothing is. At S0-T04 the cost is specification. S1-T16 roughly doubles, from about one day to about two. If F4 fired, `Relation` gains a structural variant, which widens S1-T01 and S1-T02 by about half a day between them.
+    * **Costs** about one and a half to two days if decided at S0-T04. The same failure discovered at S1-T16 or S2-T01 costs three to four, because S1-T01, S1-T02 and S1-T16 would already exist and be wrong. That difference is the reason this spike runs before anything else.
+    * There is no plan C worth writing. The replica is our own HTML, so DOM access is guaranteed. If plan B fails as well, that is a bug to find and not a design limit.
+
 
 ---
 
@@ -154,6 +204,7 @@ Read `docs/TARGET_APP.md`. Two tasks, not nine. It is a fixture and `CLAUDE.md` 
   * Test: unit and integration, money parsed to a typed value, and a missing required output is a hard failure rather than a silent undefined.
 * [ ] **S1-T24** **Gate, Skeleton 1.** The fixture artifact replays against the live target app and returns a typed money output.
   * Test: integration, `member.readSavingsBalance` for member `10001` returns `success` with `savingsBalance` of 425075 minor units in USD. No evidence directory yet, because the evidence sink is S3-T07 and a gate that waits for it is a gate that moved.
+  * Accept: re-forecast. Record the hours Slices 0 and 1 actually took in `PROGRESS.md`, and re-forecast every remaining slice from that measured pace. Every estimate before this point is unmeasured.
 
 ---
 
@@ -161,8 +212,8 @@ Read `docs/TARGET_APP.md`. Two tasks, not nine. It is a fixture and `CLAUDE.md` 
 
 The one thing design review cannot answer. Do not skip it and do not polish it.
 
-* [ ] **S2-T01** **Gate, Perception.** A throwaway loop in `scripts/spike/`, real model, real target app, refs only tool surface, no policy, no recorder, no artifact.
-  * Accept: does a real model reach the savings balance for member `10001` from our observation format, in under twenty steps. The transcript goes to the scratchpad, not to `evidence/`, because this is not the deliverable run.
+* [ ] **S2-T01** **Gate, Perception.** A throwaway loop in `scratch/spike/`, never committed, real model, real target app, refs only tool surface, no policy, no recorder, no artifact.
+  * Accept: does a real model reach the savings balance for member `10001` from our observation format, in under twenty steps. The loop and its transcript stay in `scratch/spike/`, never committed, because this is not the deliverable run and because nothing is committed before Harden.
   * Accept: findings land in `PROGRESS.md`, and if the observation format has to change, as an amendment to ADR 0012 plus S2-T02.
 * [ ] **S2-T02** Fold the spike findings back into `src/core/surfaceModel` and the observation builder contract. Conditional. If nothing needs changing, tick it with a note saying so, which is itself a result.
 
@@ -170,15 +221,19 @@ The one thing design review cannot answer. Do not skip it and do not polish it.
 
 ## Slice 3. Harden
 
-Seven tasks the thread deferred. They come first after the two gates because everything from here on persists something, and redaction has to exist before the first byte is written rather than after.
+Eight tasks. Seven the thread deferred, plus the evidence scanner, whose commit lifts the rule that nothing is committed before this slice. They come first after the two gates because everything from here on persists something, and redaction has to exist before the first byte is written rather than after.
 
 * [ ] **S3-T01** `tests/contract/surfaceDriver.contract.ts`, the full suite from `docs/TESTING.md` section 5, run against both drivers.
   * Accept: a reusable function parameterised over driver factories, not a test file bound to one implementation. It lands here because it compares two implementations, and until Slice 1 finished there was only one.
   * Test: `FakeSurfaceDriver` and `WebSurfaceDriver` both pass, including `derivedLabel` on an unnamed node and a geometric relation.
 * [ ] **S3-T02** ESLint and Prettier, plus the rule that bans raw timers.
   * Accept: `no-restricted-globals` refuses `setTimeout`, `setInterval` and `setImmediate` in `src/core`, `src/replay`, `src/discovery` and `src/control`. The only sanctioned delay is `Clock.delay`. The rule lands before S4-T06 introduces backoff, which is the first code that would reach for a raw timer.
-* [ ] **S3-T03** GitHub Actions workflow running typecheck, lint, test, test:integration and test:e2e.
-  * Accept: installs Chromium, references no secret, leaves `ANTHROPIC_API_KEY` unset so a live call cannot happen by accident.
+* [ ] **S3-T03** GitHub Actions workflow, plus the suite level guards that the recut left without an owner.
+  * Accept: CI installs Chromium, references no secret, and leaves `ANTHROPIC_API_KEY` unset so a live call cannot happen by accident. It runs every script that exists, and each later script is added to the workflow by the task that creates it.
+  * Accept: Vitest projects for unit, contract, integration and e2e, and the coverage gates from `docs/TESTING.md` section 7. Both belonged to a Slice 0 task the recut removed, and nothing picked them up. `test:all` lands here.
+  * Accept: the setup guard that fails the suite if a socket opens to anything other than loopback, which `docs/TESTING.md` section 4 promises and which also lost its owner in the recut.
+  * Test: the loopback guard fails a fixture test that opens a socket to a non loopback address, and passes one that talks to the target app on `127.0.0.1`.
+
 * [ ] **S3-T04** `Redactor`, pattern based plus provenance based, with Luhn validation and object traversal.
   * Accept: patterns load from the allowlist with an explicit `flags` field. Inline `(?i)` is PCRE syntax that JavaScript rejects when it constructs the expression, so it appears nowhere.
   * Test: unit, every pattern positive and negative, Luhn rejects an invalid number, redaction is idempotent, nested arrays are traversed.
@@ -190,6 +245,12 @@ Seven tasks the thread deferred. They come first after the two gates because eve
 * [ ] **S3-T07** `EvidenceSink` writing logs, screenshots, snapshots and the run manifest to `evidence/<phase>/<runId>/`.
   * Accept: masking uses Playwright's own screenshot mask option so unmasked bytes never exist in the process. Masks come from the profile sensitivity map once S4-T01 lands, and from an explicit list until then. Two projections are named. The caller projection carries real output values, the persisted projection is redacted.
   * Test: unit, the manifest lists every artefact. Integration, a masked region is absent from the stored image, sampled by pixel.
+* [ ] **S3-T08** The evidence scanner, permanent, part of the suite. Never cut. Its commit lifts the rule that nothing is committed before Harden.
+  * Accept: it scans `evidence/`, `capabilities/` and `tests/fixtures/cassettes/`. The cassette is a committed model transcript and would otherwise go unscanned. It searches for seeded canary literals, meaning the seed member names, the seed balances, the member IDs and a Luhn valid card number planted in the fixture, as well as the redaction patterns. A scanner that knows only the redactor's own patterns can only find what the redactor would already have caught, which makes it close to a tautology.
+  * Accept: moved here from Slice 7. There it would have run two slices after the first evidence was committed. It belongs in the slice whose whole job is making commits safe.
+  * Accept: removes the `.gitignore` exclusions for `/evidence/`, `/capabilities/` and `tests/fixtures/cassettes/` in the same commit that turns the scanner on. Those paths become committable at exactly the moment something checks what lands in them.
+  * Test: unit, the scanner fails on a planted canary and passes on the committed tree.
+
 
 ---
 
@@ -350,10 +411,7 @@ Read `docs/ESCALATION.md` in full, and ADRs 0014 and 0016.
 * [ ] **S7-T08** JSON Schema generation from the capability schema, plus a human readable review sheet.
   * Accept: generated from Zod, so there is one definition and three consumers. It sits here rather than in Slice 9 so requirement 3.2h does not rest on a conditional stretch task.
   * Test: unit, the generated tool schema names every required input with its type, and the review sheet lists every step intent and every declared outcome.
-* [ ] **S7-T09** The evidence scanner, permanent, part of the suite. Never cut.
-  * Accept: it scans `evidence/`, `capabilities/` and `tests/fixtures/cassettes/`. The cassette is a committed model transcript and would otherwise go unscanned. It searches for seeded canary literals, the seed member names, the seed balances, the member IDs and a Luhn valid card number planted in the fixture, as well as the redaction patterns. A scanner that knows only the redactor's own patterns can only find what the redactor would already have caught, which makes it close to a tautology.
-  * Test: unit, the scanner fails on a planted canary and passes on the committed tree.
-* [ ] **S7-T10** `evidence/README.md`, written for a reviewer with limited time. One or two sentences per directory, naming the single most interesting file in each.
+* [ ] **S7-T09** `evidence/README.md`, written for a reviewer with limited time. One or two sentences per directory, naming the single most interesting file in each.
 
 ---
 
@@ -423,3 +481,4 @@ Genuine unknowns. Each is closed by a named task, and none of them blocks starti
 * **How a ref maps back to a handle.** Closed by S0-T04, recorded as an amendment to ADR 0012.
 * **Whether the observation format is enough for a real model on this surface.** Closed by S2-T01. If it is not, the fix lands in S2-T02 before discovery is built.
 * **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decide at S6-T13. A second live run is the more honest answer and costs one more model budget, and it would exercise the confirm path during discovery rather than only during replay.
+* **The deadline.** The instruction that was meant to set it still had its placeholder in it. The forecast is measured against the framing in the brief, a focused effort that should not eat a month, until a real date replaces it.
