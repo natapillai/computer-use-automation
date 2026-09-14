@@ -31,7 +31,7 @@ Every one of these exists because it breaks a naive automation approach.
 * **Table layout.** Forms are laid out in nested `<table>` elements. Labels are `<td>` siblings, not `<label for>`. This is what makes `anchor-relative` locators necessary.
 * **No test IDs.** None. Anywhere.
 * **Generated IDs.** Element IDs look like `ctl00_cph_txt_7f3a2` and are generated from a per process seed, so an artifact that captured one would break across restarts. Our locator strategy must rank them low.
-* **Non semantic controls.** At least one control is a `<td onclick>` styled as a button, with no role and no accessible name. It carries inner text only. A `title` attribute would defeat the point, because Chromium feeds `title` into the accessible name computation, so the control would quietly become nameable and the fallback would never be exercised. Its test asserts what is actually true of the accessible name rather than what the document wishes were true.
+* **Non semantic controls.** At least one control is a `<td onclick>` styled as a button. It has no button role. Chromium exposes it as a table cell named by its own text, with a pointer cursor, which the spike at S0-T03 confirmed. It carries no `title`, because a second naming source would make it look more semantic than a real legacy console does. This is where the accessibility tree says less than a person sees, which keeps the ladder honest.
 * **Server rendered with full page reloads.** No SPA routing. Navigation is real.
 * **Inconsistent casing and whitespace** in labels, because real legacy apps have `Member  ID:` with two spaces.
 

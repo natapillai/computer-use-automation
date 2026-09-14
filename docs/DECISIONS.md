@@ -186,6 +186,13 @@ Vite is pinned at 7.3.6 and forced there on every dependency edge with an npm `o
 
 **Amendment, 2026-09-13.** The pass criteria, five named failures and a costed alternative now live in S0-T03. A failure there stops the plan for a design decision and is not worked around. Separately, a correction to the record. From the commit that recorded this ADR until the Slice 1 recut, the decision above cited retired S0-T08, which was sensitivity propagation, while the spike was retired S0-T10. The recut corrected it without saying so. A dead ID check could not have caught it because the ID was live, which is why task IDs are frozen from S0-T01 onward.
 
+**Amendment, 2026-09-14. Spike result, S0-T03, pass.** The mechanism is public Playwright 1.63.0 API. `page.ariaSnapshotJSON({ mode: 'ai', boxes: true })` returns the tree with a box and a ref per node, and an `aria-ref=` locator resolves a ref back to its live element. It treats both `<iframe>` and `<frame>` as frames and prefixes their refs, so no CDP fallback is needed. All five failure conditions were checked against the hostile page and none fired. **F1** both unlabelled inputs appear as `textbox` nodes with empty names and refs. **F2** the member ID ref resolved inside the `content` frame, and a fill landed in that field and no other. **F3** `Member  ID:` is a `cell` node with a box, with its whitespace collapsed to one space. **F4** the nearest cell to the left in the same row band bound each input to its own label. **F5** the `<td onclick>` is a `cell` named `Search` with `cursor=pointer`, a box and a ref, and clicking the ref submitted the form. Refs were identical across two fresh loads.
+
+Two premises in this ADR were wrong, and they are corrected here rather than rewritten. Chromium did not flatten the nested layout tables on this page. It exposed table, row and cell roles. Geometry stays the relation mechanism anyway, because whether Chromium treats a layout table as a table is a heuristic that other markup can flip, and bounding boxes are what UI Automation offers on desktop. The non semantic control is not nameless either. Chromium names a cell from its text, so what is actually true is that it has no button role, and the pointer cursor is the signal that it is clickable.
+
+The first run reported F5 as failed. The snapshot showed the node was present, and the failure was the spike reading the `cursor` property as text. The detector was fixed and the spike re-run, and the result recorded above is the second run.
+
+
 ---
 
 ## ADR 0013. Locator derivation is verified at record time and carries no PII

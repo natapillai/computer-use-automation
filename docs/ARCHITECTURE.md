@@ -55,9 +55,9 @@ export interface SurfaceDriver {
 }
 ```
 
-`Observation` is surface agnostic. It is a pruned accessibility tree of `UINode` values, each carrying a role, an accessible name, a value, an enabled and visible flag, a frame path, a per snapshot `ref`, and the raw platform handle that only the driver understands.
+`Observation` is surface agnostic. It is a pruned accessibility tree of `UINode` values, each carrying a role, an accessible name, a value, an enabled and visible flag, a frame path, and a per snapshot `ref`. There is no raw platform handle on the node. The driver resolves a ref to its live element, which keeps every `UINode` serialisable.
 
-Two fields on that node are there because of what the target app does to us. `derivedLabel` carries the nearest text by layout, because a form input whose label is a sibling table cell has no accessible name at all. `box` carries viewport geometry, because relations such as "the input in the same row as this text" cannot be computed from a layout table that Chromium has flattened. Geometry is used for relations between nodes and never as an absolute coordinate to click. This is ADR 0012.
+Two fields on that node are there because of what the target app does to us. `derivedLabel` carries the nearest text by layout, because a form input whose label is a sibling table cell has no accessible name at all. `box` carries viewport geometry, because a relation such as "the input in the same row as this text" should not depend on whether Chromium decides a layout table is a table. It decided yes on the spike page, and that decision is a heuristic other markup can flip. Geometry is used for relations between nodes and never as an absolute coordinate to click. This is ADR 0012.
 
 ```ts
 interface UINode {
@@ -69,8 +69,8 @@ interface UINode {
   framePath: string[];      // [] for top document, then frame names
   derivedLabel?: string;    // nearest text by layout, when the accessible name is empty
   box: Box;                 // viewport geometry, for relations only, never for clicking
+  clickableHint: boolean;   // a pointer cursor on a node with no interactive role
   children: UINode[];
-  raw: unknown;             // driver private, never serialised
 }
 ```
 
@@ -126,7 +126,7 @@ type LocatorStrategy =
 // rather than committed as a literal.
 ```
 
-`anchor-relative` is the strategy that carries legacy surfaces. It targets an element by its spatial relationship to a stable nearby landmark, for example "the input in the same row as the text Savings" or "the first textbox below the heading Member Search". The relation is computed from bounding boxes, not from markup, which matters because the target app lays its forms out in nested tables that Chromium reports as presentational. Geometry also maps directly onto desktop accessibility, where UI Automation exposes a bounding rectangle for every element.
+`anchor-relative` is the strategy that carries legacy surfaces. It targets an element by its spatial relationship to a stable nearby landmark, for example "the input in the same row as the text Savings" or "the first textbox below the heading Member Search". The relation is computed from bounding boxes, not from markup or table roles, because whether Chromium exposes a layout table as a table is a heuristic. Geometry also maps directly onto desktop accessibility, where UI Automation exposes a bounding rectangle for every element.
 
 Resolution at replay tries strategies in order and stops at the first that resolves under the match policy. Three rules that matter.
 
@@ -238,5 +238,5 @@ Every stub is deliberate and sits on an interface that a real implementation wou
 * **Accessibility tree over screenshots.** Cheaper, more stable, and portable to desktop. It costs us on canvas heavy or badly authored surfaces, and there is no visual fallback for those.
 * **Single process over services.** The brief explicitly discourages scaling infrastructure. Boundaries are interfaces, not network hops. Any of them could become a service without changing callers.
 * **Sparse overlays over per tenant artifacts, as a design.** A merge that has to know which fields are contract and which are binding. It avoids the rebuild per tenant problem the brief calls out and keeps one reviewable definition of what the capability does. Not built, so the cost is paid on paper only.
-* **Geometry as a first class part of perception.** It costs a bounding box on every node and a rule that geometry is never used to click. It buys relations that survive a layout table Chromium has flattened, and it is the same abstraction UI Automation offers on desktop.
+* **Geometry as a first class part of perception.** It costs a bounding box on every node and a rule that geometry is never used to click. It buys relations that do not depend on how Chromium classifies a layout table, and it is the same abstraction UI Automation offers on desktop.
 * **Confirm writes rather than block them.** Blocking makes the system useless, since opening a sub account is both a write and one of the brief's own example goals. Reusing the escalation channel for confirmation means one control transfer mechanism instead of two.

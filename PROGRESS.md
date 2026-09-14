@@ -3,17 +3,17 @@
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
 **Last updated.** 2026-09-14
-**Current slice.** Slice 0, Foundation
-**Next task.** S0-T02
-**Suite status.** no tests yet, typecheck clean
+**Current slice.** Slice 1, Thread
+**Next task.** S1-T01
+**Suite status.** 10 tests passing across 3 files, typecheck clean
 **Blocked on.** nothing
 
 ## Slice status
 
 | Slice | Tasks | Status |
 | --- | --- | --- |
-| S0 Foundation | 3 | in progress, S0-T01 done |
-| S1 Thread | 10 | not started |
+| S0 Foundation | 3 | done |
+| S1 Thread | 10 | in progress |
 | S2 Perception spike | 1 | not started |
 | S3 Harden | 5 | not started |
 | S4 Discovery | 10 | not started |
@@ -26,18 +26,18 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 
 Newest first. Earlier detail lives in git history.
 
+### 2026-09-14, Slice 0 closed
+Done: S0-T02, the injected clock, id provider and env config. S0-T03, the perception spike, passed all five failure conditions using public Playwright API, `ariaSnapshotJSON` in `ai` mode with `aria-ref` locators. The hostile page it ran against is now the first file of `apps/target`.
+Decisions: no new ADRs. ADR 0011 amended because Claude Sonnet 5 rejects a temperature parameter. ADR 0012 amended with the spike result.
+Surprises: two premises were wrong. Chromium did not flatten the layout tables, and the non semantic control is a cell named by its text rather than a nameless node. Geometry stays the relation mechanism regardless. The first spike run reported a false F5 failure, caused by the spike reading a cursor property as text, and was re-run after the fix.
+Next: S1-T01 through gate S1-T10.
+
 ### 2026-09-14, reconciliation
 Done: nine design documents reconciled to the forty six task plan and its cuts. The detector set became `NoProgress`, `UnclassifiedCondition` and `ModelRequested`. Canonicalisation restored as the fifth generalizer transform.
-Decisions: no new ADRs. A scope note in `DECISIONS.md` marks which recorded consequences are now design only. Day estimates removed from the plan.
-Surprises: parameterise covered step values only, so a recorded navigate would have stored a member ID.
-Next: S0-T02 through gate S1-T10.
+Decisions: no new ADRs. A scope note in `DECISIONS.md` marks which recorded consequences are now design only.
 
-### 2026-09-13, replan
-Done: S0-T01. The plan consolidated from ninety seven tasks to forty six with the structural cuts applied. The planning document checker deleted.
-Decisions: commit ceremony, the PROGRESS cadence and the ADR threshold reduced in `CLAUDE.md`. No new ADRs.
-
-### 2026-09-11 and 2026-09-12
-Repository restructure, ADRs 0011 to 0018, attribution hook, two replans.
+### 2026-09-11 to 2026-09-13
+Repository restructure, ADRs 0011 to 0018, attribution hook, replans down to forty six tasks, S0-T01.
 
 ## Open questions
 
