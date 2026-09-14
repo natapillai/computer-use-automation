@@ -139,6 +139,12 @@ describe('WebSurfaceDriver against MERIDIAN Core', { timeout: 30_000 }, () => {
     );
   });
 
+  it('reads the live url of a frame by path, and null for a frame that does not exist', async () => {
+    expect(await driver.frameUrl(['content'])).toBe(`${base}/servicing/search`);
+    expect(await driver.frameUrl([])).toBe(`${base}/servicing`);
+    expect(await driver.frameUrl(['missing'])).toBeNull();
+  });
+
   it('gives refs in document order with no duplicates', async () => {
     const refs = [...walkNodes((await driver.observe()).root)].map((node) => node.ref);
 

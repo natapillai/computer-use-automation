@@ -72,7 +72,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T08** `WebSurfaceDriver`.
   * Accept: the accessibility tree with geometry and derived labels through the S0-T03 mechanism, frame traversal, refs in document order, and `match(strategy)` for the core resolver.
   * Test: integration, the member ID input resolves through `anchor-relative` despite having no accessible name, with the correct frame path.
-* [ ] **S1-T09** `SessionBroker` and `GuardedSurface`.
+* [x] **S1-T09** `SessionBroker` and `GuardedSurface`.
   * Accept: the broker logs in before leasing a session, so no artifact holds a credential, and a `context.route` handler refuses non allowlisted origins and paths. `authorize` has exactly one call site, inside `GuardedSurface`.
   * Test: integration, a leased session is authenticated and a denied path is refused at the network layer. Unit, a denied action never reaches the driver, and an import graph test proves `replay` and `discovery` cannot reach the raw driver.
 * [ ] **S1-T10** Fixture artifact and `ReplayExecutor`. **Gate, Skeleton 1.**

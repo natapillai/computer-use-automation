@@ -125,6 +125,14 @@ describe('FakeSurfaceDriver', () => {
     expect(await driver.match({ kind: 'text', text: 'Search', exact: true, confidence: 0.6 }, ['content'])).toEqual(['n6']);
   });
 
+  it('reports the url of a frame by path, and null for a frame that does not exist', async () => {
+    const { driver } = setup();
+
+    expect(await driver.frameUrl(['content'])).toBe('http://localhost:4010/servicing/search');
+    expect(await driver.frameUrl([])).toBe('http://localhost:4010/servicing');
+    expect(await driver.frameUrl(['missing'])).toBeNull();
+  });
+
   it('refuses a script whose transition names a screen that does not exist', () => {
     const tokens = createControlTokens('sess_000001', createSequentialIds());
     const broken: FakeScript = { ...script, transitions: [{ from: 'search', on: { kind: 'click', ref: 'n6' }, to: 'detail' }] };

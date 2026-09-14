@@ -18,6 +18,10 @@ export interface SurfaceDriver {
   // strategy matches in the current observation, in document order.
   match(strategy: LocatorStrategy, framePath: readonly string[]): Promise<readonly string[]>;
 
+  // The live url of the frame at a path, or null when there is no such frame. It takes no
+  // snapshot, so asking never moves the observation a ref is checked against.
+  frameUrl(framePath: readonly string[]): Promise<string | null>;
+
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
 
   // Throws ControlLostError before touching the surface when the token is not current.

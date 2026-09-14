@@ -135,6 +135,7 @@ export function createWebSurfaceDriver(options: WebSurfaceOptions): SurfaceDrive
     sessionId,
     observe: refresh,
     match: async (strategy, framePath) => matchStrategy(latest ?? (await refresh()), strategy, framePath),
+    frameUrl: async (framePath) => frameAt(page, framePath)?.url() ?? null,
     resolve: async (bundle, token) => {
       control.assertCurrent(token);
       const observation = await refresh();

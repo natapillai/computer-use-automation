@@ -1,5 +1,6 @@
 import type { ControlGate } from '../../control/controlToken.js';
 import { resolveBundle, type StrategyMatcher } from '../../core/locator/resolve.js';
+import { sameFramePath } from '../../core/surfaceModel/geometry.js';
 import { matchStrategy } from '../../core/surfaceModel/match.js';
 import { findNodeByRef } from '../../core/surfaceModel/tree.js';
 import type { ActionResult, Observation, ResolvedAction, UINode } from '../../core/surfaceModel/types.js';
@@ -103,6 +104,7 @@ export function createFakeSurfaceDriver(options: FakeSurfaceOptions): FakeSurfac
     },
     observe: async () => current,
     match,
+    frameUrl: async (framePath) => current.frames.find((frame) => sameFramePath(frame.framePath, framePath))?.url ?? null,
     resolve: async (bundle, token) => {
       control.assertCurrent(token);
       return resolveBundle(bundle, match);
