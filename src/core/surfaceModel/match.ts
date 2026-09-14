@@ -1,4 +1,6 @@
 import type { LocatorStrategy } from '../locator/schema.js';
+import { overlapsHorizontally, sameFramePath, sameRow } from './geometry.js';
+import { LABELLED_ROLES } from './roles.js';
 import type { Box, Observation, UINode } from './types.js';
 
 // Matches one locator strategy against an observation. It is surface agnostic, so the
@@ -12,9 +14,6 @@ interface Placed {
   readonly ancestors: ReadonlySet<string>;
 }
 
-// Roles a label can name. A cell reading Member ID: is text, not a labelled control.
-const LABELLED_ROLES = new Set(['textbox', 'searchbox', 'combobox', 'listbox', 'checkbox', 'radio', 'spinbutton', 'slider', 'switch']);
-
 // One pixel of slack, because layout engines round box edges.
 const EDGE_TOLERANCE = 1;
 
@@ -26,7 +25,7 @@ export function matchStrategy(observation: Observation, strategy: LocatorStrateg
 function placeNodes(root: UINode, framePath: readonly string[]): readonly Placed[] {
   const placed: Placed[] = [];
   const visit = (node: UINode, ancestors: ReadonlySet<string>): void => {
-    if (node.state.visible && sameFrame(node.framePath, framePath)) placed.push({ node, ancestors });
+    if (node.state.visible && sameFramePath(node.framePath, framePath)) placed.push({ node, ancestors });
     const below = new Set(ancestors).add(node.ref);
     for (const child of node.children) visit(child, below);
   };
@@ -93,15 +92,6 @@ function nearestBelow(related: readonly Placed[]): readonly Placed[] {
   return related.filter((p) => p.node.box.y <= top + EDGE_TOLERANCE);
 }
 
-function sameRow(a: Box, b: Box): boolean {
-  const within = (y: number, box: Box): boolean => y >= box.y && y <= box.y + box.height;
-  return within(a.y + a.height / 2, b) || within(b.y + b.height / 2, a);
-}
-
-function overlapsHorizontally(a: Box, b: Box): boolean {
-  return a.x < b.x + b.width && b.x < a.x + a.width;
-}
-
 // A row or a cell is often named by the text of its descendants. Only the deepest
 // match counts, the way a person points at the words and not at the table.
 function innermost(matches: readonly Placed[]): readonly Placed[] {
@@ -127,8 +117,4 @@ function textMatches(actual: string, wanted: string, exact: boolean): boolean {
 // Legacy labels carry doubled spaces and non breaking spaces. Neither is meaning.
 function normalize(text: string): string {
   return text.replace(/\s+/g, ' ').trim();
-}
-
-function sameFrame(a: readonly string[], b: readonly string[]): boolean {
-  return a.length === b.length && a.every((segment, i) => segment === b[i]);
 }

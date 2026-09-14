@@ -69,7 +69,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T07** `SurfaceDriver` interface, `ControlToken` and `FakeSurfaceDriver`.
   * Accept: `act()` requires a current token and throws `ControlLostError` otherwise. The fake exists so the executor, the loop and the control plane are unit testable without Chromium.
   * Test: unit, a stale token is rejected and the fake returns scripted observations.
-* [ ] **S1-T08** `WebSurfaceDriver`.
+* [x] **S1-T08** `WebSurfaceDriver`.
   * Accept: the accessibility tree with geometry and derived labels through the S0-T03 mechanism, frame traversal, refs in document order, and `match(strategy)` for the core resolver.
   * Test: integration, the member ID input resolves through `anchor-relative` despite having no accessible name, with the correct frame path.
 * [ ] **S1-T09** `SessionBroker` and `GuardedSurface`.
