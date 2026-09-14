@@ -118,10 +118,12 @@ type LocatorStrategy =
   | { kind: 'test-id'; attr: string; value: string; confidence: number }
   | { kind: 'label'; text: TemplateExpr; confidence: number }
   | { kind: 'text'; text: TemplateExpr; exact: boolean; confidence: number }
-  | { kind: 'anchor-relative'; anchor: LocatorStrategy; relation: Relation; role?: string; confidence: number }
+  | { kind: 'anchor-relative'; anchor: AnchorStrategy; relation: Relation; role?: string; confidence: number }
   | { kind: 'structural'; path: string; confidence: number };
 
 // Relation is geometric. sameRow, rightOf, below, firstBelow, computed from boxes.
+// AnchorStrategy is role-name, label or text. An anchor is a landmark and is never
+// itself relative, which keeps a bundle flat and resolution non recursive.
 // Text bearing fields are TemplateExpr, so a member ID in a locator is parameterised
 // rather than committed as a literal.
 ```

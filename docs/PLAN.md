@@ -48,7 +48,7 @@ Uncuttable work lands first, so a stop removes breadth rather than a requirement
 
 Ends at gate S1-T10, a four step replay against the live app returning a typed money output.
 
-* [ ] **S1-T01** Surface model types, locator types and the resolution policy, in `src/core`.
+* [x] **S1-T01** Surface model types, locator types and the resolution policy, in `src/core`.
   * Accept: `UINode` carries ref, role, name, `derivedLabel`, value, state, `framePath`, `box` and a clickable hint, and no raw handle, because the driver resolves a ref to its live element. The action vocabulary lives in core. Strategy kinds exclude `visual`, `matchPolicy` excludes `first`, relations are geometric, and strategy text is a template. Core owns ordering, ambiguity rejection and degradation records, through a driver supplied `match(strategy)` port.
   * Test: unit, the first resolving strategy wins, an ambiguous strategy under `unique` is skipped, all ambiguous yields `LocatorAmbiguous`, nothing resolving yields `LocatorNotFound` with every attempt listed, and a lower ranked win is recorded as drift.
 * [ ] **S1-T02** Capability schema, refinements and loader.
