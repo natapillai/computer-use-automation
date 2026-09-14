@@ -57,7 +57,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T03** Templates, input validation and the result contract.
   * Accept: templates resolve `inputs`, earlier `outputs` and allowlisted `env`, with no expression language. Inputs are validated before any surface opens. `ResultBase` carries `inputNames`, `recoveries[]`, `interventions[]` and `drift[]`, and failure constructors require `expected` and `observed`.
   * Test: unit, each scope resolves, an unresolved reference fails before acting, each constraint yields `InputValidation`, and each failure class is constructible.
-* [ ] **S1-T04** `ConditionMatcher` evaluation and the money parser.
+* [x] **S1-T04** `ConditionMatcher` evaluation and the money parser.
   * Accept: one matcher language including `all`, `any`, `not` and `outputResolvable`, used by checkpoints and detectors alike. Money is minor units plus currency plus raw text, and the raw text is `pii`.
   * Test: unit, one per matcher kind positive and negative, then `$4,250.75`, `4250.75 USD`, `(125.00)` and `$0.00`, and an unparseable string as a typed failure.
 * [ ] **S1-T05** `PolicyEngine.authorize`.
