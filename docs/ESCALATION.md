@@ -1,6 +1,6 @@
 # Escalation, control transfer, and handoff
 
-The brief is explicit that this must be real and well reasoned, "not just a TODO". It is also the requirement most submissions will fake. The rule for this repo is that the control transfer model and the handoff mechanism are fully implemented and integration tested. Only the operator's HTML is allowed to be bare.
+The brief is explicit that this must be real and well reasoned, "not just a TODO". It is also the requirement most submissions will fake. The control transfer model and the handoff mechanism are implemented and integration tested. Only the operator page is allowed to be bare.
 
 ## 1. The core idea
 
@@ -8,7 +8,7 @@ Automation and a human share one live browser session. The only way that is safe
 
 `SurfaceDriver.act()` requires a `ControlToken`. The `ControlPlane` issues exactly one valid token per session. If the token is not current, `act()` throws `ControlLostError` before touching the page. A race between an operator click and a queued automation action is therefore structurally impossible, not merely unlikely.
 
-The second requirement is that the operator can reach the session at all. The run process hosts the operator API and console on :4020 for its own lifetime, blocks in `pending_human` when it escalates, and prints the intervention URL to stdout. `serve` is the same server with no run attached, for the catalog and for reading past interventions. Running the executor in one process and the operator API in another leaves the human pointed at a browser they cannot touch, which is the version of this feature that demos well and does nothing. See ADR 0016.
+The second requirement is that the operator can reach the session at all. The run process hosts the operator API and page on :4020 for its own lifetime, blocks in `pending_human` when it escalates, and prints the intervention URL to stdout. Running the executor in one process and the operator API in another leaves the human pointed at a browser they cannot touch, which is the version of this feature that demos well and does nothing. See ADR 0016.
 
 ## 2. Control state machine
 
@@ -41,30 +41,35 @@ interface SessionControl {
 
 The token rotates on every transition. An action holding a stale token fails even if control has since returned to automation, because the stale holder does not know what happened in between and its assumptions about page state are void. After a handback, automation must re observe.
 
-`pending_human` has a timeout. If nobody claims within `interventionClaimTimeoutMs` the run terminates as `escalated` with `unclaimed`, rather than holding a browser session open forever. This is the difference between a design and something that survives a weekend.
+`pending_human` has a timeout. If nobody claims within `INTERVENTION_CLAIM_TIMEOUT_MS` the run terminates as `escalated` with `unclaimed`, rather than holding a browser session open forever.
 
-The transitions are a pure reducer in `src/control/reducer.ts`, so every legal and illegal transition is unit tested without a browser. Illegal transitions throw. There is no path from `human` back to `automation` that does not pass through `resuming`.
+The transitions are a pure reducer, so every legal and illegal transition is unit tested without a browser. Illegal transitions throw. There is no path from `human` back to `automation` that does not pass through `resuming`.
 
 ## 3. Detecting stuck
 
-Escalation is raised by a single function, `Escalation.raise(context)`, called from six detectors. Each one is independently unit tested.
+Stuck means the system does not know what to do next. Three detectors raise an intervention through one function, `Escalation.raise(context)`, and each is unit tested on its own.
 
 | Detector | Trigger | Phase |
 | --- | --- | --- |
-| `NoProgress` | The observation hash is unchanged for N consecutive model actions | Discovery |
-| `ActionFailureStreak` | M consecutive actions failed to produce their expected effect | Both |
-| `ModelRequested` | The model called the `escalate` tool with a reason | Discovery |
-| `PolicyConfirmation` | An action the profile classifies as a `write` needs a human decision | Both |
-| `UnclassifiedCondition` | A dialog or error appeared that no detector claims | Replay |
-| `RecoveryExhausted` | A recoverable condition hit its bound without resolving | Replay |
+| `NoProgress` | The observation hash is unchanged across three consecutive acting tool calls | Discovery |
+| `UnclassifiedCondition` | A dialog appears that no rule claims | Both |
+| `ModelRequested` | The model calls the `escalate` tool with a reason | Discovery |
 
-`NoProgress` uses the hash of the normalised accessibility skeleton, not the screenshot, so a blinking cursor or a rotating advert does not count as progress. That is a small detail that makes the detector actually work.
+`NoProgress` is the detector that catches a model failing silently. A model that keeps clicking the same dead control never asks for help, so a detector that depends on the model choosing to escalate misses exactly the failure that matters, and the live discovery run is the one run that cannot be rehearsed. It compares `a11yHash` values the trace already records and keeps a counter. Only acting tool calls count, meaning `click`, `fill`, `select`, `press` and `navigate`, because an `extract` changes nothing on the page by design. The hash covers structure, roles, names, values and states, and excludes static text, so a clock ticking in the status frame is not progress and a newly rendered result row is.
 
-Budget exhaustion, meaning max steps or max duration, is not stuck. It is a `failure` with `Timeout`. Stuck means we do not know what to do next. Out of budget means we knew and ran out of room. Conflating them produces escalations nobody can action.
+`ModelRequested` is kept because it is nearly free. The `escalate` tool exists anyway, and a model that recognises it cannot proceed should be able to say so.
+
+A policy `confirm` is not a detector, because nothing is stuck. A write step on a healthy run needs a person to approve it, and that approval travels through the same intervention channel and resolves with a one shot grant, described in section 5.
+
+Budget exhaustion is not stuck either. Max steps and max duration end the run as a `failure` with `Timeout`. Stuck means we do not know what to do next. Out of budget means we knew and ran out of room. Conflating them produces escalations nobody can action. A streak of failed actions and an exhausted recovery are deliberately left to that path, so they reach an engineer rather than an operator.
 
 ## 4. The intervention request
 
 ```ts
+type EscalationReason =
+  | 'NoProgress' | 'UnclassifiedCondition' | 'ModelRequested'
+  | 'PolicyConfirmation' | 'resumePreconditionFailed';
+
 interface InterventionRequest {
   id: string;
   createdAt: string;
@@ -72,7 +77,7 @@ interface InterventionRequest {
   runId: string;
   phase: 'discovery' | 'replay';
 
-  capability?: { id: string; version: string; variant: string };
+  capability?: { id: string; version: string };
   goal?: string;                     // discovery runs have a goal, replays have a capability
 
   reason: EscalationReason;
@@ -97,56 +102,58 @@ The brief asks for "enough context to act on it, which capability or goal, the c
 
 ## 5. Taking control of the live session
 
-The mechanism is real. The session is a Playwright Chromium context owned by `SessionBroker` and reachable over the Chrome DevTools Protocol.
+The session is a Playwright Chromium context owned by `SessionBroker` and reachable over the Chrome DevTools Protocol.
 
-Operator API, served by Fastify on port 4020.
+The operator API is served by Fastify on 127.0.0.1:4020, inside the run process.
 
 ```
-GET   /interventions                       open interventions
-GET   /interventions/:id                   full context, redacted
-POST  /interventions/:id/claim             transfer control to a human, returns humanToken
-WS    /sessions/:id/stream                 live screenshot frames, throttled, masked
-POST  /sessions/:id/input                  forward a mouse or keyboard event via CDP
-POST  /interventions/:id/note              record an operator note
-POST  /interventions/:id/release           hand control back, { outcome, note, approval? }
-POST  /interventions/:id/abort             terminate the run
+GET   /                                   the operator page
+GET   /interventions                      open interventions
+GET   /interventions/:id                  full context, redacted
+GET   /sessions/:id/screenshot            the current screenshot, masked, polled by the page
+POST  /interventions/:id/claim            transfer control to a human, returns humanToken
+POST  /sessions/:id/input                 forward a click or key through CDP, requires humanToken
+POST  /interventions/:id/release          hand control back, { outcome, approval? }
+POST  /interventions/:id/abort            terminate the run
 ```
 
 `POST /sessions/:id/input` requires the human token returned by claim. That path never passes through `act()`, so it does not inherit the fencing ADR 0008 put there, and it has to carry it explicitly.
 
 `release` carries an optional approval grant. When the intervention was raised by a policy `confirm` rather than by a stuck detector, the human is approving one action, not performing it. The grant is bound to the run, the step id and the resolved target, and `PolicyEngine` accepts it exactly once. Without it the resumed step re authorizes, is told to confirm again, and escalates in a loop until the budget ends the run.
 
-Live control works by forwarding input over CDP, `Input.dispatchMouseEvent` and `Input.dispatchKeyEvent`, into the same page the automation was using. The operator console renders the screenshot stream onto a canvas and forwards clicks and keystrokes at the corresponding coordinates. This is genuinely the same session, with the same cookies, the same frame state, and the same half completed form. It is not a fresh browser pointed at the same URL, which is the shortcut that would fail the requirement.
+Live control works by forwarding input over CDP, `Input.dispatchMouseEvent` and `Input.dispatchKeyEvent`, into the same page the automation was using. The operator page polls the masked screenshot, draws it on a canvas, and forwards clicks and keystrokes at the corresponding coordinates. This is genuinely the same session, with the same cookies, the same frame state, and the same half completed form. It is not a fresh browser pointed at the same URL, which is the shortcut that would fail the requirement.
 
-The console itself is one static HTML file with a canvas, a context panel, and three buttons. That is the mocked part, and it is documented as such. The API beneath it is real and fully tested.
+Polling rather than streaming is a deliberate cut. A screenshot a second is enough to unblock a flow, and it costs one endpoint rather than a socket protocol.
+
+The page itself is one static HTML file with a canvas, a context panel, and three buttons. That is the mocked part, and it is documented as such. The API beneath it is real and tested.
 
 Two clients drive that API.
 
-* `OperatorConsole`, the browser page a human uses.
-* `MockOperator`, a test client in `tests/integration` that calls the exact same HTTP endpoints.
+* The operator page a human uses.
+* `MockOperator`, a test client in `tests/integration` that calls the same endpoints.
 
-Because they share the API, the handoff is exercised on every CI run without a human being present. That is the only way a handoff feature stays working.
+Because they share the API, every run of the integration suite exercises the handoff without a person present. That is the only way a handoff feature stays working.
 
 ## 6. Recording what the human did
 
-Required by the brief. Two independent capture channels, because neither is complete alone.
+Required by the brief. Two capture channels, because neither is complete alone.
 
-1. **Hit test at the forwarding point.** Every operator click arrives at `POST /sessions/:id/input` as a coordinate. Before dispatching it, the server hit tests that coordinate with CDP `DOM.getNodeForLocation` and runs the ordinary recorder on the node it finds. The human action therefore produces a real `LocatorBundle`, derived and verified exactly like a model driven one. An in page listener could only have reported a role and a name, and a role and a name cannot be replayed, which would have made the draft steps this section produces useless. Hit testing also works across frames without injecting anything into the page.
+1. **Hit test at the forwarding point.** Every operator click arrives at `POST /sessions/:id/input` as a coordinate. Before dispatching it, the server hit tests that coordinate with CDP `DOM.getNodeForLocation` and runs the ordinary recorder on the node it finds. The record therefore carries a real `LocatorBundle`, derived and verified exactly like a model driven one. An in page listener could only have reported a role and a name, which is too little to say which element was touched once the page has changed. Hit testing also works across frames without injecting anything into the page.
 2. **Protocol capture.** CDP `Page.frameNavigated` and `Network.responseReceived` for navigations and status codes, which catches what the forwarding path cannot see, such as a redirect that follows the click.
 
 ```ts
 interface HumanActionRecord {
   at: string;
-  kind: 'click' | 'fill' | 'select' | 'press' | 'navigate' | 'note';
-  target?: { describedAs: string; bundle: LocatorBundle };  // derived, replayable
+  kind: 'click' | 'fill' | 'select' | 'press' | 'navigate';
+  target?: { describedAs: string; bundle: LocatorBundle };  // derived, verified
   url: string;                                              // redacted
   screenshotRef?: string;
 }
 ```
 
-There is no value field, not even a redacted one with a length. A typed value is never needed. When a human fills a field, the draft step that results binds that field to an input template, and the value itself is the caller's to supply at replay. Capturing it would create a copy of regulated data in evidence for no gain, and the safest version of a field is the one that does not exist.
+There is no value field, not even a redacted one with a length. The record answers what was touched, where and when. It does not need what was typed, and capturing it would create a copy of regulated data in evidence for no gain.
 
-These land in the run evidence, and they are also converted into candidate steps with `provenance: 'human'` and offered as a draft revision of the capability. That is the loop closing. A human unblocking the automation teaches the capability, and because the revision is a draft requiring approval, nothing a human improvised at 2am starts running unattended.
+These records go to the run evidence and nowhere else. They are not converted into draft steps on a new revision of the capability, so a person unblocking a run leaves an audit trail but does not yet teach the capability. That is a cut, named in `PROGRESS.md`.
 
 ## 7. Handing control back
 
@@ -166,7 +173,7 @@ release
   -> ControlPlane: resuming -> automation
 ```
 
-The approval branch exists because a `confirm` escalation is not a stuck escalation. The human is approving one action, not performing it, so on release the executor performs that action itself with a one shot grant. Without that branch the resumed step asks policy again, hears confirm again, and escalates forever. Checking the whole capability success condition first matters. An operator asked to unblock a two step problem will often just finish the task, and the system should notice that and report success rather than re clicking a submit button that already posted.
+The approval branch exists because a `confirm` escalation is not a stuck escalation. The human is approving one action, not performing it, so on release the executor performs that action itself with a one shot grant. Checking the whole capability success condition first matters too. An operator asked to unblock a two step problem will often just finish the task, and the system should notice that and report success rather than re clicking a submit button that already posted.
 
 `resumePreconditionFailed` escalating again rather than failing is deliberate. The operator is already engaged. Handing it straight back with "this is still not where I expected to be, here is what I see" is more useful than terminating the run and making them start over.
 
@@ -174,16 +181,16 @@ Every transition is appended to the run's evidence, so the audit trail says who 
 
 ## 8. Escalation during discovery versus during replay
 
-The mechanism is shared, the intent differs.
+The mechanism is shared. The consequence differs.
 
-**Discovery.** The human is teaching. Their actions become candidate steps. After handback the model continues from the new state with the human's actions summarised in its context, so it does not repeat them.
+**Discovery.** After handback the model continues from the new state, with the human's actions summarised in its context so it does not repeat them. The generalizer does not turn human actions into steps, so a discovery run that a human had to complete does not produce an artifact. Its `DiscoveryResult` says so, and the evidence shows why.
 
-**Replay.** The human is unblocking a production run. Their actions are recorded as evidence and proposed as a capability revision, but they do not silently amend an approved artifact. A repeated escalation at the same step is the signal that the capability needs re recording, and `lifecycle.stability.consecutiveFailures` is what surfaces it.
+**Replay.** The human is unblocking a production run. Their actions are recorded as evidence and never amend the artifact. A capability that keeps escalating at the same step needs re recording, and the evidence across those runs is what shows it.
 
 ## 9. Limits, stated honestly for REPORT.md
 
-* Screenshot streaming plus CDP input forwarding is adequate for an operator to unblock a stuck flow. It is not a production co browsing console. Latency, multi monitor, file uploads, and clipboard are not handled. The brief puts that out of scope.
+* Polled screenshots plus CDP input forwarding is adequate for an operator to unblock a stuck flow. It is not a co browsing console. Latency, multi monitor, file uploads and clipboard are not handled, and the brief puts that out of scope.
 * One operator per session. There is no queue, no assignment, no shift model.
 * Interventions live in an in memory store with no journal. A run owns its browser, so a process restart loses the session the intervention pointed at, which makes a restored claim worse than no claim. Evidence is written as events happen and survives. A real deployment needs durable storage and a session that outlives one process, and `InterventionStore` is the seam for the first half.
 * The operator API lives inside the run process, so an intervention is only claimable while that run is alive. That is the honest consequence of one process and a filesystem, and it is the first thing a real deployment would change.
-* The operator is trusted. There is no per operator permission model and no verification that the human stayed inside the allowlist during their control window. Their actions are recorded, which gives after the fact audit but not prevention. This is a real limit and it goes in the report.
+* The operator is trusted. There is no per operator permission model. Their actions are recorded, which gives after the fact audit rather than prevention. The one control that does apply during their window is the network level refusal in `docs/SAFETY.md` section 5.

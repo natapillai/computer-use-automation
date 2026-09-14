@@ -8,9 +8,9 @@ Use these seven headings, in this order, with exactly this wording. The brief sp
 
 1. Architecture
 2. Artifact schema
-3. Determinism and error handling
-4. Heterogeneity and multi tenant
-5. Escalation and handoff
+3. Determinism & error handling
+4. Heterogeneity & multi-tenant
+5. Escalation & handoff
 6. Safety
 7. Cuts
 
@@ -19,8 +19,8 @@ Rules.
 * First person singular. A person is submitting this.
 * Draw substance from the design docs, but do not copy them. The report is an argument, not a summary. Every paragraph carries a decision or a trade off.
 * Every section names at least one thing that was traded away. A report with no costs in it reads as untested thinking.
-* Section 7 comes from the Deferred and cut list in `PROGRESS.md`. Be specific and honest about what is stubbed and what you would build next.
-* Follow the writing style rules in `CLAUDE.md` section 10. No em dashes, no en dashes, no hyphens as connectors, `*` for bullets.
+* Section 7 is about half a page. Start from the draft under Cuts for REPORT section 7 in `docs/PLAN.md`. The full list in `PROGRESS.md` is source material, not the section.
+* Follow the writing style rules in `CLAUDE.md` section 10. No em dashes, no en dashes, no hyphens as connectors, `*` for bullets. The headings keep the brief ampersands and the hyphen in multi-tenant, because a graded instruction beats the style rules.
 
 Before writing, re read `docs/ASSIGNMENT.md` section 6 item 2 and section 7 so the report answers what is actually being graded.
 

@@ -22,7 +22,7 @@ Decisions are three valued, never boolean.
 type AuthorizationDecision =
   | { verdict: 'allow' }
   | { verdict: 'deny'; rule: string; reason: string }
-  | { verdict: 'confirm'; rule: string; reason: string; risk: RiskLevel };
+  | { verdict: 'confirm'; rule: string; reason: string; effect: 'write' };
 ```
 
 `confirm` routes into the escalation channel described in `docs/ESCALATION.md`. One control transfer mechanism serves both "I am stuck" and "I need a person to approve this", which is a simplification worth having.
@@ -37,25 +37,17 @@ Unknown means deny. If the classifier cannot categorise an action, or the target
 version: 1
 
 origins:
-  - pattern: "http://acme.localhost:4010"
-    description: "Local MERIDIAN Core target app, tenant acme"
-    allowedPaths: &meridianPaths
+  - pattern: "http://localhost:4010"
+    description: "Local MERIDIAN Core target app"
+    allowedPaths:
       - "/servicing/**"
       - "/member/**"
       - "/auth/login"
-    deniedPaths: &meridianDenied
+    deniedPaths:
       - "/admin/**"
       - "/__control__/**"
       - "/**/delete"
       - "/**/wire/**"
-  - pattern: "http://borealis.localhost:4010"
-    description: "Local MERIDIAN Core target app, tenant borealis. Same product, different tenant"
-    allowedPaths: *meridianPaths
-    deniedPaths: *meridianDenied
-  - pattern: "http://localhost:4010"
-    description: "Local MERIDIAN Core target app, no tenant host"
-    allowedPaths: *meridianPaths
-    deniedPaths: *meridianDenied
 
 actions:
   allowed: [navigate, click, fill, select, press, hover, scroll, waitFor, extract, assert, dismiss]
@@ -74,27 +66,28 @@ budgets:
   maxStepsPerRun: 40
   maxModelCallsPerRun: 40
   maxRunDurationMs: 300000
-  maxActionsPerMinute: 60
 
 data:
   neverPersist: [password, token, ssn, cardNumber, cvv, pin, apiKey]
+  # flags is an explicit field. An inline (?i) is PCRE syntax and JavaScript throws
+  # when it constructs the expression, so it appears nowhere in this file.
   redactPatterns:
-    - { name: ssn, pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b" }
-    - { name: cardNumber, pattern: "\\b(?:\\d[ -]*?){13,19}\\b", validator: luhn }
-    - { name: email, pattern: "\\b[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}\\b" }
-    - { name: phone, pattern: "\\b\\+?1?[ .-]?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b" }
-    - { name: accountNumber, pattern: "\\b\\d{9,17}\\b", contextual: true }
+    - { name: ssn, pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b", flags: "g" }
+    - { name: cardNumber, pattern: "\\b(?:\\d[ -]*?){13,19}\\b", flags: "g", validator: luhn }
+    - { name: email, pattern: "\\b[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}\\b", flags: "gi" }
+    - { name: phone, pattern: "\\b\\+?1?[ .-]?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b", flags: "g" }
+    - { name: accountNumber, pattern: "\\b\\d{9,17}\\b", flags: "g", contextual: true }
 ```
 
-Path matching is glob over the canonicalised path with the query string stripped. Denied wins over allowed. Origin matching is exact scheme, host, and port, with no wildcard hosts, because a wildcard host allowlist in a multitenant system is not an allowlist. Two tenant hosts of the same product are two entries, which is the honest shape and also what a real deployment would generate per tenant binding.
+Path matching is glob over the canonicalised path with the query string stripped. Denied wins over allowed. Origin matching is exact scheme, host, and port, with no wildcard hosts, because a wildcard host allowlist in a multitenant system is not an allowlist.
 
-`/__control__/**` is denied on every origin. The target app mounts its own fault injection there, and an agent that can arm the faults it is being tested against is not being tested. It is a small thing that proves the allowlist constrains something real.
+`/__control__/**` is denied. The target app mounts its own fault injection there, and an agent that can arm the faults it is being tested against is not being tested. It is a small thing that proves the allowlist constrains something real.
 
-`maxActionsPerMinute` is a rate limit, not a budget. It exists because the brief tells us to respect rate limits on target systems, and because a model in a loop can otherwise hammer a legacy app that was never built for it.
+There is no rate limit on actions against the target app. The budgets bound a run's length, not its speed. That is a cut, named in `PROGRESS.md`.
 
 ## 3. Risk classification
 
-Two independent properties, both classified from the app profile route and method table, plus a sensitivity flag from the same profile. This is ADR 0014.
+Two independent properties, declared per step and cross checked against the app profile route and method table, plus a sensitivity flag from the same profile. This is ADR 0014.
 
 | Property | Question it answers | Decided by | Governs |
 | --- | --- | --- | --- |
@@ -108,13 +101,15 @@ Two independent properties, both classified from the app profile route and metho
 | read, sensitive | allow, redaction enforced | allow | allow |
 | write | confirm | confirm | allow, if the capability declares `allowUnattendedReplay` |
 
+Until the profile lands at S3-T04, the policy engine reads the effect a capability declares for its own steps and the allowlist still caps what is reachable. After it lands, a capability whose declared effect contradicts the profile is refused.
+
 The first version of this section had one enum and classified any POST as irreversible. The member search on the target app is a POST. That made the primary read capability require human confirmation on every discovery and every draft replay, and it made the transient retry case unreachable, because the schema forbids retrying an irreversible step. A search is a read that is not idempotent. One enum could not say that, and the regex over button names that sat beside it was the same defect in a different place.
 
 ### Why confirm rather than block
 
-Blocking irreversible actions outright would make the system useless. "Open a new sub account and reach the confirmation screen" is one of the brief's own example goals, and it is irreversible by definition. A system that can only read is not an integration layer, it is a scraper.
+Blocking writes outright would make the system useless. "Open a new sub account and reach the confirmation screen" is one of the brief's own example goals, and it is a write by definition. A system that can only read is not an integration layer, it is a scraper.
 
-Blocking is also weaker than it looks. It pushes the work back to a human who then does the whole task manually, with no audit trail and no capability produced. Confirm keeps the human in the decision seat for the one action that matters while the automation does the other thirty steps.
+Blocking is also weaker than it looks. It pushes the work back to a human who then does the whole task manually, with no audit trail and no capability produced. Confirm keeps the human in the decision seat for the one action that matters while the automation does the other steps.
 
 The escalation is where the confirmation happens, which means the person confirming sees the live screen, the step intent, and the full context. Approving a change to a member's account from a screenshot and a sentence is a meaningfully better control than approving it from a log line.
 
@@ -130,15 +125,14 @@ Redaction happens at the sink, never at the call site. Every write path funnels 
 interface Redactor {
   text(s: string, ctx: RedactionContext): string;
   object<T>(o: T, ctx: RedactionContext): T;
-  screenshot(buf: Buffer, masks: Box[]): Promise<Buffer>;
 }
 ```
 
-Sinks that must use it, with no exceptions. The structured logger. The artifact writer. The evidence writer. The screenshot writer. The model prompt builder. The operator API responses. The catalog API responses, with one deliberate carve out below.
+Sinks that must use it, with no exceptions. The structured logger. The artifact writer. The evidence writer. The screenshot writer. The model prompt builder. The operator API responses.
 
-A result exists in two projections and the difference is explicit. The **caller projection** carries real output values, because an agent that asked for a balance and received `[redacted]` has been handed a system that does not work. The **persisted projection** is redacted, and it is what reaches logs, evidence and the trace. The carve out is narrow, it is named here, and the catalog returns the caller projection only to the invocation that asked for it.
+The operator API is the one that is easy to forget. An intervention payload carries a screenshot and an accessibility snapshot of a member's account, and it is sent to a browser over HTTP. It gets redacted like everything else.
 
-That last one is easy to forget. An intervention payload carries a screenshot and an accessibility snapshot of a member's account, and it is being sent to a browser over HTTP. It gets redacted like everything else.
+A result exists in two projections and the difference is explicit. The **caller projection** carries real output values, because an agent that asked for a balance and received `[redacted]` has been handed a system that does not work. The replay CLI returns it to the process that invoked it and to nothing else. The **persisted projection** is redacted, and it is what reaches logs, evidence and the trace.
 
 ### Three redaction mechanisms
 
@@ -148,13 +142,13 @@ That last one is easy to forget. An intervention payload carries a screenshot an
 
 ### Sensitivity propagation
 
-An output extracted from an element populated by a `secret` input inherits `secret`. A `money` value read from a member account is `pii`. Propagation is computed in `core/redaction/propagate.ts` as a pure function and unit tested, because getting it wrong silently is the failure mode that matters.
+An output extracted from an element populated by a `secret` input inherits `secret`. A `money` value read from a member account is `pii`. Propagation is a pure function and unit tested, because getting it wrong silently is the failure mode that matters.
 
 ### What the model sees
 
 The observation sent to the model is redacted before the prompt is built. The model sees `[redacted:pii]` in place of a member's name or balance. It does not need real PII to decide which button to click, and sending regulated financial data to a third party inference API when the task does not require it is not defensible.
 
-The one exception is values the model must type, which are supplied as template references such as `{{inputs.memberId}}` rather than literals. The model asks to fill a field with a named input. The executor resolves it. The model never sees the value.
+The one exception is values the model must type, which are supplied as template references such as `{{inputs.memberId}}` rather than literals. The model asks to fill a field with a named input. The executor resolves it. The model never sees the value. The goal it is given is templated the same way.
 
 ## 5. What the guardrails do not cover
 
@@ -163,8 +157,9 @@ For `REPORT.md`. Stating the limits is part of the deliverable.
 * **Prompt injection from page content.** A malicious page could contain text instructing the model to navigate elsewhere. The allowlist contains the blast radius, since it cannot leave permitted origins or perform denied actions, but it could still be steered into a permitted but wrong action. Real mitigations are structural output constraints, treating page text as data rather than instruction in the prompt, and an anomaly check on the action sequence. We implement the first two and note the third.
 * **Semantic correctness.** Policy can tell that a click targets a submit button. It cannot tell that the submit is for the wrong member. Checkpoints and typed outputs are the mitigation, and they are partial.
 * **Regex redaction is imperfect.** It will miss unusual account formats and occasionally over redact. Provenance based redaction is the strong mechanism and pattern matching is the net, not the floor.
-* **The operator is trusted.** Their actions during a control window are recorded but not authorized action by action. There is one real control. A `context.route` handler refuses any request to an origin or path outside the allowlist, which applies to the human window exactly as it applies to automation, and it is also what keeps either of them out of `/__control__`. Semantic constraint on what an operator does inside a permitted origin is designed and not built.
+* **The operator is trusted.** Their actions during a control window are recorded but not authorized action by action. There is one real control. A `context.route` handler refuses any request to an origin or path outside the allowlist, which applies to the human window exactly as it applies to automation, and it is also what keeps either of them out of `/__control__`. Semantic constraint on what an operator does inside a permitted origin is not built.
 * **No egress control.** A compromised dependency could exfiltrate. Out of scope, worth naming.
+* **No rate limit.** A model in a loop is bounded in steps and duration but not in speed. Against a fragile legacy system that matters, and the next thing to build here is a throttle through the injected clock.
 * **Screenshot masking depends on correct element detection.** A sensitive value rendered inside a canvas or an image will not be masked. The mitigation is not persisting screenshots at all on steps marked `sensitive` unless evidence capture is explicitly enabled.
 
 ## 6. Tests that must exist
@@ -180,9 +175,9 @@ Listed here because safety properties are exactly the ones that rot silently.
 * An approval grant is accepted exactly once and refused on a second presentation.
 * A secret input value never appears in the serialised artifact, asserted by scanning the JSON for the literal.
 * A secret input value never appears in any log line produced during a run, asserted by capturing the log sink.
-* Screenshot masking covers the declared boxes, asserted on pixel samples.
+* Screenshot masking covers the declared regions, asserted on pixel samples.
 * The model prompt contains no unredacted PII, asserted against a fixture observation.
 * `src/discovery` and `src/replay` do not import the unguarded driver, asserted over the import graph.
-* Budgets terminate a run that exceeds max steps or max duration. The rate limit throttles through `Clock.delay` rather than failing, because respecting a legacy application is politeness and not an error condition.
+* Budgets terminate a run that exceeds max steps or max duration.
 * A request to an origin or path outside the allowlist is refused at the network layer, including while a human holds control.
 * The evidence scanner fails on a planted canary and passes on the committed tree.

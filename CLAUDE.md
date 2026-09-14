@@ -31,7 +31,7 @@ These are not preferences. Violating any of them is a defect.
 4. **No secrets, no raw PII.** Nothing sensitive is written to artifacts, logs, evidence, screenshots, or model prompts. Redaction happens at the sink, not at the call site. See `docs/SAFETY.md`.
 5. **Locators are derived, never invented.** The model selects an element by reference. The recorder derives the locator bundle from the real element. The model never writes a CSS selector.
 6. **Business outcomes are not failures.** "No such member" is a legitimate typed result. Conflating the two is the single most penalised mistake in this brief. See `docs/ERROR_TAXONOMY.md`.
-7. **Deterministic tests.** No network in unit or integration tests. No real model calls in CI. No `sleep` based waits anywhere, in tests or in production code.
+7. **Deterministic tests.** No network in unit or integration tests. No real model calls in the test suite. No `sleep` based waits anywhere, in tests or in production code.
 8. **Decisions get recorded, in proportion.** A new ADR only when a decision supersedes an existing ADR or changes an answer in `REPORT.md`. Anything smaller is recorded in the commit body.
 9. **Never read or print credential files.** Not `.npmrc`, `.env`, cloud credentials or key files, not even to check one setting. Use targeted commands such as `npm config get strict-ssl` that return a single value.
 
@@ -47,7 +47,7 @@ Decided already. Do not re litigate without an ADR.
 | Model | Anthropic Claude Sonnet via the official SDK, tool use, temperature 0 |
 | Test runner | Vitest |
 | Target application | A local legacy styled banking app we build, see `docs/TARGET_APP.md` |
-| Operator console and capability API | Fastify plus one static HTML page, no frontend framework |
+| Operator console | Fastify plus one static HTML page, no frontend framework |
 | Logging | Structured JSON lines through a redacting logger |
 | Config | Zod validated env plus `policy/allowlist.yaml` |
 
@@ -55,18 +55,18 @@ Decided already. Do not re litigate without an ADR.
 
 ```
 CLAUDE.md              this file
-README.md              deliverable, setup and demo path, written in Slice 7
-REPORT.md              deliverable, the seven required headings, written in Slice 7
-PROGRESS.md            living state, updated every session
+README.md              deliverable, setup and demo path, written in Slice 8
+REPORT.md              deliverable, the seven required headings, written in Slice 8
+PROGRESS.md            living state, updated once per slice
 policy/allowlist.yaml  the safety allowlist
 profiles/              app profiles, conditions and sensitivity true of a whole application
-capabilities/          saved capability artifacts, plus a state sidecar per capability
+capabilities/          saved capability artifacts, one file per version
 evidence/              committed run evidence, deliverable
 docs/                  design documents, read on demand
 src/
   core/                pure domain, zero IO
     surfaceModel/      UINode, Observation, geometry, the action vocabulary
-    capability/        artifact schema, versioning, templating, overlays
+    capability/        artifact schema, loader, templating
     locator/           locator bundle types, derivation, ranking, resolution policy
     outcome/           result contract, error taxonomy, condition detectors
     policy/            policy engine, allowlist, risk classification
@@ -120,7 +120,7 @@ For every task in `docs/PLAN.md`:
 6. Run `npm run test` and `npm run typecheck`.
 7. Tick the box in `docs/PLAN.md` and commit with the task ID in the message, for example `S4-T05 derive locator bundles from AX nodes`. Update `PROGRESS.md` when the slice closes.
 
-If a task turns out to be wrong or underspecified, do not silently improvise. Update `docs/PLAN.md`, note it in `PROGRESS.md`, and write an ADR if it changes a design decision.
+If a task turns out to be wrong or underspecified, do not silently improvise. Update `docs/PLAN.md`, and write an ADR only if the change supersedes an existing ADR or changes an answer in `REPORT.md`.
 
 ## 7. Definition of done, per task
 
@@ -200,19 +200,18 @@ Any new counter, signal, threshold, or reported field introduced. Write "none" i
 ### Example
 
 ```
-S6-T02 add bounded recovery handlers for transient and interstitial conditions
+S6-T02 add bounded TransientLoad recovery on idempotent steps
 
 Issue
-Replay treated a 503 and a known maintenance overlay as hard failures. Both are
-routine on the target surface and both are recoverable, so a capability that is
-working correctly was reporting as broken.
+Replay treated a 503 as a hard failure. A transient load is routine on the target
+surface and recoverable, so a capability that was working correctly reported as
+broken.
 
 Change
-Adds four recovery handlers behind the condition classifier. TransientLoad retries
-the step with exponential backoff. KnownInterstitial dismisses via the declared
-action and re evaluates the precondition. StaleElement re resolves once.
-SessionExpired re authenticates once when policy allows it. Every handler is
-bounded and every invocation is appended to result.recoveries.
+Adds a TransientLoad handler behind the condition classifier. It retries the step
+with exponential backoff through Clock.delay, bounded at three attempts, and only
+when the step is declared idempotent. Every invocation is appended to
+result.recoveries, including on a run that succeeds.
 
 Why
 The brief separates recoverable conditions from hard failures, and a replay that
@@ -223,15 +222,14 @@ would make a write unsafe.
 
 Tests
 src/replay/recovery/transient.test.ts asserts backoff timing and the three attempt
-bound using fake timers.
-src/replay/recovery/interstitial.test.ts asserts the precondition is re evaluated
-after dismissal and that the per step and per run bounds hold.
-tests/integration/replay.faults.test.ts covers flaky503 and interstitial end to end
-against the target app and asserts both appear in result.recoveries on a success.
+bound using fake timers, and that a non idempotent step is never retried.
+tests/integration/replay.faults.test.ts covers flaky503 end to end against the
+target app and asserts the recovery appears in result.recoveries on a success.
 
 Metrics
 Adds recoveries[] to ReplayResult, reported on every result including success.
 Adds RecoveryRecord with condition, strategy, attempt, and resolved.
+
 ```
 
 ## 12. Document index
@@ -248,7 +246,7 @@ Read these when the task references them.
 | `docs/ERROR_TAXONOMY.md` | The result contract, failure classes, detectors, retries |
 | `docs/ESCALATION.md` | Control transfer model, operator API, resume semantics |
 | `docs/SAFETY.md` | Allowlist, risk classes, redaction, limits |
-| `docs/TESTING.md` | TDD rules, the pyramid, fakes, cassettes, coverage gates |
-| `docs/TARGET_APP.md` | The local legacy app, fault injection, tenant variants |
+| `docs/TESTING.md` | TDD rules, the pyramid, fakes, cassettes, running the suite |
+| `docs/TARGET_APP.md` | The local legacy app and its fault injection |
 | `docs/EVIDENCE.md` | Exactly what must land in `/evidence/` and how |
 | `docs/DECISIONS.md` | ADRs already made, plus the template for new ones |

@@ -1,8 +1,10 @@
 # Architecture decision records
 
-Decisions already made. Do not re litigate these without writing a superseding ADR. Every new decision that is not already covered here gets an entry before the code lands.
+Decisions already made. Do not re litigate these without writing a superseding ADR. A new ADR is written only when a decision supersedes one here or changes an answer in `REPORT.md`. Anything smaller goes in a commit body.
 
 Format is deliberately short. Context, decision, consequences, alternatives rejected. If an ADR runs past a page it is two decisions.
+
+**Scope note, 2026-09-14.** The plan was cut to a thin vertical slice. The ADRs below were not rewritten for it, because the decisions still hold, but some recorded consequences are now design only. ADR 0002 no longer carries a second tenant, and its fault list is down to six. ADR 0011 no longer serves a catalog from Fastify. ADR 0015 overlays are specified in `docs/ARTIFACT_SCHEMA.md` and not implemented, and their `app.baseUrl` override has nothing to override, because the base URL moved to config. ADR 0016 no longer has a `serve` command, which went with the catalog. The reason for each cut is in `PROGRESS.md` under Deferred and cut.
 
 ---
 
