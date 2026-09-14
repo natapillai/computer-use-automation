@@ -63,7 +63,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T05** `PolicyEngine.authorize`.
   * Accept: an allowlist of origins, paths and action kinds, a three valued verdict, denied beats allowed, unknown means deny. Confirmation reads the declared `effect` until the profile cross check at S3-T04. One shot approval grants are bound to run, step and target and accepted once.
   * Test: unit, the origin and path table from `docs/SAFETY.md` section 6, an unknown action denied, and a grant accepted once and refused the second time.
-* [ ] **S1-T06** MERIDIAN Core, grown from the spike page. Frameset, login with a session cookie, member search, member detail, and `/__control__` reset under `TARGET_TEST_MODE`.
+* [x] **S1-T06** MERIDIAN Core, grown from the spike page. Frameset, login with a session cookie, member search, member detail, and `/__control__` reset under `TARGET_TEST_MODE`.
   * Accept: nested tables, no test IDs, generated IDs seeded per process, the two hostile controls kept, and the seed members from `docs/TARGET_APP.md` section 6 with their four balance formats and the canary card number. `npm run target` lands here.
   * Test: integration, routes return 200, unauthenticated requests redirect, a known ID returns a row, `00000` returns the no records banner, and control routes are unmounted without the flag.
 * [ ] **S1-T07** `SurfaceDriver` interface, `ControlToken` and `FakeSurfaceDriver`.

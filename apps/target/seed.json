@@ -1,0 +1,38 @@
+{
+  "members": [
+    {
+      "id": "10001",
+      "name": "Test Member One",
+      "card": "4111 1111 1111 1111",
+      "accounts": [
+        { "suffix": "S01", "type": "Savings", "balance": "$4,250.75" },
+        { "suffix": "C01", "type": "Checking", "balance": "$310.20" }
+      ]
+    },
+    {
+      "id": "10002",
+      "name": "Test Member Two",
+      "accounts": [
+        { "suffix": "S01", "type": "Savings", "balance": "1980.40 USD" },
+        { "suffix": "C01", "type": "Checking", "balance": "15.00 USD" }
+      ]
+    },
+    {
+      "id": "10003",
+      "name": "Test Member Three",
+      "accounts": [
+        { "suffix": "S01", "type": "Savings", "balance": "(125.00)" },
+        { "suffix": "S02", "type": "Holiday Club", "balance": "40.00" },
+        { "suffix": "S03", "type": "Share Certificate", "balance": "1,000.00" },
+        { "suffix": "C01", "type": "Checking", "balance": "(12.50)" }
+      ]
+    },
+    {
+      "id": "10004",
+      "name": "Test Member Four",
+      "accounts": [
+        { "suffix": "S01", "type": "Savings", "balance": "$0.00" }
+      ]
+    }
+  ]
+}

@@ -54,7 +54,7 @@ GET  /member/:id/subaccount     new sub account form
 POST /member/:id/subaccount     validation, then a confirmation screen
 GET  /servicing/status          status frame
 
-GET  /__control__/reset         reset all state, test only
+GET  /__control__/reset         reset members and faults, test only, sessions survive
 POST /__control__/fault         arm a fault, test only
 GET  /__control__/state         inspect state, test only
 ```

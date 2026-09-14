@@ -10,11 +10,15 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "target": "node --env-file-if-exists=.env --import tsx apps/target/src/server.ts"
   },
   "devDependencies": {
+    "@types/ejs": "3.1.5",
+    "@types/express": "5.0.6",
     "@types/node": "22.20.2",
     "playwright": "1.63.0",
+    "tsx": "4.22.0",
     "typescript": "6.0.3",
     "vite": "7.3.6",
     "vitest": "4.1.11"
@@ -23,6 +27,8 @@
     "vite": "7.3.6"
   },
   "dependencies": {
+    "ejs": "3.1.10",
+    "express": "5.2.1",
     "yaml": "2.8.4",
     "zod": "4.5.4"
   }
