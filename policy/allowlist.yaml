@@ -1,0 +1,42 @@
+version: 1
+
+origins:
+  - pattern: "http://localhost:4010"
+    description: "Local MERIDIAN Core target app"
+    allowedPaths:
+      - "/servicing/**"
+      - "/member/**"
+      - "/auth/login"
+    deniedPaths:
+      - "/admin/**"
+      - "/__control__/**"
+      - "/**/delete"
+      - "/**/wire/**"
+
+actions:
+  allowed: [navigate, click, fill, select, press, hover, scroll, waitFor, extract, assert, dismiss]
+  denied: [upload, download, execScript, newTab, clipboardRead]
+
+# Risk classification is not in this file. It lives in profiles/<appId>.json as a
+# route plus method table, because effect and idempotency are properties of an
+# application and not of a regex over button text. This file caps what is permitted
+# at all. The profile says what each action actually is.
+risk:
+  unclassified: deny
+  writeHandling: confirm
+  sensitiveHandling: allow_redacted
+
+budgets:
+  maxStepsPerRun: 40
+  maxModelCallsPerRun: 40
+  maxRunDurationMs: 300000
+
+data:
+  neverPersist: [password, token, ssn, cardNumber, cvv, pin, apiKey]
+  # flags is an explicit field. An inline (?i) is PCRE syntax that JavaScript rejects.
+  redactPatterns:
+    - { name: ssn, pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b", flags: "g" }
+    - { name: cardNumber, pattern: "\\b(?:\\d[ -]*?){13,19}\\b", flags: "g", validator: luhn }
+    - { name: email, pattern: "\\b[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}\\b", flags: "gi" }
+    - { name: phone, pattern: "\\b\\+?1?[ .-]?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b", flags: "g" }
+    - { name: accountNumber, pattern: "\\b\\d{9,17}\\b", flags: "g", contextual: true }

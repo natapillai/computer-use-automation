@@ -1,0 +1,24 @@
+version: 1
+
+origins:
+  - pattern: "http://localhost:4010/servicing"
+    description: "Invalid on purpose. An origin must not carry a path."
+    allowedPaths:
+      - "/servicing/**"
+
+actions:
+  allowed: [click]
+
+risk:
+  unclassified: deny
+  writeHandling: confirm
+  sensitiveHandling: allow_redacted
+
+budgets:
+  maxStepsPerRun: 40
+  maxModelCallsPerRun: 40
+  maxRunDurationMs: 300000
+
+data:
+  neverPersist: []
+  redactPatterns: []

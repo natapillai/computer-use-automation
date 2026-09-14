@@ -60,7 +60,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T04** `ConditionMatcher` evaluation and the money parser.
   * Accept: one matcher language including `all`, `any`, `not` and `outputResolvable`, used by checkpoints and detectors alike. Money is minor units plus currency plus raw text, and the raw text is `pii`.
   * Test: unit, one per matcher kind positive and negative, then `$4,250.75`, `4250.75 USD`, `(125.00)` and `$0.00`, and an unparseable string as a typed failure.
-* [ ] **S1-T05** `PolicyEngine.authorize`.
+* [x] **S1-T05** `PolicyEngine.authorize`.
   * Accept: an allowlist of origins, paths and action kinds, a three valued verdict, denied beats allowed, unknown means deny. Confirmation reads the declared `effect` until the profile cross check at S3-T04. One shot approval grants are bound to run, step and target and accepted once.
   * Test: unit, the origin and path table from `docs/SAFETY.md` section 6, an unknown action denied, and a grant accepted once and refused the second time.
 * [ ] **S1-T06** MERIDIAN Core, grown from the spike page. Frameset, login with a session cookie, member search, member detail, and `/__control__` reset under `TARGET_TEST_MODE`.
