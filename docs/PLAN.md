@@ -75,7 +75,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T09** `SessionBroker` and `GuardedSurface`.
   * Accept: the broker logs in before leasing a session, so no artifact holds a credential, and a `context.route` handler refuses non allowlisted origins and paths. `authorize` has exactly one call site, inside `GuardedSurface`.
   * Test: integration, a leased session is authenticated and a denied path is refused at the network layer. Unit, a denied action never reaches the driver, and an import graph test proves `replay` and `discovery` cannot reach the raw driver.
-* [ ] **S1-T10** Fixture artifact and `ReplayExecutor`. **Gate, Skeleton 1.**
+* [x] **S1-T10** Fixture artifact and `ReplayExecutor`. **Gate, Skeleton 1.**
   * Accept: the hand authored `member.readSavingsBalance` has `entryPath` `/servicing` and a `framePath` on every navigate. The executor resolves, authorizes, acts, waits on a bounded condition named in its timeout message, evaluates checkpoints into `CheckpointFailed`, and extracts typed outputs or `OutputUnresolvable`. `test:integration` lands here.
   * Test: unit against the fake for the happy path. Integration, member `10001` returns `success` with 425075 minor units in USD.
 

@@ -184,8 +184,10 @@ The app profile layer may classify recoverable, escalate or failure. It may not 
 There is exactly one wait primitive and it takes a condition.
 
 ```ts
-waitFor(condition: ConditionMatcher, timeoutMs: number): Promise<WaitResult>
+race(contenders: { condition: ConditionMatcher; entrant: T }[], timeoutMs: number): Promise<RaceOutcome<T>>
 ```
+
+The race observes, evaluates every contender in precedence order, and returns the first that holds. Between observations it calls `SurfaceDriver.waitForChange`, which returns as soon as the surface differs from the last observation or the remaining time runs out. The web driver answers it from a per document mutation counter that Playwright checks on each animation frame. The fake answers it from a version number and spends the timeout on the injected clock.
 
 No `sleep`. No fixed delays. No `networkidle` as a correctness mechanism, since a legacy app with a polling frame never goes idle. Every wait names the condition it is waiting for, which means its timeout message names it too. `Timed out after 10000ms waiting for: balance cell present in frame content` is a debuggable error. `Timeout` is not.
 

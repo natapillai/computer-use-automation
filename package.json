@@ -10,6 +10,7 @@
   "scripts": {
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
+    "test:integration": "vitest run --config vitest.integration.config.ts",
     "typecheck": "tsc --noEmit",
     "target": "node --env-file-if-exists=.env --import tsx apps/target/src/server.ts"
   },

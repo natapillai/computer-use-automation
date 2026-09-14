@@ -4,6 +4,7 @@ import { sameFramePath } from '../../core/surfaceModel/geometry.js';
 import { matchStrategy } from '../../core/surfaceModel/match.js';
 import { findNodeByRef } from '../../core/surfaceModel/tree.js';
 import type { ActionResult, Observation, ResolvedAction, UINode } from '../../core/surfaceModel/types.js';
+import type { Clock } from '../../runtime/clock.js';
 import type { SurfaceDriver } from '../types.js';
 
 // An in memory surface with scripted screens and no browser, see docs/TESTING.md
@@ -37,6 +38,8 @@ export interface FakeSurfaceOptions {
   readonly sessionId: string;
   readonly control: ControlGate;
   readonly script: FakeScript;
+  // Needed only by waitForChange, which spends its timeout on this clock.
+  readonly clock?: Clock;
 }
 
 const OK: ActionResult = { ok: true };
@@ -58,10 +61,16 @@ export function createFakeSurfaceDriver(options: FakeSurfaceOptions): FakeSurfac
   let current = screenNamed(screen);
   const performed: ResolvedAction[] = [];
 
+  // Every change to the surface bumps the version, and every observation records the
+  // version it saw, which is all waitForChange needs to know.
+  let version = 0;
+  let observedVersion = 0;
+
   // Arriving on a screen is a new page load, so values filled on the last one are gone.
   const moveTo = (name: string): void => {
     screen = name;
     current = screenNamed(name);
+    version += 1;
   };
 
   const transitionFor = (action: ResolvedAction): FakeTransition | undefined =>
@@ -83,6 +92,7 @@ export function createFakeSurfaceDriver(options: FakeSurfaceOptions): FakeSurfac
 
     if (action.kind === 'fill' || action.kind === 'select') {
       current = { ...current, root: withValue(current.root, action.ref, action.value) };
+      version += 1;
       return OK;
     }
     // An unscripted click leaves the screen as it was, the way a dead control does.
@@ -102,9 +112,20 @@ export function createFakeSurfaceDriver(options: FakeSurfaceOptions): FakeSurfac
     get performed() {
       return [...performed];
     },
-    observe: async () => current,
+    observe: async () => {
+      observedVersion = version;
+      return current;
+    },
     match,
     frameUrl: async (framePath) => current.frames.find((frame) => sameFramePath(frame.framePath, framePath))?.url ?? null,
+    // Nothing on a fake changes by itself, so an unchanged surface waits out the whole
+    // timeout on the injected clock, which a test clock spends instantly.
+    waitForChange: async (timeoutMs) => {
+      if (version !== observedVersion) return 'changed';
+      if (options.clock === undefined) throw new TypeError('The fake surface needs a clock to wait.');
+      await options.clock.delay(timeoutMs);
+      return 'timeout';
+    },
     resolve: async (bundle, token) => {
       control.assertCurrent(token);
       return resolveBundle(bundle, match);

@@ -3,6 +3,7 @@ import { box, disabled, observationOf, uiNode } from '../../../tests/fixtures/su
 import { ControlLostError, createControlTokens } from '../../control/controlToken.js';
 import type { LocatorBundle } from '../../core/locator/schema.js';
 import { findNodeByRef } from '../../core/surfaceModel/tree.js';
+import { createTestClock, type Clock } from '../../runtime/clock.js';
 import { createSequentialIds } from '../../runtime/ids.js';
 import { createFakeSurfaceDriver, type FakeScript } from './fakeSurfaceDriver.js';
 
@@ -42,9 +43,9 @@ const memberIdField: LocatorBundle = {
   describedAs: 'Member ID input',
 };
 
-function setup() {
+function setup(clock?: Clock) {
   const tokens = createControlTokens('sess_000001', createSequentialIds());
-  const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script });
+  const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script, ...(clock === undefined ? {} : { clock }) });
   return { tokens, driver, token: tokens.issue('automation') };
 }
 
@@ -131,6 +132,25 @@ describe('FakeSurfaceDriver', () => {
     expect(await driver.frameUrl(['content'])).toBe('http://localhost:4010/servicing/search');
     expect(await driver.frameUrl([])).toBe('http://localhost:4010/servicing');
     expect(await driver.frameUrl(['missing'])).toBeNull();
+  });
+
+  it('reports a change made since the last observation at once, without spending time', async () => {
+    const clock = createTestClock('2026-09-14T09:00:00.000Z');
+    const { driver, token } = setup(clock);
+    await driver.observe();
+    await driver.act({ kind: 'click', ref: 'n6' }, token);
+
+    expect(await driver.waitForChange(1_000)).toBe('changed');
+    expect(clock.now().toISOString()).toBe('2026-09-14T09:00:00.000Z');
+  });
+
+  it('spends the whole timeout on its clock when nothing changes', async () => {
+    const clock = createTestClock('2026-09-14T09:00:00.000Z');
+    const { driver } = setup(clock);
+    await driver.observe();
+
+    expect(await driver.waitForChange(1_000)).toBe('timeout');
+    expect(clock.now().toISOString()).toBe('2026-09-14T09:00:01.000Z');
   });
 
   it('refuses a script whose transition names a screen that does not exist', () => {

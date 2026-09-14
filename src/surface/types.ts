@@ -22,6 +22,11 @@ export interface SurfaceDriver {
   // snapshot, so asking never moves the observation a ref is checked against.
   frameUrl(framePath: readonly string[]): Promise<string | null>;
 
+  // Resolves 'changed' once the surface differs from the most recent observation, at once
+  // if it already does, or 'timeout' when timeoutMs passes first. Every wait in the
+  // system is built on this and on a condition, never on a sleep.
+  waitForChange(timeoutMs: number): Promise<'changed' | 'timeout'>;
+
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
 
   // Throws ControlLostError before touching the surface when the token is not current.

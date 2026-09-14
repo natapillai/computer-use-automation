@@ -22,6 +22,7 @@ export interface GuardedSurface {
   readonly sessionId: string;
   observe(): Promise<Observation>;
   match(strategy: LocatorStrategy, framePath: readonly string[]): Promise<readonly string[]>;
+  waitForChange(timeoutMs: number): Promise<'changed' | 'timeout'>;
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
   perform(request: GuardedAction, control: ControlToken): Promise<GuardedOutcome>;
 }
@@ -55,6 +56,7 @@ export function createGuardedSurface(options: GuardedSurfaceOptions): GuardedSur
     sessionId: driver.sessionId,
     observe: () => driver.observe(),
     match: (strategy, framePath) => driver.match(strategy, framePath),
+    waitForChange: (timeoutMs) => driver.waitForChange(timeoutMs),
     resolve: (bundle, control) => driver.resolve(bundle, control),
     perform: async (request, control) => {
       const decision = authorize(

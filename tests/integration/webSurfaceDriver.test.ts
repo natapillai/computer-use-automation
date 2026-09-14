@@ -181,6 +181,19 @@ describe('WebSurfaceDriver against MERIDIAN Core', { timeout: 30_000 }, () => {
     expect(await driver.match(resultLink, [])).toEqual([]);
   });
 
+  it('waits for the content frame to change after a click, and times out when nothing changes', async () => {
+    await driver.act({ kind: 'fill', ref: (await resolvedNode(memberIdField)).ref, value: '10001' }, token);
+    const search = await driver.resolve(searchButton, token);
+    if (!search.ok) throw new Error('The search button did not resolve.');
+    await driver.act({ kind: 'click', ref: search.ref }, token);
+
+    expect(await driver.waitForChange(10_000)).toBe('changed');
+
+    await contentFrame().waitForLoadState('load');
+    await driver.observe();
+    expect(await driver.waitForChange(300)).toBe('timeout');
+  });
+
   it('refuses a ref whose element changed under it instead of acting on whatever the ref names now', async () => {
     const input = await resolvedNode(memberIdField);
     await contentFrame().goto(`${base}/member/10001`);

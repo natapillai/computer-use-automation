@@ -50,6 +50,7 @@ export interface SurfaceDriver {
   observe(opts?: ObserveOptions): Promise<Observation>;
   match(strategy: LocatorStrategy, framePath: string[]): Promise<string[]>;   // the port the core resolver calls
   frameUrl(framePath: string[]): Promise<string | null>;                   // live url with no snapshot, for policy
+  waitForChange(timeoutMs: number): Promise<'changed' | 'timeout'>;       // the only way any wait waits
   act(action: ResolvedAction, control: ControlToken): Promise<ActionResult>;
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
   capture(kind: EvidenceKind): Promise<EvidenceRef>;

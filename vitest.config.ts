@@ -1,11 +1,10 @@
 import { defineConfig } from 'vitest/config';
 
-// Projects for unit, contract, integration and e2e, and the coverage gates, land at
-// S3-T03. Until then there is one project and no gate, because there is nothing yet
-// for a gate to measure.
+// The fast loop, unit and contract. Integration tests launch Chromium and the target app,
+// so they run through vitest.integration.config.ts and npm run test:integration.
 export default defineConfig({
   test: {
-    include: ['src/**/*.test.ts', 'tests/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'tests/contract/**/*.test.ts'],
     environment: 'node',
   },
 });
