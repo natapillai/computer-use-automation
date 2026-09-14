@@ -1,0 +1,34 @@
+export interface Clock {
+  now(): Date;
+  delay(ms: number): Promise<void>;
+}
+
+export interface TestClock extends Clock {
+  advance(ms: number): void;
+}
+
+// The one place in the system a raw timer is allowed. Everything else waits on a
+// condition, or on Clock.delay for retry backoff, so tests can swap in a test clock.
+export const systemClock: Clock = {
+  now: () => new Date(),
+  delay: (ms) =>
+    new Promise<void>((resolve) => {
+      setTimeout(resolve, ms);
+    }),
+};
+
+// Virtual time. A delay advances the clock and resolves at once, so time dependent
+// code runs deterministically with no fake timers and no waiting.
+export function createTestClock(start: string | Date): TestClock {
+  let current = new Date(start).getTime();
+
+  return {
+    now: () => new Date(current),
+    advance: (ms) => {
+      current += ms;
+    },
+    delay: async (ms) => {
+      current += ms;
+    },
+  };
+}

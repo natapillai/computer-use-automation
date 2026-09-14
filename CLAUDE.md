@@ -44,7 +44,7 @@ Decided already. Do not re litigate without an ADR.
 | Language | TypeScript, strict mode, Node 22 LTS, ESM |
 | Runtime validation and types | Zod as the single source of truth, types inferred from schemas |
 | Browser automation | Playwright, Chromium, driven primarily through the accessibility tree |
-| Model | Anthropic Claude Sonnet via the official SDK, tool use, temperature 0 |
+| Model | Anthropic Claude Sonnet 5 via the official SDK, tool use, model id from `ANTHROPIC_MODEL`, no sampling parameters |
 | Test runner | Vitest |
 | Target application | A local legacy styled banking app we build, see `docs/TARGET_APP.md` |
 | Operator console | Fastify plus one static HTML page, no frontend framework |
@@ -82,6 +82,7 @@ src/
   escalation/          intervention store, operator HTTP API, mock console
   evidence/            structured logger, artifact store, screenshot store
   cli/                 discover, review and replay commands
+  runtime/             Clock, IdProvider, env config, the one place a raw timer is allowed
 apps/target/           the local legacy banking app, one tenant
 tests/
   contract/            one suite run against every SurfaceDriver implementation

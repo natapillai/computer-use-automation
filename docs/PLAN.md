@@ -31,7 +31,7 @@ Uncuttable work lands first, so a stop removes breadth rather than a requirement
 
 * [x] **S0-T01** Repo skeleton, `package.json`, TypeScript strict, ESM, Node 22, Vitest.
   * Accept: `npm run typecheck` passes on an empty `src` and `npm run test` passes with no tests. The tree matches `CLAUDE.md` section 4 except the output directories the pre Harden rule keeps out of git. Each script lands with the task that makes it work.
-* [ ] **S0-T02** `Clock`, `IdProvider` and Zod validated env config.
+* [x] **S0-T02** `Clock`, `IdProvider` and Zod validated env config.
   * Accept: one `Clock` with `now()` and `delay(ms)`, the only sanctioned delay. No secret has a default. `ANTHROPIC_MODEL` lives in config, per ADR 0011.
   * Test: unit, seeded providers are deterministic, and a missing required variable fails with a named message.
 * [ ] **S0-T03** Perception viability spike, half a day. Answers whether ADR 0012 survives the surface built to defeat it.
