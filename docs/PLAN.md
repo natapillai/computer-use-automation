@@ -66,7 +66,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T06** MERIDIAN Core, grown from the spike page. Frameset, login with a session cookie, member search, member detail, and `/__control__` reset under `TARGET_TEST_MODE`.
   * Accept: nested tables, no test IDs, generated IDs seeded per process, the two hostile controls kept, and the seed members from `docs/TARGET_APP.md` section 6 with their four balance formats and the canary card number. `npm run target` lands here.
   * Test: integration, routes return 200, unauthenticated requests redirect, a known ID returns a row, `00000` returns the no records banner, and control routes are unmounted without the flag.
-* [ ] **S1-T07** `SurfaceDriver` interface, `ControlToken` and `FakeSurfaceDriver`.
+* [x] **S1-T07** `SurfaceDriver` interface, `ControlToken` and `FakeSurfaceDriver`.
   * Accept: `act()` requires a current token and throws `ControlLostError` otherwise. The fake exists so the executor, the loop and the control plane are unit testable without Chromium.
   * Test: unit, a stale token is rejected and the fake returns scripted observations.
 * [ ] **S1-T08** `WebSurfaceDriver`.
