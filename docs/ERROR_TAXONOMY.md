@@ -51,15 +51,15 @@ interface BusinessOutcomeResult extends ResultBase {
 
 interface EscalatedResult extends ResultBase {
   status: 'escalated';
-  intervention: { id: string; reason: EscalationReason; atStepId: string; disposition: 'unclaimed' | 'aborted' };
+  intervention: { id: string; reason: EscalationReason; atStepId: string | null; disposition: 'unclaimed' | 'aborted' };
 }
 
 interface FailureResult extends ResultBase {
   status: 'failure';
   failure: {
     class: FailureClass;
-    atStepId: string;
-    stepIntent: string;          // plain language, so the error reads like a sentence
+    atStepId: string | null;     // null only when the run failed before its first step
+    stepIntent: string | null;   // plain language, so the error reads like a sentence
     expected: string;
     observed: string;
     locatorAttempts?: LocatorAttempt[];   // every strategy tried and why it was rejected

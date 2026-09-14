@@ -54,7 +54,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 * [x] **S1-T02** Capability schema, refinements and loader.
   * Accept: `effect` and `idempotent` per step, per ADR 0014. No `allowedOrigins`, no `allowReauth`, no `baseUrl`, no `variant`, no `optional` step flag, no `surfaceFingerprint` and no stability counters. Step provenance is `model` or `manual`. A navigate carries a templated `path` and a `framePath`. Refinements: unique step IDs, index matches order, output and `outputResolvable` references resolve, templates name declared inputs or earlier outputs, every acting step has a postcondition, no retry on a non idempotent step, and a step level business outcome uses a declared code. The loader refuses an unsupported `schemaVersion`. `redactionApplied` is a marker, not enforcement.
   * Test: unit, a valid fixture parses, one test per refinement, and a future version yields `SchemaIncompatible`.
-* [ ] **S1-T03** Templates, input validation and the result contract.
+* [x] **S1-T03** Templates, input validation and the result contract.
   * Accept: templates resolve `inputs`, earlier `outputs` and allowlisted `env`, with no expression language. Inputs are validated before any surface opens. `ResultBase` carries `inputNames`, `recoveries[]`, `interventions[]` and `drift[]`, and failure constructors require `expected` and `observed`.
   * Test: unit, each scope resolves, an unresolved reference fails before acting, each constraint yields `InputValidation`, and each failure class is constructible.
 * [ ] **S1-T04** `ConditionMatcher` evaluation and the money parser.
