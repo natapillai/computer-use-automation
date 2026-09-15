@@ -120,7 +120,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T02** `ModelClient`, `FakeModelClient` and `CassetteModelClient`.
   * Accept: cassette matching is positional with a tool set and observation hash assertion, per ADR 0017.
   * Test: unit, deterministic replay, and a changed observation hash fails with a diff.
-* [ ] **S4-T03** Observation builder, prompt and tool schema.
+* [x] **S4-T03** Observation builder, prompt and tool schema.
   * Accept: prune to interactive and text bearing nodes, refs in document order, derived labels, redaction through the profile before the prompt. Tools are refs only, `click`, `fill` with an input name, `select`, `press`, `navigate`, `extract`, `escalate` and `done`, and never `waitFor` or `assert`, per ADR 0013. The goal is templated so it never carries a member ID.
   * Test: unit, a fixture observation contains no unredacted PII, and tool definitions are asserted against the allowed subset.
 * [ ] **S4-T04** `AgentLoop`, with `NoProgress` and `ModelRequested`.
