@@ -14,6 +14,7 @@ import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
 import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent } from './agentLoop.js';
 import { createFakeModelClient, type FakeTurn } from './fakeModelClient.js';
+import { createRecorder, type Recorder } from './recorder.js';
 
 const allowlist = Allowlist.parse({
   version: 1,
@@ -57,6 +58,7 @@ interface RunOptions {
   readonly script?: MeridianScriptOptions;
   readonly budgets?: Partial<DiscoveryBudgets>;
   readonly goal?: string;
+  readonly recorder?: Recorder;
 }
 
 async function discover(options: RunOptions) {
@@ -84,6 +86,7 @@ async function discover(options: RunOptions) {
     budgets: { maxModelCalls: 20, maxActions: 40, maxDurationMs: 300_000, ...options.budgets },
     entryPath: '/servicing',
     onEvent: (event) => events.push(event),
+    ...(options.recorder === undefined ? {} : { recorder: options.recorder }),
   });
   return { result, driver, model, events };
 }
@@ -196,6 +199,27 @@ describe('runDiscovery', () => {
 
     expect(result).toMatchObject({ status: 'failure', reason: 'ModelCallFailed', detail: 'OverloadedError with status 529.' });
     expect(model.requests).toHaveLength(1);
+  });
+
+  it('hands the recorder each element action at the moment of acting, and nothing the model wrote but the ref', async () => {
+    const recorder = createRecorder({ profile, redactor: createRedactor(allowlist.data), inputs: { memberId: '10001' } });
+    await discover({
+      recorder,
+      turns: [
+        call('fill', { ref: 'n3', input: 'memberId', selector: 'input#ctl00_cph_txt' }),
+        call('click', { ref: 'n6', selector: 'td.btn' }),
+        call('click', { ref: 'r1' }),
+        call('extract', { ref: 's3', output: 'savingsBalance' }),
+        call('done'),
+      ],
+    });
+
+    const actions = recorder.actions();
+    expect(actions.map((action) => action.tool)).toEqual(['fill', 'click', 'click', 'extract']);
+    expect(actions.every((action) => action.bundle !== null)).toBe(true);
+    expect(actions[0]).toMatchObject({ value: '{{inputs.memberId}}' });
+    expect(actions[3]).toMatchObject({ output: 'savingsBalance' });
+    expect(JSON.stringify(actions)).not.toMatch(/ctl00_cph_txt|td\.btn|10001/);
   });
 
   it('refuses a goal that carries an input value before anything is shown to the model', async () => {

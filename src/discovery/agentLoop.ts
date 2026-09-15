@@ -12,6 +12,7 @@ import type { GuardedSurface } from '../surface/guardedSurface.js';
 import type { ModelClient } from './modelClient.js';
 import { buildObservation } from './observation.js';
 import { buildGoal, SYSTEM_PROMPT } from './prompt.js';
+import type { Recorder } from './recorder.js';
 import { toolsFor } from './tools.js';
 
 // The discovery loop, see docs/ARCHITECTURE.md section 6. Observe, decide, authorize, act,
@@ -51,6 +52,7 @@ export interface DiscoveryOptions {
   readonly budgets: DiscoveryBudgets;
   readonly entryPath: string;
   readonly onEvent?: (event: DiscoveryEvent) => void;
+  readonly recorder?: Recorder;
 }
 
 interface DiscoveryCommon {
@@ -154,32 +156,41 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (path === null || framePath === null) return bad('navigate needs a path and a framePath.');
       const resolved = resolveTemplate(path, { inputs: options.inputs, outputs: {}, env: {} }, []);
       if (!resolved.ok) return bad(`The path names something that is not an input: ${resolved.references.join(', ')}.`);
+      const before = latest;
+      // The path as the model gave it, which can only carry templates, never the resolved one.
+      if (before !== null) options.recorder?.record({ tool: 'navigate', observation: before, path, framePath });
       return perform({ kind: 'navigate', path: resolved.text, framePath }, framePath);
     }
 
     const ref = readString(input, 'ref');
     const current = latest;
     const node = ref === null || current === null ? null : findNodeByRef(current.root, ref);
-    if (ref === null || node === null) return bad(`There is no element with ref ${ref ?? '(none given)'} in the latest observation.`);
+    if (ref === null || current === null || node === null) return bad(`There is no element with ref ${ref ?? '(none given)'} in the latest observation.`);
 
+    // Each element action is recorded against the observation its ref came from, before the
+    // page can change, with only the ref and names the recorder needs.
     switch (block.name) {
       case 'click':
+        options.recorder?.record({ tool: 'click', observation: current, ref });
         return perform({ kind: 'click', ref }, node.framePath);
       case 'fill':
       case 'select': {
         const name = readString(input, 'input');
         const value = name === null ? undefined : options.inputs[name];
-        if (value === undefined) return bad(`${block.name} needs the name of an input.`);
+        if (name === null || value === undefined) return bad(`${block.name} needs the name of an input.`);
+        options.recorder?.record({ tool: block.name, observation: current, ref, inputName: name });
         return block.name === 'fill' ? perform({ kind: 'fill', ref, value }, node.framePath) : perform({ kind: 'select', ref, value }, node.framePath);
       }
       case 'press': {
         const key = readString(input, 'key');
         if (key === null) return bad('press needs a key.');
+        options.recorder?.record({ tool: 'press', observation: current, ref, key });
         return perform({ kind: 'press', ref, key }, node.framePath);
       }
       case 'extract': {
         const output = readString(input, 'output');
         if (output === null) return bad('extract needs an output name.');
+        options.recorder?.record({ tool: 'extract', observation: current, ref, output });
         extracted[output] = { ref, text: node.value ?? node.name };
         return { text: `Recorded ${output} from ${ref}.`, isError: false };
       }

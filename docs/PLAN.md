@@ -126,7 +126,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T04** `AgentLoop`, with `NoProgress` and `ModelRequested`.
   * Accept: observe, decide, authorize, act, record. Stops on `done`, max steps and max duration, and budget exhaustion is a `Timeout` failure, not an escalation. `NoProgress` fires when the observation hash is unchanged across three consecutive acting tool calls, and only `click`, `fill`, `select`, `press` and `navigate` count. The hash excludes static text. `ModelRequested` fires when the model calls `escalate`. Both end the run as `escalated` in its `DiscoveryResult` until S5-T01 raises them as live interventions.
   * Test: unit with the fake model, each stopping condition, `NoProgress` firing after three unchanged hashes and still firing when only static text changed, because a ticking clock is not progress, an `escalate` call raising `ModelRequested`, a denied action never reaching the driver, and a bad ref yielding a corrective observation.
-* [ ] **S4-T05** Locator derivation, record time verification and the `Recorder`.
+* [x] **S4-T05** Locator derivation, record time verification and the `Recorder`.
   * Accept: bundles are derived from the real element at action time, never from model output. Each strategy is resolved at record time and dropped unless it uniquely hits the element. Text equal to a declared input value becomes a template.
   * Test: unit, an unnamed input yields `anchor-relative` from its derived label, an ambiguous `text` strategy is dropped, a member ID never lands as a literal, and model text is never used as a selector.
 * [ ] **S4-T06** `RunTrace` and the `Generalizer`, five transforms.
