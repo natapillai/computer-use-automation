@@ -19,10 +19,17 @@ function screen(children: readonly UINode[], contentPath: string): Observation {
   return {
     root: uiNode('e1', 'generic', '', box(0, 0, 1024, 700), {
       framePath: [],
-      children: [uiNode('e5', 'iframe', '', box(171, 27, 853, 673), { framePath: [], children })],
+      children: [
+        uiNode('e4', 'iframe', '', box(0, 27, 170, 673), {
+          framePath: [],
+          children: [uiNode('f2e8', 'link', 'Member Search', box(6, 29, 110, 19), { framePath: ['nav'] })],
+        }),
+        uiNode('e5', 'iframe', '', box(171, 27, 853, 673), { framePath: [], children }),
+      ],
     }),
     frames: [
       { framePath: [], url: `${ORIGIN}/servicing`, lastStatus: 200 },
+      { framePath: ['nav'], url: `${ORIGIN}/servicing/nav`, lastStatus: 200 },
       { framePath: ['content'], url: `${ORIGIN}${contentPath}`, lastStatus: 200 },
     ],
     dialogOpen: false,

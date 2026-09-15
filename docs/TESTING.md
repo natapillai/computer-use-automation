@@ -76,7 +76,7 @@ export function surfaceDriverContract(name: string, factory: () => Promise<Surfa
     it('observe attaches a derivedLabel to a node with no accessible name', ...);
     it('resolve honours a geometric relation', ...);
     it('act rejects a stale control token with ControlLostError', ...);
-    it('waitFor times out with the condition description in the message', ...);
+    it('waitForChange times out when nothing changes and reports a change after an action', ...);
   });
 }
 ```
