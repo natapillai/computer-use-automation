@@ -89,6 +89,20 @@ describe('matchStrategy', () => {
     expect(match({ kind: 'anchor-relative', anchor, relation: 'rightOf', role: 'cell', confidence })).toEqual(['s3']);
   });
 
+  it('does not count a neighbouring column that only shares a border pixel as below a header', () => {
+    // Boxes Chromium reported for the MERIDIAN accounts table, where collapsed borders
+    // make adjacent cells overlap by one pixel.
+    const table = observationOf([
+      uiNode('hAccount', 'cell', 'Account', box(69, 119, 78, 24)),
+      uiNode('hBalance', 'cell', 'Balance', box(146, 119, 99, 24)),
+      uiNode('vAccount', 'cell', 'Savings', box(69, 143, 78, 24)),
+      uiNode('vBalance', 'cell', '$4,250.75', box(146, 143, 99, 24)),
+    ]);
+    const anchor = { kind: 'text', text: 'Balance', exact: true, confidence } as const;
+
+    expect(matchStrategy(table, { kind: 'anchor-relative', anchor, relation: 'below', role: 'cell', confidence }, ['content'])).toEqual(['vBalance']);
+  });
+
   it('unions candidates from every anchor, so an ambiguous anchor surfaces as several matches', () => {
     const anchor = { kind: 'text', text: '01', exact: false, confidence } as const;
 
