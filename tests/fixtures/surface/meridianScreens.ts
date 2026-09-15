@@ -15,6 +15,9 @@ export interface MeridianScriptOptions {
   // loaded with, so a profile condition can hold on the same screen as a step condition.
   readonly resultsPath?: string;
   readonly resultsStatus?: number;
+  // Puts a session clock on the search screen, and makes clicking the Member ID label move
+  // between two screens that differ only in the clock's text.
+  readonly clockTicks?: boolean;
 }
 
 const ORIGIN = 'http://localhost:4010';
@@ -71,12 +74,19 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
     { from: 'results', on: { kind: 'click', ref: 'r1' }, to: 'detail' },
   ];
   if (leadsTo !== 'nowhere') transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: leadsTo });
+  const ticking = options.clockTicks ?? false;
+  if (ticking) {
+    transitions.push({ from: 'search', on: { kind: 'click', ref: 'n2' }, to: 'searchTick' });
+    transitions.push({ from: 'searchTick', on: { kind: 'click', ref: 'n2' }, to: 'search' });
+  }
+  const clock = (time: string): readonly UINode[] => (ticking ? [uiNode('ck', 'cell', `Session active ${time}`, box(488, 3, 330, 19))] : []);
 
   return {
     start: 'blank',
     screens: {
       blank,
-      search: screen(form, '/servicing/search'),
+      search: screen([...clock('09:00:00'), ...form], '/servicing/search'),
+      searchTick: screen([...clock('09:00:01'), ...form], '/servicing/search'),
       results: screen(
         [
           ...form,
