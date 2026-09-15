@@ -86,6 +86,15 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
       detail: screen(
         [
           uiNode('h1', 'heading', 'Member Detail', box(8, 8, 837, 17)),
+          uiNode('d1', 'cell', 'Member No:', box(8, 33, 96, 25)),
+          uiNode('d2', 'cell', memberId, box(104, 33, 161, 25)),
+          uiNode('d3', 'cell', 'Name:', box(8, 58, 96, 25)),
+          uiNode('d4', 'cell', 'Test Member One', box(104, 58, 161, 25)),
+          uiNode('d5', 'cell', 'Card:', box(8, 83, 96, 25)),
+          uiNode('d6', 'cell', '4111 1111 1111 1111', box(104, 83, 161, 25)),
+          uiNode('t4', 'cell', 'Suffix', box(9, 119, 60, 24)),
+          uiNode('t5', 'cell', 'Account', box(69, 119, 78, 24)),
+          uiNode('t6', 'cell', 'Balance', box(146, 119, 99, 24)),
           uiNode('s1', 'cell', 'S01', box(9, 143, 60, 24)),
           uiNode('s2', 'cell', 'Savings', box(69, 143, 78, 24)),
           uiNode('s3', 'cell', options.balance ?? '$4,250.75', box(146, 143, 99, 24)),

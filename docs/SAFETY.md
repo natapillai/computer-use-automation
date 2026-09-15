@@ -101,7 +101,7 @@ Two independent properties, declared per step and cross checked against the app 
 | read, sensitive | allow, redaction enforced | allow | allow |
 | write | confirm | confirm | allow, if the capability declares `allowUnattendedReplay` |
 
-Until the profile lands at S3-T04, the policy engine reads the effect a capability declares for its own steps and the allowlist still caps what is reachable. After it lands, a capability whose declared effect contradicts the profile is refused.
+The policy engine reads the effect a capability declares for its own steps, and the network guard enforces it against the profile, per ADR 0014 as amended. While a step runs, a request the profile does not list is refused, and a request the profile calls a write is refused under a step declared as a read. A capability whose declared effect contradicts the profile therefore fails as `PolicyDenied` before the write lands.
 
 The first version of this section had one enum and classified any POST as irreversible. The member search on the target app is a POST. That made the primary read capability require human confirmation on every discovery and every draft replay, and it made the transient retry case unreachable, because the schema forbids retrying an irreversible step. A search is a read that is not idempotent. One enum could not say that, and the regex over button names that sat beside it was the same defect in a different place.
 
@@ -171,7 +171,7 @@ Listed here because safety properties are exactly the ones that rot silently.
 * Denied paths beat allowed paths on overlap.
 * An unknown action kind yields `deny`, proving the default branch.
 * A `write` action yields `confirm` during discovery and during a draft replay, and `allow` only when the capability is approved and declares `allowUnattendedReplay`.
-* An action the profile does not classify yields `deny`, proving the fail closed default.
+* A request the profile does not classify is refused while a step runs, proving the fail closed default.
 * An approval grant is accepted exactly once and refused on a second presentation.
 * A secret input value never appears in the serialised artifact, asserted by scanning the JSON for the literal.
 * A secret input value never appears in any log line produced during a run, asserted by capturing the log sink.

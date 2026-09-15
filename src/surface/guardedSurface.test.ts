@@ -7,6 +7,7 @@ import { ACTION_VERBS } from '../core/surfaceModel/types.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver, type FakeSurfaceDriver } from './fake/fakeSurfaceDriver.js';
 import { createGuardedSurface, type GuardedAction } from './guardedSurface.js';
+import { createStepScope } from './stepScope.js';
 
 const allowlist = Allowlist.parse({
   version: 1,
@@ -44,8 +45,9 @@ function setup(contentUrl = 'http://localhost:4010/servicing/search', grants: Gr
     },
   });
   const policy: PolicyContext = { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants };
-  const surface = createGuardedSurface({ driver, policy, runId: 'run_000001', baseUrl: 'http://localhost:4010' });
-  return { tokens, driver, surface, token: tokens.issue('automation') };
+  const scope = createStepScope();
+  const surface = createGuardedSurface({ driver, policy, runId: 'run_000001', baseUrl: 'http://localhost:4010', scope });
+  return { tokens, driver, surface, scope, token: tokens.issue('automation') };
 }
 
 function click(overrides: Partial<GuardedAction> = {}): GuardedAction {
@@ -110,6 +112,36 @@ describe('GuardedSurface', () => {
     expect(await surface.perform(click({ effect: 'write' }), token)).toMatchObject({ kind: 'performed' });
     expect(await surface.perform(click({ effect: 'write' }), token)).toMatchObject({ kind: 'confirm' });
     expect(driver.performed).toHaveLength(1);
+  });
+
+  it('enters the step scope before acting, so the network guard judges what the step causes', async () => {
+    const { surface, scope, token } = setup();
+
+    await surface.perform(click(), token);
+
+    expect(scope.current()).toEqual({ stepId: 'submitSearch', effect: 'read' });
+  });
+
+  it('leaves the step scope alone when the action is denied', async () => {
+    const { surface, scope, token } = setup();
+
+    await surface.perform(navigate('/__control__/reset'), token);
+
+    expect(scope.current()).toBeNull();
+  });
+
+  it('reports the refusals recorded during a step for that step only', async () => {
+    const { surface, scope, token } = setup();
+    await surface.perform(click(), token);
+    scope.refuse('effect');
+    scope.enter({ stepId: 'openMemberDetail', effect: 'read' });
+    scope.refuse('origin');
+
+    expect(surface.refusalsFor('submitSearch')).toEqual([{ stepId: 'submitSearch', rule: 'effect' }]);
+    expect(scope.refusals()).toEqual([
+      { stepId: 'submitSearch', rule: 'effect' },
+      { stepId: 'openMemberDetail', rule: 'origin' },
+    ]);
   });
 
   it('passes the control token through, so a stale token still fails in the driver', async () => {

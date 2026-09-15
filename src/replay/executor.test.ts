@@ -10,7 +10,10 @@ import { ACTION_VERBS } from '../core/surfaceModel/types.js';
 import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
+import type { ResolvedAction } from '../core/surfaceModel/types.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
+import { createStepScope, type StepScope } from '../surface/stepScope.js';
+import type { SurfaceDriver } from '../surface/types.js';
 import { replay } from './executor.js';
 
 const allowlist = Allowlist.parse({
@@ -35,14 +38,26 @@ interface RunOptions {
   readonly script?: MeridianScriptOptions;
   readonly memberId?: string;
   readonly capability?: CapabilityInput;
+  // Stands in for the network guard, which the fake has no network to run.
+  readonly afterAct?: (action: ResolvedAction, scope: StepScope) => void;
 }
 
 async function run(options: RunOptions = {}) {
   const clock = createTestClock(START);
   const tokens = createControlTokens('sess_000001', createSequentialIds());
   const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script: meridianScript(options.script), clock });
+  const scope = createStepScope();
+  const acting: SurfaceDriver = {
+    ...driver,
+    act: async (action, token) => {
+      const result = await driver.act(action, token);
+      options.afterAct?.(action, scope);
+      return result;
+    },
+  };
   const surface = createGuardedSurface({
-    driver,
+    driver: acting,
+    scope,
     policy: { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants: createGrantLedger() },
     runId: 'run_000001',
     baseUrl: 'http://localhost:4010',
@@ -138,6 +153,17 @@ describe('replay', () => {
 
     expect(failure).toMatchObject({ class: 'LocatorAmbiguous', atStepId: 'submitSearch' });
     expect(failure.locatorAttempts?.map((attempt) => attempt.outcome)).toEqual(['ambiguous', 'ambiguous']);
+  });
+
+  it('fails with PolicyDenied when the network guard refused a request during the step, even though the page moved on', async () => {
+    const { result } = await run({
+      afterAct: (action, scope) => {
+        if (action.kind === 'click' && action.ref === 'n6') scope.refuse('effect');
+      },
+    });
+
+    expect(failureOf(result)).toMatchObject({ class: 'PolicyDenied', atStepId: 'submitSearch', cause: 'rule effect' });
+    expect(result.stepsCompleted).toBe(2);
   });
 
   it('records drift when a lower ranked strategy finds the relabelled member ID input', async () => {

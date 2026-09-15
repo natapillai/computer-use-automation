@@ -1,0 +1,73 @@
+{
+  "appId": "meridian-core",
+  "vendor": "meridian",
+  "routes": [
+    { "method": "GET", "path": "/", "effect": "read", "idempotent": true },
+    { "method": "GET", "path": "/favicon.ico", "effect": "read", "idempotent": true, "note": "Requested by the browser rather than the product." },
+    { "method": "GET", "path": "/auth/login", "effect": "read", "idempotent": true },
+    { "method": "POST", "path": "/auth/login", "effect": "read", "idempotent": false, "note": "Opens a session and changes no record." },
+    { "method": "GET", "path": "/servicing", "effect": "read", "idempotent": true },
+    { "method": "GET", "path": "/servicing/nav", "effect": "read", "idempotent": true },
+    { "method": "GET", "path": "/servicing/status", "effect": "read", "idempotent": true },
+    { "method": "GET", "path": "/servicing/search", "effect": "read", "idempotent": true },
+    { "method": "POST", "path": "/servicing/search", "effect": "read", "idempotent": false, "note": "A search is a read that is not idempotent, per ADR 0014." },
+    { "method": "GET", "path": "/member/*", "effect": "read", "idempotent": true },
+    { "method": "GET", "path": "/member/*/subaccount", "effect": "read", "idempotent": true },
+    { "method": "POST", "path": "/member/*/subaccount", "effect": "write", "idempotent": false, "note": "Opens a sub account on the system of record." }
+  ],
+  "fields": [
+    {
+      "describedAs": "Member number on member detail",
+      "framePath": ["content"],
+      "sensitivity": "pii",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Member No:", "exact": true, "confidence": 1 }, "relation": "rightOf", "role": "cell", "confidence": 1 }
+    },
+    {
+      "describedAs": "Member name on member detail",
+      "framePath": ["content"],
+      "sensitivity": "pii",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Name:", "exact": true, "confidence": 1 }, "relation": "rightOf", "role": "cell", "confidence": 1 }
+    },
+    {
+      "describedAs": "Card number on member detail",
+      "framePath": ["content"],
+      "sensitivity": "secret",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Card:", "exact": true, "confidence": 1 }, "relation": "rightOf", "role": "cell", "confidence": 1 }
+    },
+    {
+      "describedAs": "Member numbers in search results",
+      "framePath": ["content"],
+      "sensitivity": "pii",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Member No", "exact": true, "confidence": 1 }, "relation": "below", "role": "cell", "confidence": 1 }
+    },
+    {
+      "describedAs": "Member names in search results",
+      "framePath": ["content"],
+      "sensitivity": "pii",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Name", "exact": true, "confidence": 1 }, "relation": "below", "role": "cell", "confidence": 1 }
+    },
+    {
+      "describedAs": "Account balances",
+      "framePath": ["content"],
+      "sensitivity": "pii",
+      "strategy": { "kind": "anchor-relative", "anchor": { "kind": "text", "text": "Balance", "exact": true, "confidence": 1 }, "relation": "below", "role": "cell", "confidence": 1 }
+    }
+  ],
+  "conditions": [
+    { "when": { "kind": "urlMatches", "pattern": "/auth/login" }, "classify": "failure", "code": "SessionExpired" },
+    { "when": { "kind": "httpStatus", "codes": [502, 503] }, "classify": "recoverable", "code": "TransientLoad" },
+    {
+      "when": {
+        "kind": "elementPresent",
+        "target": {
+          "framePath": ["content"],
+          "strategies": [{ "kind": "role-name", "role": "heading", "name": "Service Unavailable", "exact": false, "confidence": 0.8 }],
+          "matchPolicy": "unique",
+          "describedAs": "Generic error banner"
+        }
+      },
+      "classify": "failure",
+      "code": "SurfaceUnavailable"
+    }
+  ]
+}

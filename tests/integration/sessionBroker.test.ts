@@ -6,6 +6,8 @@ import { ControlLostError } from '../../src/control/controlToken.js';
 import { createSessionBroker, type FormLogin, type Lease, type LeaseRequest, type LeaseResult } from '../../src/control/sessionBroker.js';
 import { Allowlist } from '../../src/core/policy/allowlist.js';
 import { createGrantLedger } from '../../src/core/policy/authorize.js';
+import type { AppProfile } from '../../src/core/policy/profile.js';
+import { meridianProfile } from '../fixtures/profile.js';
 import { ACTION_VERBS } from '../../src/core/surfaceModel/types.js';
 import { createSequentialIds } from '../../src/runtime/ids.js';
 
@@ -26,6 +28,7 @@ describe('SessionBroker against MERIDIAN Core', { timeout: 30_000 }, () => {
   let port: number;
   let base: string;
   let browser: Browser;
+  let profile: AppProfile;
 
   function allowlistFor(origin: string): Allowlist {
     return Allowlist.parse({
@@ -48,6 +51,7 @@ describe('SessionBroker against MERIDIAN Core', { timeout: 30_000 }, () => {
   function brokerWith(login: Partial<FormLogin> = {}) {
     return createSessionBroker({
       browser,
+      profile,
       allowlist: allowlistFor(base),
       baseUrl: base,
       login: { path: '/auth/login', usernameField: 'username', passwordField: 'password', username: 'operator', password: PASSWORD, ...login },
@@ -71,6 +75,7 @@ describe('SessionBroker against MERIDIAN Core', { timeout: 30_000 }, () => {
     port = address.port;
     base = `http://127.0.0.1:${port}`;
     browser = await chromium.launch();
+    profile = await meridianProfile();
   }, 30_000);
 
   afterAll(async () => {

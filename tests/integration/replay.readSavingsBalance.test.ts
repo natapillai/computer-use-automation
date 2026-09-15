@@ -12,6 +12,7 @@ import { replay } from '../../src/replay/executor.js';
 import { systemClock } from '../../src/runtime/clock.js';
 import { createSequentialIds } from '../../src/runtime/ids.js';
 import { readSavingsBalanceFixture } from '../fixtures/capabilities/readSavingsBalance.js';
+import { meridianProfile } from '../fixtures/profile.js';
 
 // Gate, Skeleton 1. The hand authored fixture replayed through the broker, the guarded
 // surface and the web driver against the live app, with no model anywhere.
@@ -33,6 +34,7 @@ describe('Skeleton 1, member.readSavingsBalance against MERIDIAN Core', () => {
     browser = await chromium.launch();
     broker = createSessionBroker({
       browser,
+      profile: await meridianProfile(),
       allowlist: Allowlist.parse({
         version: 1,
         origins: [

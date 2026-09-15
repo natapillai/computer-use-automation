@@ -3,6 +3,7 @@ import { authorize, type AuthorizationDecision, type PolicyContext } from '../co
 import type { Resolution } from '../core/locator/resolve.js';
 import type { LocatorBundle, LocatorStrategy } from '../core/locator/schema.js';
 import type { ActionResult, Observation, ResolvedAction } from '../core/surfaceModel/types.js';
+import type { StepRefusal, StepScope } from './stepScope.js';
 import type { SurfaceDriver } from './types.js';
 
 export interface GuardedAction {
@@ -26,6 +27,7 @@ export interface GuardedSurface {
   screenshot(maskRefs: readonly string[]): Promise<Uint8Array>;
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
   perform(request: GuardedAction, control: ControlToken): Promise<GuardedOutcome>;
+  refusalsFor(stepId: string): readonly StepRefusal[];
 }
 
 export interface GuardedSurfaceOptions {
@@ -33,13 +35,14 @@ export interface GuardedSurfaceOptions {
   readonly policy: PolicyContext;
   readonly runId: string;
   readonly baseUrl: string;
+  readonly scope?: StepScope;
 }
 
 // The only place authorize is called, see docs/SAFETY.md section 1. Discovery and replay
 // hold this and never the driver, so bypassing policy means editing the wiring rather
 // than forgetting a call. A denied or confirmed action never reaches the driver.
 export function createGuardedSurface(options: GuardedSurfaceOptions): GuardedSurface {
-  const { driver, policy, runId, baseUrl } = options;
+  const { driver, policy, runId, baseUrl, scope } = options;
 
   // A navigate is judged by where it goes. Anything else is judged by the live url of
   // the frame it lands in. A url that cannot be worked out is empty, which authorize denies.
@@ -59,6 +62,7 @@ export function createGuardedSurface(options: GuardedSurfaceOptions): GuardedSur
     match: (strategy, framePath) => driver.match(strategy, framePath),
     waitForChange: (timeoutMs) => driver.waitForChange(timeoutMs),
     screenshot: (maskRefs) => driver.screenshot(maskRefs),
+    refusalsFor: (stepId) => (scope === undefined ? [] : scope.refusals().filter((refusal) => refusal.stepId === stepId)),
     resolve: (bundle, control) => driver.resolve(bundle, control),
     perform: async (request, control) => {
       const decision = authorize(
@@ -78,6 +82,9 @@ export function createGuardedSurface(options: GuardedSurfaceOptions): GuardedSur
         case 'confirm':
           return { kind: 'confirm', decision };
         case 'allow':
+          // Entered only once the action is allowed, and before it runs, so every request it
+          // causes is judged against the step's declared effect.
+          scope?.enter({ stepId: request.stepId, effect: request.effect });
           return { kind: 'performed', result: await driver.act(request.action, control) };
       }
     },

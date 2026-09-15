@@ -162,6 +162,27 @@ describe('MERIDIAN Core in test mode', () => {
   });
 });
 
+describe('MERIDIAN Core request log in test mode', () => {
+  it('records the requests it serves outside the control routes, and reset clears them', async () => {
+    const target = await start({ testMode: true });
+    try {
+      await get(target.baseUrl, '/auth/login');
+      await login(target.baseUrl, 'wrong');
+      expect(await (await get(target.baseUrl, '/__control__/state')).json()).toMatchObject({
+        requests: [
+          { method: 'GET', path: '/auth/login' },
+          { method: 'POST', path: '/auth/login' },
+        ],
+      });
+
+      await get(target.baseUrl, '/__control__/reset');
+      expect(await (await get(target.baseUrl, '/__control__/state')).json()).toMatchObject({ requests: [] });
+    } finally {
+      await target.close();
+    }
+  });
+});
+
 describe('generated element ids', () => {
   it('are stable for one seed and change with the seed', async () => {
     const pages: string[] = [];

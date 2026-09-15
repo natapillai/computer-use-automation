@@ -233,6 +233,8 @@ The first run reported F5 as failed. The snapshot showed the node was present, a
 
 **Rejected.** HTTP method as a proxy for irreversibility, which is the defect this ADR exists to fix. A global name regex over button text, which is the same defect relocated. Blocking outright, already rejected in ADR 0006 and still rejected.
 
+**Amendment, 2026-09-15. Enforcement is at the network guard, per step.** Decided by the project owner at S3-T04. A browser step is a click or a fill and has no method or URL until the request it causes fires, so the declared effect is checked where that request is visible. While a step runs, the broker's route handler classifies every request the page makes against the profile. A request the profile does not list is refused, and a request the profile calls a write is refused while the step declares a read. The refusal is recorded against the step, and the executor fails the step as `PolicyDenied` before the write reaches the server. Outside a step, which includes the window a person holds control, only the allowlist applies. The rejected alternatives were classifying the navigation after the step, which catches a write only once it has landed, and deferring the check to the write flow at S5-T06.
+
 ---
 
 ## ADR 0015. Overlays override bindings, never contracts

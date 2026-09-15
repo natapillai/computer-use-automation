@@ -85,6 +85,16 @@ export function createTargetApp(options: TargetAppOptions): Express {
   app.set('views', fileURLToPath(new URL('../views', import.meta.url)));
   app.use(express.urlencoded({ extended: false }));
 
+  // Test mode only. Every request served outside the control routes, so a test can prove
+  // a request the network guard refused never reached the app.
+  const requests: { method: string; path: string }[] = [];
+  if (options.testMode) {
+    app.use((req: Request, _res: Response, next: NextFunction) => {
+      if (!req.path.startsWith('/__control__')) requests.push({ method: req.method, path: req.path });
+      next();
+    });
+  }
+
   app.get('/', (req, res) => {
     res.redirect(hasSession(req) ? '/servicing' : '/auth/login');
   });
@@ -110,10 +120,11 @@ export function createTargetApp(options: TargetAppOptions): Express {
     app.get('/__control__/reset', (_req, res) => {
       members = loadSeed();
       faults = [];
+      requests.length = 0;
       res.json({ reset: true });
     });
     app.get('/__control__/state', (_req, res) => {
-      res.json({ faults, sessions: sessions.size });
+      res.json({ faults, sessions: sessions.size, requests });
     });
   }
 

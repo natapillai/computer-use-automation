@@ -1,15 +1,19 @@
 import type { Browser } from 'playwright';
 import type { Allowlist } from '../core/policy/allowlist.js';
 import { checkUrl, type PolicyContext } from '../core/policy/authorize.js';
+import { authorizeRequest, type AppProfile } from '../core/policy/profile.js';
 import type { IdProvider } from '../runtime/ids.js';
 import { createGuardedSurface, type GuardedSurface } from '../surface/guardedSurface.js';
+import { createStepScope } from '../surface/stepScope.js';
 import { createWebSurfaceDriver } from '../surface/web/webSurfaceDriver.js';
 import { createControlTokens, type SessionControlTokens } from './controlToken.js';
 
 // Owns browser sessions. A session is signed in before it is leased, so no capability
 // step ever types a credential and no artifact can hold one. Every lease carries a
-// network guard that refuses any request outside the allowlist, which is the one control
-// that still applies while a person holds the session. See ADR 0008 and docs/SAFETY.md.
+// network guard. It refuses any request outside the allowlist, which is the one control
+// that still applies while a person holds the session, and while a step runs it enforces
+// the app profile against the step's declared effect. See ADR 0008, ADR 0014 as amended
+// on 2026-09-15, and docs/SAFETY.md.
 
 export interface FormLogin {
   readonly path: string;
@@ -22,6 +26,7 @@ export interface FormLogin {
 export interface SessionBrokerOptions {
   readonly browser: Browser;
   readonly allowlist: Allowlist;
+  readonly profile: AppProfile;
   readonly baseUrl: string;
   readonly login: FormLogin;
   readonly ids: IdProvider;
@@ -53,7 +58,7 @@ export interface SessionBroker {
 const VIEWPORT = { width: 1024, height: 700 };
 
 export function createSessionBroker(options: SessionBrokerOptions): SessionBroker {
-  const { browser, allowlist, baseUrl, login, ids } = options;
+  const { browser, allowlist, profile, baseUrl, login, ids } = options;
 
   const unavailable = (detail: string): LeaseResult => ({ ok: false, failure: 'SurfaceUnavailable', detail });
 
@@ -66,14 +71,15 @@ export function createSessionBroker(options: SessionBrokerOptions): SessionBroke
       }
 
       const context = await browser.newContext({ viewport: VIEWPORT });
-      const refused: string[] = [];
+      const scope = createStepScope();
       await context.route('**/*', async (route) => {
-        const verdict = checkUrl(allowlist, route.request().url());
-        if (verdict.allowed) {
+        const pending = route.request();
+        const decision = authorizeRequest({ allowlist, profile, step: scope.current(), method: pending.method(), url: pending.url() });
+        if (decision.allowed) {
           await route.continue();
           return;
         }
-        refused.push(verdict.rule);
+        scope.refuse(decision.rule);
         await route.abort('blockedbyclient');
       });
 
@@ -110,9 +116,9 @@ export function createSessionBroker(options: SessionBrokerOptions): SessionBroke
         ok: true,
         lease: {
           sessionId,
-          surface: createGuardedSurface({ driver, policy: { allowlist, ...request.policy }, runId: request.runId, baseUrl }),
+          surface: createGuardedSurface({ driver, policy: { allowlist, ...request.policy }, runId: request.runId, baseUrl, scope }),
           tokens,
-          refusedRequests: () => [...refused],
+          refusedRequests: () => scope.refusals().map((refusal) => refusal.rule),
           release: () => context.close(),
         },
       };

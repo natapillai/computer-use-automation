@@ -101,7 +101,7 @@ Everything after this slice persists something, so redaction and the scanner exi
 * [x] **S3-T03** Structured logger and `EvidenceSink`.
   * Accept: JSON lines carrying `runId`, redacted at the sink. The sink writes logs, screenshots, accessibility snapshots and a manifest to `evidence/<phase>/<runId>/`, masks screenshots with Playwright's own mask option, and names a caller projection with real values and a redacted persisted projection.
   * Test: unit, log lines are valid JSON and redacted, and the manifest lists every file. Integration, a masked region is absent from the stored image, sampled by pixel.
-* [ ] **S3-T04** App profile, `profiles/meridian-core.json`.
+* [x] **S3-T04** App profile, `profiles/meridian-core.json`.
   * Accept: the route plus method table that classifies `effect` and `idempotent`, the field sensitivity map that masks member names and balances, and the generic detectors, meaning the login redirect classified as `SessionExpired` and the generic error banner. An unclassified route is write and not idempotent. The policy engine now cross checks declared effect against the profile.
   * Test: unit, an unknown route classifies as write, a capability whose declared effect contradicts the profile is refused, the login redirect classifies as `SessionExpired`, and the member name cell is `pii`.
 * [ ] **S3-T05** Evidence scanner with canaries. Lifts the pre Harden rule.

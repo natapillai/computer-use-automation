@@ -144,6 +144,21 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     }
   };
 
+  // The network guard refuses a request the app profile does not allow for the running
+  // step, before it reaches the server. Any refusal fails that step, whatever the page did.
+  const failIfRefused = (stepId: string): void => {
+    const refusals = surface.refusalsFor(stepId);
+    const [first] = refusals;
+    if (first === undefined) return;
+    throw fail({
+      class: 'PolicyDenied',
+      expected: 'Every request the step makes is permitted by the allowlist and classified by the app profile as the step declares.',
+      observed: `The network guard refused ${refusals.length} request(s) while this step ran.`,
+      cause: `rule ${first.rule}`,
+      retryable: false,
+    });
+  };
+
   const prepare = async (step: Step): Promise<PreparedAction> => {
     const stepAction = step.action;
     if (stepAction.kind === 'navigate') {
@@ -198,8 +213,9 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     if (step.precondition !== undefined) {
       const condition = templated(templateCondition(step.precondition.condition, values(), allowedEnv), `the precondition of ${step.id}`);
       const ready = await race(surface, clock, [{ condition, entrant: 'precondition' }], step.precondition.timeoutMs, outputResolvable);
-      if (ready.kind === 'expired') {
-        throw fail({ class: 'PreconditionFailed', expected: step.precondition.description, observed: ready.lastDetail, retryable: false });
+      if (ready.kind !== 'fired') {
+        const observed = ready.kind === 'expired' ? ready.lastDetail : 'The wait for the precondition stopped.';
+        throw fail({ class: 'PreconditionFailed', expected: step.precondition.description, observed, retryable: false });
       }
     }
 
@@ -229,7 +245,11 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     ];
 
     const timeoutMs = Math.min(step.postcondition.timeoutMs, step.timeoutMs);
-    const settled = await race(surface, clock, contenders, timeoutMs, outputResolvable);
+    const settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, () => surface.refusalsFor(step.id).length > 0);
+    failIfRefused(step.id);
+    if (settled.kind === 'stopped') {
+      throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
+    }
 
     if (settled.kind === 'expired') {
       // Nothing changed at all is a wait that ran out. A change into the wrong state is a
@@ -272,6 +292,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
 
   try {
     await perform({ action: { kind: 'navigate', path: capability.app.entryPath, framePath: [] }, framePath: [], targetKey: null }, ENTRY_STEP_ID, 'read', true);
+    failIfRefused(ENTRY_STEP_ID);
 
     for (const step of capability.steps) {
       currentStep = step;
@@ -283,8 +304,9 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     const success = capability.successCondition;
     const condition = templated(templateCondition(success.condition, values(), allowedEnv), 'the success condition');
     const done = await race(surface, clock, [{ condition, entrant: 'success' }], success.timeoutMs, outputResolvable);
-    if (done.kind === 'expired') {
-      throw fail({ class: 'CheckpointFailed', stepIntent: success.description, expected: success.description, observed: done.lastDetail, retryable: false });
+    if (done.kind !== 'fired') {
+      const observed = done.kind === 'expired' ? done.lastDetail : 'The wait for the success condition stopped.';
+      throw fail({ class: 'CheckpointFailed', stepIntent: success.description, expected: success.description, observed, retryable: false });
     }
     return successResult(base(), outputs);
   } catch (error) {
