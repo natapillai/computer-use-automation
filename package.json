@@ -11,8 +11,10 @@
     "test": "vitest run --passWithNoTests",
     "test:watch": "vitest",
     "test:integration": "vitest run --config vitest.integration.config.ts",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "tsc --noEmit",
-    "target": "node --env-file-if-exists=.env --import tsx apps/target/src/server.ts"
+    "target": "node --env-file-if-exists=.env --import tsx apps/target/src/server.ts",
+    "replay": "node --env-file-if-exists=.env --import tsx src/cli/replay.ts"
   },
   "devDependencies": {
     "@types/ejs": "3.1.5",
