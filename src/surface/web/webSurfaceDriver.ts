@@ -221,6 +221,17 @@ export function createWebSurfaceDriver(options: WebSurfaceOptions): SurfaceDrive
     match: async (strategy, framePath) => matchStrategy(latest ?? (await refresh()), strategy, framePath),
     frameUrl: async (framePath) => frameAt(page, framePath)?.url() ?? null,
     waitForChange,
+    // Refusing rather than skipping a mask ref, because a screenshot missing one mask is
+    // exactly the unmasked image this method exists to prevent.
+    screenshot: async (maskRefs) => {
+      const current = latest;
+      const missing = maskRefs.filter((ref) => current === null || findNodeByRef(current.root, ref) === null);
+      if (missing.length > 0) {
+        throw new TypeError(`${missing.length} mask ref(s) are not in the latest observation, so no screenshot was taken.`);
+      }
+      const bytes = await page.screenshot({ type: 'png', mask: maskRefs.map((ref) => page.locator(`aria-ref=${ref}`)), maskColor: '#FF00FF' });
+      return new Uint8Array(bytes);
+    },
     resolve: async (bundle, token) => {
       control.assertCurrent(token);
       const observation = await refresh();

@@ -98,7 +98,7 @@ Everything after this slice persists something, so redaction and the scanner exi
 * [x] **S3-T02** `Redactor` and sensitivity propagation.
   * Accept: provenance based and pattern based, patterns loaded with an explicit `flags` field, Luhn validated card numbers, idempotent, nested objects traversed. An output fed by a secret input inherits secret.
   * Test: unit, every pattern positive and negative, Luhn rejects an invalid number, redacting twice equals once, and propagation lifts sensitivity.
-* [ ] **S3-T03** Structured logger and `EvidenceSink`.
+* [x] **S3-T03** Structured logger and `EvidenceSink`.
   * Accept: JSON lines carrying `runId`, redacted at the sink. The sink writes logs, screenshots, accessibility snapshots and a manifest to `evidence/<phase>/<runId>/`, masks screenshots with Playwright's own mask option, and names a caller projection with real values and a redacted persisted projection.
   * Test: unit, log lines are valid JSON and redacted, and the manifest lists every file. Integration, a masked region is absent from the stored image, sampled by pixel.
 * [ ] **S3-T04** App profile, `profiles/meridian-core.json`.

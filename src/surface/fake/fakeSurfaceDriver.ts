@@ -126,6 +126,12 @@ export function createFakeSurfaceDriver(options: FakeSurfaceOptions): FakeSurfac
       await options.clock.delay(timeoutMs);
       return 'timeout';
     },
+    // No pixels on a fake, only the PNG signature, but a mask ref must still be on screen.
+    screenshot: async (maskRefs) => {
+      const missing = maskRefs.filter((ref) => findNodeByRef(current.root, ref) === null);
+      if (missing.length > 0) throw new TypeError(`${missing.length} mask ref(s) are not on the current screen, so no screenshot was taken.`);
+      return new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]);
+    },
     resolve: async (bundle, token) => {
       control.assertCurrent(token);
       return resolveBundle(bundle, match);

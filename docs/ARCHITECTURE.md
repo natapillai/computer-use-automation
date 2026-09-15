@@ -53,7 +53,7 @@ export interface SurfaceDriver {
   waitForChange(timeoutMs: number): Promise<'changed' | 'timeout'>;       // the only way any wait waits
   act(action: ResolvedAction, control: ControlToken): Promise<ActionResult>;
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
-  capture(kind: EvidenceKind): Promise<EvidenceRef>;
+  screenshot(maskRefs: string[]): Promise<Uint8Array>;                   // masked before the bytes exist
   close(): Promise<void>;
 }
 ```

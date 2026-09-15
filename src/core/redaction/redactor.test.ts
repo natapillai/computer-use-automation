@@ -58,6 +58,17 @@ describe('Redactor.text', () => {
     expect(redactor.text('balance $4,250.75 read', { known: [{ value: '$4,250.75', replacement: '[redacted:pii]' }] })).toBe('balance [redacted:pii] read');
   });
 
+  it('reports how many times each pattern and known value matched, never what matched', () => {
+    const counts: Record<string, number> = {};
+    const tally = (name: string): void => {
+      counts[name] = (counts[name] ?? 0) + 1;
+    };
+
+    redactor.text('member 10001 at /member/10001, card 4111 1111 1111 1111, mail test.member@example.com', { ...memberId, onMatch: tally });
+
+    expect(counts).toEqual({ known: 2, cardNumber: 1, email: 1 });
+  });
+
   it('redacts twice the same as once', () => {
     const once = redactor.text('member 10001, card 4111 1111 1111 1111, mail test.member@example.com, account 123456789012', memberId);
 

@@ -27,6 +27,11 @@ export interface SurfaceDriver {
   // system is built on this and on a condition, never on a sleep.
   waitForChange(timeoutMs: number): Promise<'changed' | 'timeout'>;
 
+  // A PNG of the whole surface with every element named by these refs painted over before
+  // the bytes exist, so an unmasked image of a member's data never reaches the process.
+  // Refs are checked against the latest observation like any other ref.
+  screenshot(maskRefs: readonly string[]): Promise<Uint8Array>;
+
   resolve(bundle: LocatorBundle, control: ControlToken): Promise<Resolution>;
 
   // Throws ControlLostError before touching the surface when the token is not current.

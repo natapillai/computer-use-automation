@@ -12,6 +12,9 @@ export interface KnownValue {
 // the primary mechanism. Patterns are the net for data nobody declared.
 export interface RedactionContext {
   readonly known: readonly KnownValue[];
+  // Called once per replacement with the pattern name, or known for a known value, so a
+  // manifest can report counts without ever seeing a value.
+  readonly onMatch?: (name: string) => void;
 }
 
 export interface Redactor {
@@ -41,9 +44,18 @@ export function createRedactor(policy: RedactionPolicy): Redactor {
     let out = input;
     // Longest first, so a known value is never broken up by a shorter one inside it.
     const known = context.known.filter((item) => item.value !== '').sort((a, b) => b.value.length - a.value.length);
-    for (const item of known) out = out.replace(knownValuePattern(item.value), () => item.replacement);
+    for (const item of known) {
+      out = out.replace(knownValuePattern(item.value), () => {
+        context.onMatch?.('known');
+        return item.replacement;
+      });
+    }
     for (const pattern of patterns) {
-      out = out.replace(pattern.expression, (match) => (pattern.luhn && !passesLuhn(match) ? match : `[redacted:${pattern.name}]`));
+      out = out.replace(pattern.expression, (match) => {
+        if (pattern.luhn && !passesLuhn(match)) return match;
+        context.onMatch?.(pattern.name);
+        return `[redacted:${pattern.name}]`;
+      });
     }
     return out;
   };
