@@ -1,5 +1,6 @@
 import type { z } from 'zod';
 import { Capability, SUPPORTED_SCHEMA_VERSION, type CapabilityInput, type ParamSpec } from '../core/capability/schema.js';
+import { findSensitiveLiterals, wholeTokenPattern } from '../core/capability/sensitiveLiterals.js';
 import { templateBundle, templateCondition } from '../core/capability/templateCondition.js';
 import { resolveBundle, type StrategyMatcher } from '../core/locator/resolve.js';
 import type { LocatorBundle, LocatorStrategy } from '../core/locator/schema.js';
@@ -157,14 +158,9 @@ export async function generalize(trace: RunTrace, options: GeneralizeOptions): P
   };
 
   // Never emit a sensitive literal. A supplied value that survived templating, or anything
-  // the redactor would catch, refuses the artifact. The writer at S4-T07 scans again.
-  const serialized = JSON.stringify(candidate);
-  const leakedInput = options.inputs.find((spec) => {
-    const value = options.inputValues[spec.name];
-    return (spec.sensitivity === 'pii' || spec.sensitivity === 'secret') && value !== undefined && value !== '' && containsToken(serialized, value);
-  });
-  if (leakedInput !== undefined) return fail('SensitiveLiteral', `The value of ${leakedInput.name} survived as a literal.`);
-  if (options.redactor.text(serialized, { known: [] }) !== serialized) return fail('SensitiveLiteral', 'The artifact carries text the redactor would hide.');
+  // the redactor would catch, refuses the artifact. The capability store scans again.
+  const leaks = findSensitiveLiterals(JSON.stringify(candidate), { inputs: options.inputs, inputValues: options.inputValues, redactor: options.redactor });
+  if (leaks.length > 0) return fail('SensitiveLiteral', `The artifact carries ${leaks.join(', ')}.`);
 
   const parsed = Capability.safeParse(candidate);
   if (!parsed.success) {
@@ -311,17 +307,9 @@ function cap(word: string): string {
 function templateInputs(text: string, inputs: Readonly<Record<string, string>>): string {
   let out = text;
   for (const [name, value] of Object.entries(inputs)) {
-    if (value !== '') out = out.replace(tokenPattern(value), `{{inputs.${name}}}`);
+    if (value !== '') out = out.replace(wholeTokenPattern(value), `{{inputs.${name}}}`);
   }
   return out;
-}
-
-function containsToken(text: string, value: string): boolean {
-  return tokenPattern(value).test(text);
-}
-
-function tokenPattern(value: string): RegExp {
-  return new RegExp(`(?<!\\w)${value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?!\\w)`, 'g');
 }
 
 function mapBundle(bundle: LocatorBundle, map: (text: string) => string): LocatorBundle {
