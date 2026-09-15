@@ -135,7 +135,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T07** `CapabilityStore` writer, `npm run discover` and `npm run replay`.
   * Accept: canonical JSON with stable key order, and a refusal scan for declared input values and redactor matches before writing. Discovery returns a typed `DiscoveryResult`. Replay takes inputs from stdin or a file, never argv. `test:e2e` lands here.
   * Test: unit, a byte stable round trip and a refused sensitive literal. E2E, the replay CLI exits 0 on success and non zero on failure, with valid JSON output.
-* [ ] **S4-T08** The live discovery run. Commit its evidence.
+* [x] **S4-T08** The live discovery run. Commit its evidence.
   * Accept: a real key against the S1-T06 app. `evidence/discovery/<runId>/` holds the redacted transcript, the trace, screenshots and the artifact at `1.0.0`, status draft. This is the brief's one non negotiable requirement.
 * [ ] **S4-T09** Negative probe review and approval, `npm run review`.
   * Accept: replays the draft with `00000`, stops where the postcondition fails, and lets a reviewer name `MEMBER_NOT_FOUND` while the recorder derives the detector from the real banner. Emits `1.1.0` with `provenance: 'manual'`, a minor bump by rule. The same command approves, writing `status`, `approvedBy` and `approvedAt`.
