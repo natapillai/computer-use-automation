@@ -170,6 +170,8 @@ Vite is pinned at 7.3.6 and forced there on every dependency edge with an npm `o
 
 **Amendment, 2026-09-14. No temperature.** The stack table said the model runs at temperature 0. Claude Sonnet 5 rejects sampling parameters with a 400, so the agent loop sends none. Nothing depended on it. Discovery determinism was never going to come from sampling, because a model run is not reproducible at any temperature, and it comes from the cassette in ADR 0017 instead. The default model is `claude-sonnet-5`, set in `.env.example` and nowhere in code.
 
+**Amendment, 2026-09-14. No values in `.env.example`.** The file lists every key the system reads and holds no values, because it documents configuration rather than supplying it. The current default model is stated once, in the configuration section of `README.md`, and still nowhere in code.
+
 ---
 
 ## ADR 0012. Perception is the accessibility tree plus geometry plus derived labels

@@ -6,7 +6,7 @@ import { createTargetApp } from './app.js';
 const username = process.env.TARGET_USERNAME;
 const password = process.env.TARGET_PASSWORD;
 if (username === undefined || username === '' || password === undefined || password === '') {
-  console.error('Invalid environment. TARGET_USERNAME and TARGET_PASSWORD are required. Copy .env.example to .env.');
+  console.error('Invalid environment. TARGET_USERNAME and TARGET_PASSWORD are required. Copy .env.example to .env and fill in every key.');
   process.exit(1);
 }
 
