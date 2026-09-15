@@ -75,7 +75,7 @@ data:
     - { name: ssn, pattern: "\\b\\d{3}-\\d{2}-\\d{4}\\b", flags: "g" }
     - { name: cardNumber, pattern: "\\b(?:\\d[ -]*?){13,19}\\b", flags: "g", validator: luhn }
     - { name: email, pattern: "\\b[\\w.+-]+@[\\w-]+\\.[\\w.]{2,}\\b", flags: "gi" }
-    - { name: phone, pattern: "\\b\\+?1?[ .-]?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b", flags: "g" }
+    - { name: phone, pattern: "\\b(?:\\+?1[ .-]?)?\\(?\\d{3}\\)?[ .-]?\\d{3}[ .-]?\\d{4}\\b", flags: "g" }
     - { name: accountNumber, pattern: "\\b\\d{9,17}\\b", flags: "g", contextual: true }
 ```
 
@@ -124,7 +124,7 @@ Redaction happens at the sink, never at the call site. Every write path funnels 
 ```ts
 interface Redactor {
   text(s: string, ctx: RedactionContext): string;
-  object<T>(o: T, ctx: RedactionContext): T;
+  object(value: unknown, ctx: RedactionContext): unknown;   // sinks serialise the result, so no type is claimed
 }
 ```
 

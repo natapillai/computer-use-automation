@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createRedactor } from '../core/redaction/redactor.js';
 import { loadAllowlist } from './allowlist.js';
 
 describe('loadAllowlist', () => {
@@ -19,6 +20,13 @@ describe('loadAllowlist', () => {
     if (result.ok) return;
     expect(result.failure).toBe('AllowlistInvalid');
     expect(result.message).toContain('origins.0.pattern');
+  });
+
+  it('supplies patterns that catch the seeded card number through the redactor', async () => {
+    const result = await loadAllowlist('policy/allowlist.yaml');
+    if (!result.ok) throw new Error(result.message);
+
+    expect(createRedactor(result.allowlist.data).text('Card: 4111 1111 1111 1111', { known: [] })).toBe('Card: [redacted:cardNumber]');
   });
 
   it('reports a missing file as a typed failure rather than throwing', async () => {

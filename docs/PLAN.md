@@ -95,7 +95,7 @@ Everything after this slice persists something, so redaction and the scanner exi
 * [x] **S3-T01** `SurfaceDriver` contract suite, run against the fake and the web driver.
   * Accept: one reusable suite parameterised over driver factories. It is the evidence behind the seam claim in `REPORT.md`, not tooling.
   * Test: both drivers pass stale token rejection, `not_found` and `ambiguous` resolution, frame path scoping, a derived label on an unnamed node, a geometric relation, and `waitForChange` reporting a change after an action and a bounded timeout when nothing changes. The timeout message that names its condition belongs to the race and is proven by the executor tests.
-* [ ] **S3-T02** `Redactor` and sensitivity propagation.
+* [x] **S3-T02** `Redactor` and sensitivity propagation.
   * Accept: provenance based and pattern based, patterns loaded with an explicit `flags` field, Luhn validated card numbers, idempotent, nested objects traversed. An output fed by a secret input inherits secret.
   * Test: unit, every pattern positive and negative, Luhn rejects an invalid number, redacting twice equals once, and propagation lifts sensitivity.
 * [ ] **S3-T03** Structured logger and `EvidenceSink`.
