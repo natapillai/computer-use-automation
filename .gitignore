@@ -19,10 +19,6 @@ docs/ASSIGNMENT.md
 # scripts, spike output, transcripts. Never committed, at any point.
 scratch/
 
-# The pre Harden rule, enforced. Nothing produced by running code or a model is
-# committed before Slice 3 lands. S3-T08 removes these three lines in the same
-# commit that turns on the evidence scanner guarding the same paths.
-# See docs/PLAN.md, Nothing is committed before Harden.
-/evidence/
-/capabilities/
-tests/fixtures/cassettes/
+# evidence/, capabilities/ and tests/fixtures/cassettes/ are committed from S3-T05 on.
+# The evidence scanner in src/evidence/scanner.test.ts fails the suite if any of them
+# carries a seeded canary or a redaction pattern match. See docs/EVIDENCE.md section 5.

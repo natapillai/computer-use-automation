@@ -104,7 +104,7 @@ Everything after this slice persists something, so redaction and the scanner exi
 * [x] **S3-T04** App profile, `profiles/meridian-core.json`.
   * Accept: the route plus method table that classifies `effect` and `idempotent`, the field sensitivity map that masks member names and balances, and the generic detectors, meaning the login redirect classified as `SessionExpired` and the generic error banner. An unclassified route is write and not idempotent. The policy engine now cross checks declared effect against the profile.
   * Test: unit, an unknown route classifies as write, a capability whose declared effect contradicts the profile is refused, the login redirect classifies as `SessionExpired`, and the member name cell is `pii`.
-* [ ] **S3-T05** Evidence scanner with canaries. Lifts the pre Harden rule.
+* [x] **S3-T05** Evidence scanner with canaries. Lifts the pre Harden rule.
   * Accept: scans `evidence/`, `capabilities/` and `tests/fixtures/cassettes/` for the seeded canaries from `docs/TARGET_APP.md` section 6, as well as the redaction patterns. Removes the three `.gitignore` exclusions in the same commit that turns the scanner on.
   * Test: unit, fails on a planted canary and passes on the committed tree.
 
