@@ -49,6 +49,14 @@ describe('module boundaries', () => {
     expect(reached.filter((file) => file.startsWith('src/surface/web/') || file.startsWith('src/surface/fake/'))).toEqual([]);
   });
 
+  it('keeps every model client and the Anthropic SDK out of replay', () => {
+    const reached = [...reachableFrom(sourceFiles('src/replay'))];
+
+    expect(reached).toContain('src/replay/executor.ts');
+    expect(reached.filter((file) => file.startsWith('src/discovery/'))).toEqual([]);
+    expect(reached.filter((file) => /from\s+['"]@anthropic-ai\/sdk['"]/.test(readFileSync(join(repository, file), 'utf8')))).toEqual([]);
+  });
+
   it('calls authorize from exactly one place, inside GuardedSurface', () => {
     const callers = sourceFiles('src')
       .filter((file) => /(?<!function\s)\bauthorize\(/.test(readFileSync(file, 'utf8')))

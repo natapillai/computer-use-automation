@@ -117,7 +117,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T01** Outcome classifier and the classification race.
   * Accept: one total precedence order. Step detectors, then capability outcomes, then app profile, and within a tie business outcome beats failure. The profile never declares a business outcome. After acting, the executor waits on any of the postcondition, the outcome detectors and the profile detectors, and classifies whichever fired. An unclassifiable state is `Internal`.
   * Test: unit, the precedence table. Integration, `00000` classifies `MEMBER_NOT_FOUND` well inside the step timeout.
-* [ ] **S4-T02** `ModelClient`, `FakeModelClient` and `CassetteModelClient`.
+* [x] **S4-T02** `ModelClient`, `FakeModelClient` and `CassetteModelClient`.
   * Accept: cassette matching is positional with a tool set and observation hash assertion, per ADR 0017.
   * Test: unit, deterministic replay, and a changed observation hash fails with a diff.
 * [ ] **S4-T03** Observation builder, prompt and tool schema.
