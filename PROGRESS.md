@@ -3,9 +3,9 @@
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
 **Last updated.** 2026-09-15
-**Current slice.** Slice 3, Harden
-**Next task.** S3-T01
-**Suite status.** 167 unit tests across 24 files and 31 integration tests across 4 files passing, typecheck clean
+**Current slice.** Slice 4, Discovery
+**Next task.** S4-T01
+**Suite status.** 239 unit tests across 32 files and 43 integration tests across 7 files passing, typecheck clean
 **Blocked on.** nothing
 
 ## Slice status
@@ -15,7 +15,7 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 | S0 Foundation | 3 | done |
 | S1 Thread | 10 | done |
 | S2 Perception spike | 1 | done |
-| S3 Harden | 5 | not started |
+| S3 Harden | 5 | done |
 | S4 Discovery | 10 | not started |
 | S5 Escalation | 7 | not started |
 | S6 Error breadth | 4 | not started |
@@ -25,6 +25,12 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-15, Slice 3 closed, Harden
+Done: S3-T01 to S3-T05. One SurfaceDriver contract suite passes on the fake and the web driver. The Redactor and sensitivity propagation redact provenance first and patterns second. The evidence sink redacts every text byte at the sink, writes a manifest with redaction counts and never values, and takes screenshots that Playwright masks before the bytes exist, which a pixel test proves inside the content frame. The MERIDIAN Core profile classifies routes and marks sensitive fields, and the network guard enforces it per step. The evidence scanner guards evidence, capabilities and cassettes, and the pre Harden exclusions are gone.
+Decisions: the project owner chose enforcement at the network guard per step, recorded as an amendment to ADR 0014. While a step runs, a request the profile does not list is refused and a write is refused under a read step, so the step fails as `PolicyDenied` before the write lands. Integration files now run one at a time, which the project owner chose as the test of whether the second integration failure was contention, and two serial runs passed. The S2-T01 spike cassette passed the scanner and is committed, so S4 loop development runs offline.
+Surprises: the committed phone pattern swallowed the space before a number, and is fixed in the allowlist and SAFETY. A bash heredoc on this machine collapses double backslashes, which a count check in the edit script caught before anything changed. The integration failure recurred with seven files in parallel, as a 5 second frameset load timeout in broker sessions rather than a 30 second hang, and did not recur serially.
+Next: S4-T01.
 
 ### 2026-09-15, Slice 2 closed, the live spike passed
 Done: S2-T01. Claude Sonnet 5 reached the savings balance of member 10001 in five model calls and four actions. It filled the member ID field by input name, clicked the td Search cell, clicked the member link, extracted the balance cell and called done. Checked in code, the extracted element was the cell right of Savings and its text parsed as 425075 minor units of USD. Estimated cost two cents. The prompt was not iterated.
@@ -55,7 +61,7 @@ Repository restructure, ADRs 0011 to 0018, attribution hook, replans down to for
 
 ## Open questions
 
-* **One integration run hung.** Three tests in three files ran to the 30 second timeout while the unit suite ran on the same machine. Three isolated runs passed. The cause is not confirmed. Revisit if it recurs, starting with file parallelism in `vitest.integration.config.ts`.
+* **What `contextual` means on a redaction pattern.** No document defines it. The redactor applies a contextual pattern everywhere, which over redacts and fails closed. Decide whether it narrows to a nearby keyword before any real account data is in scope.
 * **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decided at S5-T06.
 
 ## Deferred and cut
