@@ -7,15 +7,19 @@ import { box, uiNode } from './nodes.js';
 
 export interface MeridianScriptOptions {
   readonly memberLabel?: string;
-  readonly searchLeadsTo?: 'results' | 'noRecords' | 'wrongPage' | 'nowhere';
+  readonly searchLeadsTo?: 'results' | 'noRecords' | 'wrongPage' | 'nowhere' | 'loginRedirect';
   readonly memberId?: string;
   readonly balance?: string;
   readonly duplicateSearchButton?: boolean;
+  // Where the results and no records screens say the content frame is, and the status it
+  // loaded with, so a profile condition can hold on the same screen as a step condition.
+  readonly resultsPath?: string;
+  readonly resultsStatus?: number;
 }
 
 const ORIGIN = 'http://localhost:4010';
 
-function screen(children: readonly UINode[], contentPath: string): Observation {
+function screen(children: readonly UINode[], contentPath: string, contentStatus = 200): Observation {
   return {
     root: uiNode('e1', 'generic', '', box(0, 0, 1024, 700), {
       framePath: [],
@@ -30,7 +34,7 @@ function screen(children: readonly UINode[], contentPath: string): Observation {
     frames: [
       { framePath: [], url: `${ORIGIN}/servicing`, lastStatus: 200 },
       { framePath: ['nav'], url: `${ORIGIN}/servicing/nav`, lastStatus: 200 },
-      { framePath: ['content'], url: `${ORIGIN}${contentPath}`, lastStatus: 200 },
+      { framePath: ['content'], url: `${ORIGIN}${contentPath}`, lastStatus: contentStatus },
     ],
     dialogOpen: false,
   };
@@ -58,6 +62,8 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
   const memberId = options.memberId ?? '10001';
   const form = searchForm(options.memberLabel ?? 'Member ID:', options.duplicateSearchButton ?? false);
   const leadsTo = options.searchLeadsTo ?? 'results';
+  const resultsPath = options.resultsPath ?? '/servicing/search';
+  const resultsStatus = options.resultsStatus ?? 200;
 
   const transitions: FakeTransition[] = [
     { from: 'blank', on: { kind: 'navigate', path: '/servicing' }, to: 'search' },
@@ -79,10 +85,19 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
           uiNode('r1', 'link', memberId, box(15, 158, 44, 19)),
           uiNode('t3', 'cell', 'Test Member One', box(114, 156, 138, 24)),
         ],
-        '/servicing/search',
+        resultsPath,
+        resultsStatus,
       ),
-      noRecords: screen([...form, uiNode('m1', 'cell', 'No records found.', box(8, 131, 120, 20))], '/servicing/search'),
+      noRecords: screen([...form, uiNode('m1', 'cell', 'No records found.', box(8, 131, 120, 20))], resultsPath, resultsStatus),
       wrongPage: screen([uiNode('h1', 'heading', 'Session Notice', box(8, 8, 837, 17))], '/servicing/search'),
+      loginRedirect: screen(
+        [
+          uiNode('lh', 'heading', 'MERIDIAN Core', box(24, 24, 300, 17)),
+          uiNode('lu', 'textbox', 'User name:', box(120, 60, 160, 21)),
+          uiNode('lp', 'textbox', 'Password:', box(120, 88, 160, 21)),
+        ],
+        '/auth/login',
+      ),
       detail: screen(
         [
           uiNode('h1', 'heading', 'Member Detail', box(8, 8, 837, 17)),

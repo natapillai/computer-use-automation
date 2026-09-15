@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
+import profileJson from '../../profiles/meridian-core.json' with { type: 'json' };
 import { readSavingsBalanceFixture } from '../../tests/fixtures/capabilities/readSavingsBalance.js';
+import { AppProfile } from '../core/policy/profile.js';
 import { meridianScript, type MeridianScriptOptions } from '../../tests/fixtures/surface/meridianScreens.js';
 import { createControlTokens } from '../control/controlToken.js';
 import { Capability, type CapabilityInput } from '../core/capability/schema.js';
@@ -34,6 +36,20 @@ const allowlist = Allowlist.parse({
 
 const START = '2026-09-14T09:00:00.000Z';
 
+const profile = AppProfile.parse(profileJson);
+
+// The fixture with the search step's condition rules replaced, for the precedence table.
+function withSearchRules(rules: NonNullable<CapabilityInput['steps'][number]['onCondition']>): CapabilityInput {
+  const fixture = readSavingsBalanceFixture();
+  return { ...fixture, steps: fixture.steps.map((step) => (step.id === 'submitSearch' ? { ...step, onCondition: rules } : step)) };
+}
+
+function noRecordsBanner() {
+  const rule = readSavingsBalanceFixture().steps.find((step) => step.id === 'submitSearch')?.onCondition?.[0];
+  if (rule === undefined) throw new Error('The fixture search step has no condition rule.');
+  return rule.when;
+}
+
 interface RunOptions {
   readonly script?: MeridianScriptOptions;
   readonly memberId?: string;
@@ -63,7 +79,7 @@ async function run(options: RunOptions = {}) {
     baseUrl: 'http://localhost:4010',
   });
   const capability = Capability.parse(options.capability ?? readSavingsBalanceFixture());
-  const result = await replay(capability, { memberId: options.memberId ?? '10001' }, { surface, control: tokens.issue('automation'), clock, runId: 'run_000001' });
+  const result = await replay(capability, { memberId: options.memberId ?? '10001' }, { surface, control: tokens.issue('automation'), clock, runId: 'run_000001', profile });
   return { result, driver, elapsedMs: clock.now().getTime() - Date.parse(START) };
 }
 
@@ -164,6 +180,54 @@ describe('replay', () => {
 
     expect(failureOf(result)).toMatchObject({ class: 'PolicyDenied', atStepId: 'submitSearch', cause: 'rule effect' });
     expect(result.stepsCompleted).toBe(2);
+  });
+
+  describe('classification precedence, step rules then capability outcomes then the app profile then the postcondition', () => {
+    it('classifies a redirect to the login page as SessionExpired from the app profile, at once', async () => {
+      const { result, elapsedMs } = await run({ script: { searchLeadsTo: 'loginRedirect' } });
+
+      expect(failureOf(result)).toMatchObject({ class: 'SessionExpired', atStepId: 'submitSearch', retryable: false });
+      expect(failureOf(result).observed).toContain('SessionExpired');
+      expect(elapsedMs).toBe(0);
+    });
+
+    it('lets a profile condition win over a postcondition that also holds', async () => {
+      const { result } = await run({ script: { resultsPath: '/auth/login' } });
+
+      expect(failureOf(result)).toMatchObject({ class: 'SessionExpired', atStepId: 'submitSearch' });
+    });
+
+    it('lets a capability outcome win over a profile condition that also holds', async () => {
+      const { result } = await run({ memberId: '00000', script: { searchLeadsTo: 'noRecords', resultsPath: '/auth/login' } });
+
+      expect(result).toMatchObject({ status: 'business_outcome', outcome: { code: 'MEMBER_NOT_FOUND' } });
+    });
+
+    it('lets a step rule win over a capability outcome that also holds, and fails with the class it names', async () => {
+      const capability = withSearchRules([{ when: noRecordsBanner(), classify: 'failure', code: 'SurfaceUnavailable' }]);
+      const { result } = await run({ memberId: '00000', capability, script: { searchLeadsTo: 'noRecords' } });
+
+      expect(failureOf(result)).toMatchObject({ class: 'SurfaceUnavailable', atStepId: 'submitSearch' });
+    });
+
+    it('lets a business outcome beat a failure within the step rules', async () => {
+      const capability = withSearchRules([
+        { when: noRecordsBanner(), classify: 'failure', code: 'SurfaceUnavailable' },
+        { when: noRecordsBanner(), classify: 'business_outcome', code: 'MEMBER_NOT_FOUND' },
+      ]);
+      const { result } = await run({ memberId: '00000', capability, script: { searchLeadsTo: 'noRecords' } });
+
+      expect(result).toMatchObject({ status: 'business_outcome', outcome: { code: 'MEMBER_NOT_FOUND' } });
+    });
+
+    it('fails as Internal, naming the classification, when a condition fires that no handler covers yet', async () => {
+      const { result } = await run({ script: { resultsStatus: 503 } });
+      const failure = failureOf(result);
+
+      expect(failure).toMatchObject({ class: 'Internal', atStepId: 'submitSearch' });
+      expect(failure.observed).toContain('TransientLoad');
+      expect(failure.observed).toContain('recoverable');
+    });
   });
 
   it('records drift when a lower ranked strategy finds the relabelled member ID input', async () => {

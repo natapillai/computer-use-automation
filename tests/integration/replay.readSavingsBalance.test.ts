@@ -6,6 +6,7 @@ import { createSessionBroker, type SessionBroker } from '../../src/control/sessi
 import { Capability } from '../../src/core/capability/schema.js';
 import type { ReplayResult } from '../../src/core/outcome/result.js';
 import { Allowlist } from '../../src/core/policy/allowlist.js';
+import type { AppProfile } from '../../src/core/policy/profile.js';
 import { createGrantLedger } from '../../src/core/policy/authorize.js';
 import { ACTION_VERBS } from '../../src/core/surfaceModel/types.js';
 import { replay } from '../../src/replay/executor.js';
@@ -21,8 +22,10 @@ describe('Skeleton 1, member.readSavingsBalance against MERIDIAN Core', () => {
   let server: Server;
   let browser: Browser;
   let broker: SessionBroker;
+  let profile: AppProfile;
 
   beforeAll(async () => {
+    profile = await meridianProfile();
     const app = createTargetApp({ username: 'operator', password: 'meridian-fixture', testMode: false, idSeed: 'skeleton-1' });
     server = await new Promise<Server>((resolve) => {
       const listening = app.listen(0, '127.0.0.1', () => resolve(listening));
@@ -34,7 +37,7 @@ describe('Skeleton 1, member.readSavingsBalance against MERIDIAN Core', () => {
     browser = await chromium.launch();
     broker = createSessionBroker({
       browser,
-      profile: await meridianProfile(),
+      profile,
       allowlist: Allowlist.parse({
         version: 1,
         origins: [
@@ -73,6 +76,7 @@ describe('Skeleton 1, member.readSavingsBalance against MERIDIAN Core', () => {
         control: leased.lease.tokens.issue('automation'),
         clock: systemClock,
         runId: 'run_000001',
+        profile,
       });
     } finally {
       await leased.lease.release();

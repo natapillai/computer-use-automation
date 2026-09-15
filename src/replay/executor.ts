@@ -4,10 +4,13 @@ import { resolveTemplate, type TemplateValues } from '../core/capability/resolve
 import type { Capability, Step } from '../core/capability/schema.js';
 import { templateBundle, templateCondition, type Templated } from '../core/capability/templateCondition.js';
 import type { DriftRecord } from '../core/locator/resolve.js';
+import type { AppProfile } from '../core/policy/profile.js';
 import {
   businessOutcomeResult,
+  FAILURE_CLASSES,
   failureResult,
   successResult,
+  type FailureClass,
   type FailureDetail,
   type ReplayResult,
   type ResultBaseInput,
@@ -31,6 +34,7 @@ export interface ReplayContext {
   readonly control: ControlToken;
   readonly clock: Clock;
   readonly runId: string;
+  readonly profile: AppProfile;
   readonly env?: Readonly<Record<string, string>>;
   readonly allowedEnv?: readonly string[];
 }
@@ -40,6 +44,7 @@ type RuleClass = Step['onCondition'][number]['classify'];
 type Entrant =
   | { readonly kind: 'rule'; readonly code: string; readonly classify: RuleClass }
   | { readonly kind: 'outcome'; readonly code: string }
+  | { readonly kind: 'profile'; readonly code: string; readonly classify: AppProfile['conditions'][number]['classify'] }
   | { readonly kind: 'postcondition' };
 
 type FailureInput = Omit<FailureDetail, 'atStepId' | 'stepIntent'> & Partial<Pick<FailureDetail, 'stepIntent'>>;
@@ -224,9 +229,11 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     const before = fingerprint(await surface.observe());
     await perform(await prepare(step), step.id, step.effect, step.idempotent);
 
-    // Precedence is one total order. Step rules, then capability outcomes, then the
-    // postcondition. Within the step rules a business outcome goes first. The postcondition
-    // is last, so an expired race explains the postcondition.
+    // Precedence is one total order, docs/ERROR_TAXONOMY.md section 6. Step rules, then
+    // capability outcomes, then the app profile, then the postcondition. Within the step
+    // rules a business outcome goes first. The profile sits above the postcondition, so a
+    // login page that happens to satisfy a postcondition still reads as SessionExpired. The
+    // postcondition is last, so an expired race explains the postcondition.
     const contenders: Contender<Entrant>[] = [
       ...[...step.onCondition]
         .sort((a, b) => Number(a.classify !== 'business_outcome') - Number(b.classify !== 'business_outcome'))
@@ -237,6 +244,10 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       ...capability.outcomes.map((outcome) => ({
         condition: templated(templateCondition(outcome.detect, values(), allowedEnv), `outcome ${outcome.code}`),
         entrant: { kind: 'outcome', code: outcome.code } as const,
+      })),
+      ...context.profile.conditions.map((condition) => ({
+        condition: templated(templateCondition(condition.when, values(), allowedEnv), `the app profile condition ${condition.code}`),
+        entrant: { kind: 'profile', code: condition.code, classify: condition.classify } as const,
       })),
       {
         condition: templated(templateCondition(step.postcondition.condition, values(), allowedEnv), `the postcondition of ${step.id}`),
@@ -269,11 +280,22 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     if (entrant.kind === 'outcome' || (entrant.kind === 'rule' && entrant.classify === 'business_outcome')) {
       throw businessOutcome(entrant.code);
     }
-    if (entrant.kind === 'rule') {
+    if (entrant.kind === 'rule' || entrant.kind === 'profile') {
+      const layer = entrant.kind === 'rule' ? 'step' : 'app profile';
+      // A failure named by a known class is that class. Anything else that fired has no
+      // handler yet, recovery at S6-T02 and escalation at S5, and fails as our own gap.
+      if (entrant.classify === 'failure' && isFailureClass(entrant.code)) {
+        throw fail({
+          class: entrant.code,
+          expected: step.postcondition.description,
+          observed: `The ${layer} condition ${entrant.code} holds.`,
+          retryable: entrant.code === 'SurfaceUnavailable' && step.idempotent,
+        });
+      }
       throw fail({
         class: 'Internal',
         expected: `A handler for the ${entrant.classify} classification of ${entrant.code}.`,
-        observed: `The condition ${entrant.code} fired and asks for ${entrant.classify}, which no handler in this executor covers.`,
+        observed: `The ${layer} condition ${entrant.code} fired and asks for ${entrant.classify}, which no handler in this executor covers.`,
         retryable: false,
       });
     }
@@ -330,6 +352,10 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       retryable: false,
     });
   }
+}
+
+function isFailureClass(code: string): code is FailureClass {
+  return FAILURE_CLASSES.some((failureClass) => failureClass === code);
 }
 
 function actionFailure(result: Extract<ActionResult, { ok: false }>, idempotent: boolean): FailureInput {

@@ -57,6 +57,7 @@ describe('the network guard enforcing the app profile per step', { timeout: 60_0
         control: leased.lease.tokens.issue('automation'),
         clock: systemClock,
         runId: 'run_000001',
+        profile: withProfile,
       });
       return { result, refused: leased.lease.refusedRequests() };
     } finally {

@@ -114,7 +114,7 @@ Everything after this slice persists something, so redaction and the scanner exi
 
 Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that returns a business outcome.
 
-* [ ] **S4-T01** Outcome classifier and the classification race.
+* [x] **S4-T01** Outcome classifier and the classification race.
   * Accept: one total precedence order. Step detectors, then capability outcomes, then app profile, and within a tie business outcome beats failure. The profile never declares a business outcome. After acting, the executor waits on any of the postcondition, the outcome detectors and the profile detectors, and classifies whichever fired. An unclassifiable state is `Internal`.
   * Test: unit, the precedence table. Integration, `00000` classifies `MEMBER_NOT_FOUND` well inside the step timeout.
 * [ ] **S4-T02** `ModelClient`, `FakeModelClient` and `CassetteModelClient`.
