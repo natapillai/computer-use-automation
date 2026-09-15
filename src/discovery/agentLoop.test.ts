@@ -222,6 +222,22 @@ describe('runDiscovery', () => {
     expect(JSON.stringify(actions)).not.toMatch(/ctl00_cph_txt|td\.btn|10001/);
   });
 
+  it('completes each recorded action with whether it succeeded and changed the page, and records every authorization verdict', async () => {
+    const recorder = createRecorder({ profile, redactor: createRedactor(allowlist.data), inputs: { memberId: '10001' } });
+    const { events } = await discover({ recorder, turns: happyPath });
+
+    expect(recorder.actions().map((action) => [action.tool, action.ok, action.changed])).toEqual([
+      ['fill', true, true],
+      ['click', true, true],
+      ['click', true, true],
+      ['extract', true, false],
+    ]);
+    expect(events.filter((event) => event.t === 'authorization').map((event) => event.t === 'authorization' && event.verdict)).toEqual(['allow', 'allow', 'allow', 'allow']);
+
+    const denied = await discover({ turns: [call('navigate', { path: '/__control__/reset', framePath: ['content'] }), call('done')] });
+    expect(denied.events).toContainEqual(expect.objectContaining({ t: 'authorization', tool: 'navigate', verdict: 'deny', rule: 'deniedPath' }));
+  });
+
   it('refuses a goal that carries an input value before anything is shown to the model', async () => {
     const { result, model, driver } = await discover({ turns: [call('done')], goal: 'Find the savings balance of member 10001.' });
 

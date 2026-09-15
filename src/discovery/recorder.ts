@@ -3,7 +3,7 @@ import type { LocatorBundle } from '../core/locator/schema.js';
 import { sensitiveFields, type AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
-import type { Observation } from '../core/surfaceModel/types.js';
+import type { Observation, UINode } from '../core/surfaceModel/types.js';
 
 // Records each action discovery takes, with a locator bundle derived from the real element at
 // the moment of acting. The loop passes a ref and names, never text the model wrote about an
@@ -32,10 +32,16 @@ export interface RecordedAction {
   readonly key?: string;
   readonly path?: string;
   readonly output?: string;
+  // Set once the action ran. changed says whether the page's progress key moved.
+  readonly ok?: boolean;
+  readonly changed?: boolean;
+  // The acted element's parent with member data masked, so a bundle can be derived again later.
+  readonly neighbourhood?: UINode;
 }
 
 export interface Recorder {
   record(action: ActionToRecord): RecordedAction;
+  complete(index: number, outcome: { readonly ok: boolean; readonly changed: boolean }): void;
   actions(): readonly RecordedAction[];
 }
 
@@ -64,11 +70,13 @@ export function createRecorder(context: RecorderContext): Recorder {
         };
       } else {
         const node = findNodeByRef(action.observation.root, action.ref);
+        const sensitive = sensitiveFields(context.profile, action.observation);
         const derived = deriveBundle(action.observation, action.ref, {
           inputs: context.inputs,
-          sensitive: sensitiveFields(context.profile, action.observation),
+          sensitive,
           redacts: (text) => context.redactor.text(text, { known: [] }) !== text,
         });
+        const parent = parentOf(action.observation.root, action.ref);
         entry = {
           index,
           tool: action.tool,
@@ -79,12 +87,52 @@ export function createRecorder(context: RecorderContext): Recorder {
           ...(action.inputName === undefined ? {} : { value: `{{inputs.${action.inputName}}}` }),
           ...(action.key === undefined ? {} : { key: action.key }),
           ...(action.output === undefined ? {} : { output: action.output }),
+          ...(parent === null ? {} : { neighbourhood: masked(parent, sensitive, context) }),
         };
       }
 
       recorded.push(entry);
       return entry;
     },
+    complete: (index, outcome) => {
+      const entry = recorded[index];
+      if (entry === undefined) throw new TypeError(`There is no recorded action ${index} to complete.`);
+      recorded[index] = { ...entry, ok: outcome.ok, changed: outcome.changed };
+    },
     actions: () => [...recorded],
   };
+}
+
+function parentOf(root: UINode, ref: string): UINode | null {
+  for (const child of root.children) {
+    if (child.ref === ref) return root;
+    const found = parentOf(child, ref);
+    if (found !== null) return found;
+  }
+  return null;
+}
+
+// The neighbourhood as the trace may keep it. Sensitive cells are hidden, a supplied value
+// shows as its template, and everything else passes through the redactor.
+function masked(node: UINode, sensitive: ReadonlyMap<string, unknown>, context: RecorderContext): UINode {
+  const known = Object.entries(context.inputs)
+    .filter(([, value]) => value !== '')
+    .map(([name, value]) => ({ value, replacement: `{{inputs.${name}}}` }));
+  const clean = (text: string): string => context.redactor.text(text, { known });
+  const templateOnly = (text: string): string | null => {
+    const collapsed = text.replace(/\s+/g, ' ').trim();
+    const input = Object.entries(context.inputs).find(([, value]) => value !== '' && value === collapsed);
+    return input === undefined ? null : `{{inputs.${input[0]}}}`;
+  };
+  const walk = (current: UINode, hidden: boolean): UINode => {
+    const hide = hidden || sensitive.has(current.ref);
+    const name = hide && current.name.trim() !== '' ? (templateOnly(current.name) ?? '[redacted:pii]') : clean(current.name);
+    return {
+      ...current,
+      name,
+      ...(current.value === undefined ? {} : { value: hide ? (templateOnly(current.value) ?? '[redacted:pii]') : clean(current.value) }),
+      children: current.children.map((child) => walk(child, hide)),
+    };
+  };
+  return walk(node, false);
 }

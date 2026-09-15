@@ -46,6 +46,25 @@ describe('Recorder', () => {
     });
   });
 
+  it('stores the acted element neighbourhood with member data masked', () => {
+    const recorder = createRecorder({ profile, redactor, inputs: { memberId: '10001' } });
+
+    const recorded = recorder.record({ tool: 'extract', observation: screen('detail'), ref: 's3', output: 'savingsBalance' });
+
+    const neighbourhood = JSON.stringify(recorded.neighbourhood);
+    expect(neighbourhood).toContain('Savings');
+    expect(neighbourhood).not.toMatch(/4,250\.75|Test Member One|4111|10001/);
+  });
+
+  it('completes an action with whether it succeeded and changed the page', () => {
+    const recorder = createRecorder({ profile, redactor, inputs: { memberId: '10001' } });
+    recorder.record({ tool: 'click', observation: screen('search'), ref: 'n6' });
+
+    recorder.complete(0, { ok: true, changed: true });
+
+    expect(recorder.actions()[0]).toMatchObject({ ok: true, changed: true });
+  });
+
   it('records an action whose element has no unique strategy, with what was dropped, and keeps order', () => {
     const recorder = createRecorder({ profile, redactor, inputs: { memberId: '10001' } });
     recorder.record({ tool: 'fill', observation: screen('search', true), ref: 'n3', inputName: 'memberId' });

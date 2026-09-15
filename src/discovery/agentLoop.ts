@@ -8,11 +8,11 @@ import { progressHash } from '../core/surfaceModel/progressHash.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
 import type { Observation, ResolvedAction } from '../core/surfaceModel/types.js';
 import type { Clock } from '../runtime/clock.js';
-import type { GuardedSurface } from '../surface/guardedSurface.js';
+import type { GuardedOutcome, GuardedSurface } from '../surface/guardedSurface.js';
 import type { ModelClient } from './modelClient.js';
 import { buildObservation } from './observation.js';
 import { buildGoal, SYSTEM_PROMPT } from './prompt.js';
-import type { Recorder } from './recorder.js';
+import type { RecordedAction, Recorder } from './recorder.js';
 import { toolsFor } from './tools.js';
 
 // The discovery loop, see docs/ARCHITECTURE.md section 6. Observe, decide, authorize, act,
@@ -37,6 +37,7 @@ export type DiscoveryEvent =
   | { readonly t: 'observation'; readonly at: string; readonly observationHash: string; readonly progressHash: string }
   | { readonly t: 'decision'; readonly at: string; readonly tool: string; readonly input: unknown }
   | { readonly t: 'action'; readonly at: string; readonly tool: string; readonly ok: boolean; readonly detail: string }
+  | { readonly t: 'authorization'; readonly at: string; readonly tool: string; readonly verdict: 'allow' | 'deny' | 'confirm'; readonly rule?: string }
   | { readonly t: 'stuck'; readonly at: string; readonly detector: 'NoProgress' | 'ModelRequested'; readonly detail: string };
 
 export interface DiscoveryOptions {
@@ -78,6 +79,7 @@ interface Executed {
   readonly text: string;
   readonly isError: boolean;
   readonly terminal?: 'done' | 'escalated';
+  readonly recordedIndex?: number;
 }
 
 // Only these change the page by design, so only these count toward NoProgress.
@@ -131,9 +133,20 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     }
   };
 
+  // Every verdict, allow included, because an audit trail of refusals alone cannot say what
+  // the run was permitted to do. See docs/EVIDENCE.md section 3.
+  const emitAuthorization = (tool: string, outcome: GuardedOutcome): void => {
+    if (outcome.kind === 'performed') emit({ t: 'authorization', at: at(), tool, verdict: 'allow' });
+    else emit({ t: 'authorization', at: at(), tool, verdict: outcome.kind === 'denied' ? 'deny' : 'confirm', rule: outcome.decision.rule });
+  };
+
+  const withRecord = (executed: Executed, recorded: RecordedAction | undefined): Executed =>
+    recorded === undefined ? executed : { ...executed, recordedIndex: recorded.index };
+
   const perform = async (action: ResolvedAction, framePath: readonly string[]): Promise<Executed> => {
     const stepId = `action${actions}`;
     const outcome = await surface.perform({ action, framePath, stepId, effect: 'read', targetKey: null }, control);
+    emitAuthorization(action.kind, outcome);
     if (outcome.kind === 'denied') return { text: `Policy denied this action. ${outcome.decision.reason}`, isError: true };
     if (outcome.kind === 'confirm') return { text: `This action needs a person to approve it. ${outcome.decision.reason}`, isError: true };
     if (!outcome.result.ok) return { text: `The action failed. ${outcome.result.detail}`, isError: true };
@@ -158,8 +171,8 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (!resolved.ok) return bad(`The path names something that is not an input: ${resolved.references.join(', ')}.`);
       const before = latest;
       // The path as the model gave it, which can only carry templates, never the resolved one.
-      if (before !== null) options.recorder?.record({ tool: 'navigate', observation: before, path, framePath });
-      return perform({ kind: 'navigate', path: resolved.text, framePath }, framePath);
+      const recorded = before === null ? undefined : options.recorder?.record({ tool: 'navigate', observation: before, path, framePath });
+      return withRecord(await perform({ kind: 'navigate', path: resolved.text, framePath }, framePath), recorded);
     }
 
     const ref = readString(input, 'ref');
@@ -170,29 +183,31 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     // Each element action is recorded against the observation its ref came from, before the
     // page can change, with only the ref and names the recorder needs.
     switch (block.name) {
-      case 'click':
-        options.recorder?.record({ tool: 'click', observation: current, ref });
-        return perform({ kind: 'click', ref }, node.framePath);
+      case 'click': {
+        const recorded = options.recorder?.record({ tool: 'click', observation: current, ref });
+        return withRecord(await perform({ kind: 'click', ref }, node.framePath), recorded);
+      }
       case 'fill':
       case 'select': {
         const name = readString(input, 'input');
         const value = name === null ? undefined : options.inputs[name];
         if (name === null || value === undefined) return bad(`${block.name} needs the name of an input.`);
-        options.recorder?.record({ tool: block.name, observation: current, ref, inputName: name });
-        return block.name === 'fill' ? perform({ kind: 'fill', ref, value }, node.framePath) : perform({ kind: 'select', ref, value }, node.framePath);
+        const recorded = options.recorder?.record({ tool: block.name, observation: current, ref, inputName: name });
+        const done = block.name === 'fill' ? await perform({ kind: 'fill', ref, value }, node.framePath) : await perform({ kind: 'select', ref, value }, node.framePath);
+        return withRecord(done, recorded);
       }
       case 'press': {
         const key = readString(input, 'key');
         if (key === null) return bad('press needs a key.');
-        options.recorder?.record({ tool: 'press', observation: current, ref, key });
-        return perform({ kind: 'press', ref, key }, node.framePath);
+        const recorded = options.recorder?.record({ tool: 'press', observation: current, ref, key });
+        return withRecord(await perform({ kind: 'press', ref, key }, node.framePath), recorded);
       }
       case 'extract': {
         const output = readString(input, 'output');
         if (output === null) return bad('extract needs an output name.');
-        options.recorder?.record({ tool: 'extract', observation: current, ref, output });
+        const recorded = options.recorder?.record({ tool: 'extract', observation: current, ref, output });
         extracted[output] = { ref, text: node.value ?? node.name };
-        return { text: `Recorded ${output} from ${ref}.`, isError: false };
+        return withRecord({ text: `Recorded ${output} from ${ref}.`, isError: false }, recorded);
       }
       default:
         return bad(`There is no tool named ${block.name}.`);
@@ -206,6 +221,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     }
 
     const entry = await surface.perform({ action: { kind: 'navigate', path: options.entryPath, framePath: [] }, framePath: [], stepId: 'entry', effect: 'read', targetKey: null }, control);
+    emitAuthorization('navigate', entry);
     if (entry.kind !== 'performed') throw fail('PolicyDenied', entry.decision.reason);
     if (!entry.result.ok) throw fail('SurfaceUnavailable', entry.result.detail);
 
@@ -256,6 +272,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (executed.terminal === 'escalated') throw escalate('ModelRequested', executed.text);
 
       seen = await observe();
+      if (executed.recordedIndex !== undefined) {
+        options.recorder?.complete(executed.recordedIndex, { ok: !executed.isError, changed: seen.progress !== before });
+      }
       if (acting) {
         unchanged = seen.progress === before ? unchanged + 1 : 0;
         if (unchanged >= NO_PROGRESS_LIMIT) {

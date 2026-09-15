@@ -1,0 +1,420 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "member.readSavingsBalance",
+  "version": "1.0.0",
+  "name": "Read member savings balance",
+  "description": "Looks up a member by ID and returns the current balance of their primary savings account.",
+  "app": {
+    "appId": "meridian-core",
+    "vendor": "meridian",
+    "entryPath": "/servicing"
+  },
+  "surface": {
+    "kind": "legacy-web",
+    "minDriverVersion": "1.0.0",
+    "capabilitiesRequired": [
+      "frames"
+    ]
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Institution member number",
+      "sensitivity": "pii",
+      "constraints": {
+        "pattern": "^[0-9]{5,10}$"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "savingsBalance",
+      "type": "money",
+      "description": "The value read from cell right of Savings",
+      "sensitivity": "pii",
+      "required": true,
+      "source": {
+        "stepId": "clickLinkMemberId",
+        "target": {
+          "framePath": [
+            "content"
+          ],
+          "strategies": [
+            {
+              "kind": "anchor-relative",
+              "anchor": {
+                "kind": "text",
+                "text": "Savings",
+                "exact": true,
+                "confidence": 0.75
+              },
+              "relation": "rightOf",
+              "role": "cell",
+              "confidence": 0.75
+            }
+          ],
+          "matchPolicy": "unique",
+          "describedAs": "cell right of Savings"
+        },
+        "attribute": "text",
+        "parse": {
+          "kind": "money",
+          "currency": "USD"
+        }
+      }
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "fillTextboxMemberId",
+      "index": 0,
+      "intent": "Enter the memberId input into textbox Member ID:",
+      "action": {
+        "kind": "fill"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "label",
+            "text": "Member ID:",
+            "confidence": 0.85
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Member ID:",
+              "exact": true,
+              "confidence": 0.8
+            },
+            "relation": "sameRow",
+            "role": "textbox",
+            "confidence": 0.8
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Member ID:",
+              "exact": true,
+              "confidence": 0.75
+            },
+            "relation": "rightOf",
+            "role": "textbox",
+            "confidence": 0.75
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "role-name",
+              "role": "heading",
+              "name": "Member Search",
+              "exact": true,
+              "confidence": 0.6
+            },
+            "relation": "firstBelow",
+            "role": "textbox",
+            "confidence": 0.6
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "textbox Member ID:"
+      },
+      "value": "{{inputs.memberId}}",
+      "postcondition": {
+        "description": "textbox Member ID: holds the memberId input",
+        "condition": {
+          "kind": "textMatches",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "label",
+                "text": "Member ID:",
+                "confidence": 0.85
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Member ID:",
+                  "exact": true,
+                  "confidence": 0.8
+                },
+                "relation": "sameRow",
+                "role": "textbox",
+                "confidence": 0.8
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Member ID:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "textbox",
+                "confidence": 0.75
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "role-name",
+                  "role": "heading",
+                  "name": "Member Search",
+                  "exact": true,
+                  "confidence": 0.6
+                },
+                "relation": "firstBelow",
+                "role": "textbox",
+                "confidence": 0.6
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "textbox Member ID:"
+          },
+          "pattern": "^{{inputs.memberId}}$"
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": true,
+      "sensitive": false,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    },
+    {
+      "id": "clickCellSearch",
+      "index": 1,
+      "intent": "Click cell Search",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "role-name",
+            "role": "cell",
+            "name": "Search",
+            "exact": true,
+            "confidence": 0.9
+          },
+          {
+            "kind": "text",
+            "text": "Search",
+            "exact": true,
+            "confidence": 0.7
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "cell Search"
+      },
+      "postcondition": {
+        "description": "link the memberId input is present",
+        "condition": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "role-name",
+                "role": "link",
+                "name": "{{inputs.memberId}}",
+                "exact": true,
+                "confidence": 0.9
+              },
+              {
+                "kind": "text",
+                "text": "{{inputs.memberId}}",
+                "exact": true,
+                "confidence": 0.7
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "role-name",
+                  "role": "heading",
+                  "name": "Member Search",
+                  "exact": true,
+                  "confidence": 0.6
+                },
+                "relation": "firstBelow",
+                "role": "link",
+                "confidence": 0.6
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "link {{inputs.memberId}}"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": false,
+      "sensitive": false,
+      "retry": {
+        "attempts": 0,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    },
+    {
+      "id": "clickLinkMemberId",
+      "index": 2,
+      "intent": "Click link the memberId input",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "role-name",
+            "role": "link",
+            "name": "{{inputs.memberId}}",
+            "exact": true,
+            "confidence": 0.9
+          },
+          {
+            "kind": "text",
+            "text": "{{inputs.memberId}}",
+            "exact": true,
+            "confidence": 0.7
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "role-name",
+              "role": "heading",
+              "name": "Member Search",
+              "exact": true,
+              "confidence": 0.6
+            },
+            "relation": "firstBelow",
+            "role": "link",
+            "confidence": 0.6
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "link {{inputs.memberId}}"
+      },
+      "postcondition": {
+        "description": "cell right of Savings is present",
+        "condition": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Savings",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "cell",
+                "confidence": 0.75
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell right of Savings"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": false,
+      "sensitive": false,
+      "retry": {
+        "attempts": 0,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    }
+  ],
+  "successCondition": {
+    "description": "The run ends with savingsBalance readable",
+    "condition": {
+      "kind": "all",
+      "of": [
+        {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Savings",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "cell",
+                "confidence": 0.75
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell right of Savings"
+          }
+        },
+        {
+          "kind": "outputResolvable",
+          "outputName": "savingsBalance"
+        }
+      ]
+    },
+    "timeoutMs": 10000
+  },
+  "policy": {
+    "maxEffect": "read",
+    "requiresApproval": true,
+    "allowUnattendedReplay": false,
+    "maxStepDurationMs": 20000,
+    "maxTotalDurationMs": 120000
+  },
+  "provenance": {
+    "recordedAt": "2026-09-15T09:00:00.000Z",
+    "discoveryRunId": "run_000001",
+    "model": "claude-sonnet-5",
+    "promptVersion": "1.0.0",
+    "recorderVersion": "1.0.0",
+    "generalizerVersion": "1.0.0",
+    "redactionApplied": true
+  },
+  "lifecycle": {
+    "status": "draft"
+  }
+}

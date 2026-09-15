@@ -129,7 +129,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T05** Locator derivation, record time verification and the `Recorder`.
   * Accept: bundles are derived from the real element at action time, never from model output. Each strategy is resolved at record time and dropped unless it uniquely hits the element. Text equal to a declared input value becomes a template.
   * Test: unit, an unnamed input yields `anchor-relative` from its derived label, an ambiguous `text` strategy is dropped, a member ID never lands as a literal, and model text is never used as a selector.
-* [ ] **S4-T06** `RunTrace` and the `Generalizer`, five transforms.
+* [x] **S4-T06** `RunTrace` and the `Generalizer`, five transforms.
   * Accept: the trace stores observation hashes, decisions, authorization verdicts and each acted element's redacted neighbourhood. The generalizer prunes failed and no op actions, parameterises input values in step values and locator text, canonicalises input values inside navigate paths and URL patterns, infers a checkpoint per step from the observation that followed it, and types outputs from `extract` calls. Canonicalisation is a correctness rule, because a navigate path that kept `/member/10001` would replay the wrong member for any other input. Discovery success is non circular. The success condition is synthesized from the final observation and re asserted against it.
   * Test: unit, one per transform, a recorded navigate to a member path stored as a template, a fixture trace compared against an expected artifact, a sensitive literal never emitted, and a success condition that does not hold failing the run.
 * [ ] **S4-T07** `CapabilityStore` writer, `npm run discover` and `npm run replay`.
