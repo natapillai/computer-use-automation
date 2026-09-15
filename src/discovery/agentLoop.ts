@@ -212,7 +212,8 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
         system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
         tools,
         tool_choice: { type: 'auto', disable_parallel_tool_use: true },
-        messages,
+        // A snapshot, so a request that was sent or recorded never changes as the loop goes on.
+        messages: [...messages],
       };
       modelCalls += 1;
       const answer = await model.next({ params, observationHash: seen.hash, observationText: seen.text });
