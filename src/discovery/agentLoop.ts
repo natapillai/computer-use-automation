@@ -54,6 +54,10 @@ export interface DiscoveryOptions {
   readonly entryPath: string;
   readonly onEvent?: (event: DiscoveryEvent) => void;
   readonly recorder?: Recorder;
+  // Called with the first observation, and with a fresh observation taken as the run ends, so
+  // evidence is captured against refs that are current. Without it the loop takes no extra
+  // observation.
+  readonly capture?: (moment: 'initial' | 'final', observation: Observation) => Promise<void>;
 }
 
 interface DiscoveryCommon {
@@ -115,13 +119,23 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     return new Finish({ ...common(), status: 'escalated', reason, detail });
   };
 
-  const observe = async (): Promise<{ text: string; hash: string; progress: string }> => {
+  const observe = async (): Promise<{ text: string; hash: string; progress: string; observation: Observation }> => {
     const observation = await surface.observe();
     latest = observation;
     const built = buildObservation(observation, { profile: options.profile, redactor: options.redactor, inputs: options.inputs });
     const progress = progressHash(observation);
     emit({ t: 'observation', at: at(), observationHash: built.hash, progressHash: createHash('sha256').update(progress).digest('hex').slice(0, 16) });
-    return { ...built, progress };
+    return { ...built, progress, observation };
+  };
+
+  // A fresh observation as the run ends, taken only when evidence is captured, so the final
+  // screenshot masks refs from the snapshot the driver holds now. A run that never reached a
+  // page has nothing to capture.
+  const captureEnd = async (result: DiscoveryResult): Promise<DiscoveryResult> => {
+    if (options.capture === undefined || latest === null) return result;
+    const { observation } = await observe();
+    await options.capture('final', observation);
+    return { ...result, finalObservation: observation };
   };
 
   // Wait for the first change a step caused, then until the surface stops changing, bounded.
@@ -226,6 +240,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     if (!entry.result.ok) throw fail('SurfaceUnavailable', entry.result.detail);
 
     let seen = await observe();
+    await options.capture?.('initial', seen.observation);
     let unchanged = 0;
     const messages: Anthropic.MessageParam[] = [{ role: 'user', content: `${goal.text}\n\nObservation:\n${seen.text}` }];
 
@@ -291,8 +306,8 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       });
     }
   } catch (error) {
-    if (error instanceof Finish) return error.result;
-    if (error instanceof ControlLostError) return { ...common(), status: 'failure', reason: 'ControlLost', detail: 'Control of the session moved to another holder.' };
+    if (error instanceof Finish) return captureEnd(error.result);
+    if (error instanceof ControlLostError) return captureEnd({ ...common(), status: 'failure', reason: 'ControlLost', detail: 'Control of the session moved to another holder.' });
     throw error;
   }
 }

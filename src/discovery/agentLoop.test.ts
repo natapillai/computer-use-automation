@@ -12,7 +12,7 @@ import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
-import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent } from './agentLoop.js';
+import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent, type DiscoveryOptions } from './agentLoop.js';
 import { createFakeModelClient, type FakeTurn } from './fakeModelClient.js';
 import { createRecorder, type Recorder } from './recorder.js';
 
@@ -59,6 +59,7 @@ interface RunOptions {
   readonly budgets?: Partial<DiscoveryBudgets>;
   readonly goal?: string;
   readonly recorder?: Recorder;
+  readonly capture?: DiscoveryOptions['capture'];
 }
 
 async function discover(options: RunOptions) {
@@ -87,6 +88,7 @@ async function discover(options: RunOptions) {
     entryPath: '/servicing',
     onEvent: (event) => events.push(event),
     ...(options.recorder === undefined ? {} : { recorder: options.recorder }),
+    ...(options.capture === undefined ? {} : { capture: options.capture }),
   });
   return { result, driver, model, events };
 }
@@ -236,6 +238,47 @@ describe('runDiscovery', () => {
 
     const denied = await discover({ turns: [call('navigate', { path: '/__control__/reset', framePath: ['content'] }), call('done')] });
     expect(denied.events).toContainEqual(expect.objectContaining({ t: 'authorization', tool: 'navigate', verdict: 'deny', rule: 'deniedPath' }));
+  });
+
+  it('captures the first observation and a fresh one at the end, and ends the run on that fresh observation', async () => {
+    const captured: [string, string | undefined][] = [];
+    const { result } = await discover({
+      turns: happyPath,
+      capture: async (moment, observation) => {
+        captured.push([moment, observation.frames.find((frame) => frame.framePath.join('/') === 'content')?.url]);
+      },
+    });
+
+    expect(captured).toEqual([
+      ['initial', 'http://localhost:4010/servicing/search'],
+      ['final', 'http://localhost:4010/member/10001'],
+    ]);
+    expect(result.finalObservation?.frames).toContainEqual(expect.objectContaining({ url: 'http://localhost:4010/member/10001' }));
+  });
+
+  it('still captures the end of a run that failed', async () => {
+    const moments: string[] = [];
+    await discover({
+      turns: [{ fail: 'OverloadedError with status 529.' }],
+      capture: async (moment) => {
+        moments.push(moment);
+      },
+    });
+
+    expect(moments).toEqual(['initial', 'final']);
+  });
+
+  it('captures nothing when the run never reached a page', async () => {
+    const moments: string[] = [];
+    await discover({
+      turns: [call('done')],
+      goal: 'Find the savings balance of member 10001.',
+      capture: async (moment) => {
+        moments.push(moment);
+      },
+    });
+
+    expect(moments).toEqual([]);
   });
 
   it('refuses a goal that carries an input value before anything is shown to the model', async () => {

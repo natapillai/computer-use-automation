@@ -1,6 +1,7 @@
 import { deriveBundle, type DroppedStrategy } from '../core/locator/derive.js';
 import type { LocatorBundle } from '../core/locator/schema.js';
 import { sensitiveFields, type AppProfile } from '../core/policy/profile.js';
+import { maskTree } from '../core/redaction/maskTree.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
 import type { Observation, UINode } from '../core/surfaceModel/types.js';
@@ -87,7 +88,7 @@ export function createRecorder(context: RecorderContext): Recorder {
           ...(action.inputName === undefined ? {} : { value: `{{inputs.${action.inputName}}}` }),
           ...(action.key === undefined ? {} : { key: action.key }),
           ...(action.output === undefined ? {} : { output: action.output }),
-          ...(parent === null ? {} : { neighbourhood: masked(parent, sensitive, context) }),
+          ...(parent === null ? {} : { neighbourhood: maskTree(parent, { sensitive, inputs: context.inputs, redactor: context.redactor }) }),
         };
       }
 
@@ -110,29 +111,4 @@ function parentOf(root: UINode, ref: string): UINode | null {
     if (found !== null) return found;
   }
   return null;
-}
-
-// The neighbourhood as the trace may keep it. Sensitive cells are hidden, a supplied value
-// shows as its template, and everything else passes through the redactor.
-function masked(node: UINode, sensitive: ReadonlyMap<string, unknown>, context: RecorderContext): UINode {
-  const known = Object.entries(context.inputs)
-    .filter(([, value]) => value !== '')
-    .map(([name, value]) => ({ value, replacement: `{{inputs.${name}}}` }));
-  const clean = (text: string): string => context.redactor.text(text, { known });
-  const templateOnly = (text: string): string | null => {
-    const collapsed = text.replace(/\s+/g, ' ').trim();
-    const input = Object.entries(context.inputs).find(([, value]) => value !== '' && value === collapsed);
-    return input === undefined ? null : `{{inputs.${input[0]}}}`;
-  };
-  const walk = (current: UINode, hidden: boolean): UINode => {
-    const hide = hidden || sensitive.has(current.ref);
-    const name = hide && current.name.trim() !== '' ? (templateOnly(current.name) ?? '[redacted:pii]') : clean(current.name);
-    return {
-      ...current,
-      name,
-      ...(current.value === undefined ? {} : { value: hide ? (templateOnly(current.value) ?? '[redacted:pii]') : clean(current.value) }),
-      children: current.children.map((child) => walk(child, hide)),
-    };
-  };
-  return walk(node, false);
 }
