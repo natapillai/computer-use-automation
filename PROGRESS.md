@@ -2,10 +2,10 @@
 
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
-**Last updated.** 2026-09-14
-**Current slice.** Slice 2, Perception spike
-**Next task.** S2-T01
-**Suite status.** 166 unit tests across 24 files and 31 integration tests across 4 files passing, typecheck clean
+**Last updated.** 2026-09-15
+**Current slice.** Slice 3, Harden
+**Next task.** S3-T01
+**Suite status.** 167 unit tests across 24 files and 31 integration tests across 4 files passing, typecheck clean
 **Blocked on.** nothing
 
 ## Slice status
@@ -14,7 +14,7 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 | --- | --- | --- |
 | S0 Foundation | 3 | done |
 | S1 Thread | 10 | done |
-| S2 Perception spike | 1 | not started |
+| S2 Perception spike | 1 | done |
 | S3 Harden | 5 | not started |
 | S4 Discovery | 10 | not started |
 | S5 Escalation | 7 | not started |
@@ -25,6 +25,14 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-15, Slice 2 closed, the live spike passed
+Done: S2-T01. Claude Sonnet 5 reached the savings balance of member 10001 in five model calls and four actions. It filled the member ID field by input name, clicked the td Search cell, clicked the member link, extracted the balance cell and called done. Checked in code, the extracted element was the cell right of Savings and its text parsed as 425075 minor units of USD. Estimated cost two cents. The prompt was not iterated.
+Guards: confirmed in code before the run by an offline self check with no API call. A budget of three aborted after exactly three requests. A thrown API error ended the run after one request, and the live client is built with maxRetries 0. The rendered observation carried no seeded canary, and the unredacted render tripped the canary check, so the check is known to work.
+Decisions: no new ADRs. The S1-T08 observation format needed no change. The spike leased its session through the broker and `GuardedSurface` rather than running with no policy, so the network guard applied. Prompt redaction previewed S3-T02 and the S3-T04 field map, with provenance first, so the member's own ID reaches the model only as `{{inputs.memberId}}`.
+Surprises: the self check caught two bugs before any spend. Redacting by field map before provenance hid the result link the model needs. Adjacent cells in a collapsed border table share a pixel, which put the Account column below the Balance header. The second was a core geometry bug and is fixed with a test.
+Cassette: `tests/fixtures/cassettes/discovery.readSavingsBalance.json`, five exchanges, gitignored until S3-T05. It drives loop development offline while S4-T03 keeps the spike's tool names and observation text. S4-T08 remains the one deliberate live run and records the cassette S4-T10 uses.
+Next: S3-T01.
 
 ### 2026-09-14, Slice 1 closed at Gate 1
 Done: S1-T01 to S1-T10. The hand authored `member.readSavingsBalance` replays through the session broker, `GuardedSurface` and the web driver against MERIDIAN Core. It returns 425075 minor units of USD for member 10001, and `MEMBER_NOT_FOUND` for 00000 without waiting out the step timeout.

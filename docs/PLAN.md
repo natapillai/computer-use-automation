@@ -83,7 +83,7 @@ Ends at gate S1-T10, a four step replay against the live app returning a typed m
 
 ## Slice 2. Perception spike
 
-* [ ] **S2-T01** Live model spike. **Gate, Perception.**
+* [x] **S2-T01** Live model spike. **Gate, Perception.**
   * Accept: a crude loop in `scratch/`, real model, the S1-T06 app, refs only tools, no policy, recorder or artifact. The question is whether a real model reaches the savings balance for `10001` in under twenty steps from the S1-T08 observation format. Findings go into `PROGRESS.md`. A needed change to the observation format is an amendment to ADR 0012 and is folded into this task, not deferred.
 
 ---
