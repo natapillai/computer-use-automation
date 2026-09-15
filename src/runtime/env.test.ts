@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseModelEnv, parseTargetEnv } from './env.js';
+import { checkLiveModelKey, parseModelEnv, parseTargetEnv } from './env.js';
 
 describe('parseTargetEnv', () => {
   it('parses a complete environment into typed config with defaults applied', () => {
@@ -55,5 +55,24 @@ describe('parseModelEnv', () => {
       ok: true,
       value: { model: 'claude-sonnet-5' },
     });
+  });
+});
+
+describe('checkLiveModelKey', () => {
+  it('fails naming ANTHROPIC_API_KEY when it is absent or empty, so a live run cannot start by accident', () => {
+    const refusal = {
+      ok: false,
+      error: { kind: 'EnvInvalid', message: 'Invalid environment. ANTHROPIC_API_KEY is required for a live discovery run.', variables: ['ANTHROPIC_API_KEY'] },
+    };
+
+    expect(checkLiveModelKey({})).toEqual(refusal);
+    expect(checkLiveModelKey({ ANTHROPIC_API_KEY: '' })).toEqual(refusal);
+  });
+
+  it('passes when a key is present and never repeats it', () => {
+    const result = checkLiveModelKey({ ANTHROPIC_API_KEY: 'not-a-real-key' });
+
+    expect(result.ok).toBe(true);
+    expect(JSON.stringify(result)).not.toContain('not-a-real-key');
   });
 });

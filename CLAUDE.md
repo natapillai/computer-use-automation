@@ -60,6 +60,7 @@ REPORT.md              deliverable, the seven required headings, written in Slic
 PROGRESS.md            living state, updated once per slice
 policy/allowlist.yaml  the safety allowlist
 profiles/              app profiles, conditions and sensitivity true of a whole application
+requests/              discovery requests, a goal and input specs that never hold a value
 capabilities/          saved capability artifacts, one file per version
 evidence/              committed run evidence, deliverable
 docs/                  design documents, read on demand

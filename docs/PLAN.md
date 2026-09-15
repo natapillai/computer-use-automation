@@ -132,7 +132,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T06** `RunTrace` and the `Generalizer`, five transforms.
   * Accept: the trace stores observation hashes, decisions, authorization verdicts and each acted element's redacted neighbourhood. The generalizer prunes failed and no op actions, parameterises input values in step values and locator text, canonicalises input values inside navigate paths and URL patterns, infers a checkpoint per step from the observation that followed it, and types outputs from `extract` calls. Canonicalisation is a correctness rule, because a navigate path that kept `/member/10001` would replay the wrong member for any other input. Discovery success is non circular. The success condition is synthesized from the final observation and re asserted against it.
   * Test: unit, one per transform, a recorded navigate to a member path stored as a template, a fixture trace compared against an expected artifact, a sensitive literal never emitted, and a success condition that does not hold failing the run.
-* [ ] **S4-T07** `CapabilityStore` writer, `npm run discover` and `npm run replay`.
+* [x] **S4-T07** `CapabilityStore` writer, `npm run discover` and `npm run replay`.
   * Accept: canonical JSON with stable key order, and a refusal scan for declared input values and redactor matches before writing. Discovery returns a typed `DiscoveryResult`. Replay takes inputs from stdin or a file, never argv. `test:e2e` lands here.
   * Test: unit, a byte stable round trip and a refused sensitive literal. E2E, the replay CLI exits 0 on success and non zero on failure, with valid JSON output.
 * [ ] **S4-T08** The live discovery run. Commit its evidence.

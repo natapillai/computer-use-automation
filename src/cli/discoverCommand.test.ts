@@ -1,0 +1,206 @@
+import { access, mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { allowlist, call, GOAL, happyPathTurns, profile } from '../../tests/fixtures/discovery/fakeRun.js';
+import { meridianScript } from '../../tests/fixtures/surface/meridianScreens.js';
+import { createControlTokens } from '../control/controlToken.js';
+import { createGrantLedger } from '../core/policy/authorize.js';
+import { createRedactor } from '../core/redaction/redactor.js';
+import { Cassette } from '../discovery/cassetteModelClient.js';
+import { createFakeModelClient, type FakeTurn } from '../discovery/fakeModelClient.js';
+import { canariesFromSeed, scanDirectories } from '../evidence/scanner.js';
+import { loadAllowlist } from '../runtime/allowlist.js';
+import { createTestClock } from '../runtime/clock.js';
+import { createSequentialIds } from '../runtime/ids.js';
+import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
+import { createGuardedSurface } from '../surface/guardedSurface.js';
+import { runDiscoverCommand } from './discoverCommand.js';
+
+// The discover command on the scripted app with a scripted model. The redactor is built from
+// the committed allowlist and everything written is scanned for the seeded canaries, so this
+// is the same check the committed evidence of the live run must pass.
+
+const REQUEST = {
+  id: 'member.readSavingsBalance',
+  name: 'Read member savings balance',
+  description: 'Looks up a member by ID and returns the current balance of their primary savings account.',
+  goal: GOAL,
+  app: { appId: 'meridian-core', vendor: 'meridian', entryPath: '/servicing' },
+  inputs: [{ name: 'memberId', type: 'string', required: true, sensitivity: 'pii', description: 'Institution member number', constraints: { pattern: '^[0-9]{5,10}$' } }],
+};
+
+interface Paths {
+  readonly request: string;
+  readonly evidence: string;
+  readonly capabilities: string;
+}
+
+interface Setup {
+  readonly turns?: readonly FakeTurn[];
+  readonly extraArgs?: readonly string[];
+  readonly argv?: (paths: Paths) => readonly string[];
+  readonly modelId?: string | null;
+  readonly liveModel?: 'unavailable' | 'forbidden';
+  readonly stdin?: string;
+}
+
+async function filesUnder(directory: string): Promise<string[]> {
+  const entries = await readdir(directory, { recursive: true, withFileTypes: true });
+  return entries
+    .filter((entry) => entry.isFile())
+    .map((entry) => join(entry.parentPath, entry.name).slice(directory.length + 1).split('\\').join('/'))
+    .sort();
+}
+
+describe('runDiscoverCommand', () => {
+  let root: string;
+
+  beforeEach(async () => {
+    root = await mkdtemp(join(tmpdir(), 'discover-cli-'));
+  });
+  afterEach(() => rm(root, { recursive: true, force: true }));
+
+  async function run(setup: Setup = {}) {
+    const loaded = await loadAllowlist('policy/allowlist.yaml');
+    if (!loaded.ok) throw new Error(loaded.message);
+    const paths: Paths = { request: join(root, 'request.json'), evidence: join(root, 'evidence'), capabilities: join(root, 'capabilities') };
+    await writeFile(paths.request, JSON.stringify(REQUEST));
+
+    const clock = createTestClock('2026-09-15T09:00:00.000Z');
+    const out: string[] = [];
+    const err: string[] = [];
+    let leases = 0;
+    const code = await runDiscoverCommand({
+      argv: setup.argv?.(paths) ?? ['--request', paths.request, '--evidence', paths.evidence, '--capabilities', paths.capabilities, ...(setup.extraArgs ?? [])],
+      readStdin: async () => setup.stdin ?? '{"memberId":"10001"}',
+      readText: (path) => readFile(path, 'utf8'),
+      stdout: (text) => out.push(text),
+      stderr: (text) => err.push(text),
+      loadProfile: async () => ({ ok: true, profile }),
+      lease: async ({ runId }) => {
+        leases += 1;
+        const tokens = createControlTokens('sess_000001', createSequentialIds());
+        const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script: meridianScript(), clock });
+        const surface = createGuardedSurface({
+          driver,
+          policy: { allowlist, phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants: createGrantLedger() },
+          runId,
+          baseUrl: 'http://localhost:4010',
+        });
+        return { ok: true, lease: { surface, control: tokens.issue('automation'), release: async () => undefined } };
+      },
+      liveModel: () => {
+        if (setup.liveModel === 'forbidden') throw new Error('A live model was built for a run that names a cassette.');
+        if (setup.liveModel === 'unavailable') return { ok: false, message: 'Invalid environment. ANTHROPIC_API_KEY is required for a live discovery run.' };
+        return { ok: true, client: createFakeModelClient(setup.turns ?? happyPathTurns()) };
+      },
+      modelId: setup.modelId === undefined ? 'claude-sonnet-5' : setup.modelId,
+      redactor: createRedactor(loaded.allowlist.data),
+      budgets: { maxModelCalls: 20, maxActions: 40, maxDurationMs: 300_000 },
+      clock,
+      ids: createSequentialIds(),
+      target: { baseUrl: 'http://localhost:4010' },
+      environment: { driver: 'fake', driverVersion: '1.0.0' },
+    });
+    return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, patterns: loaded.allowlist.data.redactPatterns };
+  }
+
+  it('discovers, writes the draft capability and the evidence the brief asks for, and exits 0', async () => {
+    const { code, stdout, stderr, paths } = await run();
+
+    expect(code, stderr).toBe(0);
+    expect(JSON.parse(stdout)).toMatchObject({ runId: 'run_000001', status: 'done', capability: { id: 'member.readSavingsBalance', version: '1.0.0' } });
+    expect(await filesUnder(paths.capabilities)).toEqual(['member.readSavingsBalance@1.0.0.json']);
+    expect(await filesUnder(paths.evidence)).toEqual([
+      'discovery/run_000001/artifact.json',
+      'discovery/run_000001/captures/final.a11y.json',
+      'discovery/run_000001/captures/final.png',
+      'discovery/run_000001/captures/step-00-initial.a11y.json',
+      'discovery/run_000001/captures/step-00-initial.png',
+      'discovery/run_000001/log.jsonl',
+      'discovery/run_000001/manifest.json',
+      'discovery/run_000001/trace.jsonl',
+      'discovery/run_000001/transcript.jsonl',
+    ]);
+  });
+
+  it('leaves no seeded member data and no redaction pattern match in anything it wrote', async () => {
+    const { patterns } = await run();
+
+    const scan = await scanDirectories(root, ['evidence', 'capabilities'], { canaries: await canariesFromSeed('apps/target/seed.json'), patterns });
+
+    expect(scan.filesScanned).toBeGreaterThan(5);
+    expect(scan.hits).toEqual([]);
+  });
+
+  it('keeps observation hashes, decisions, authorization verdicts, actions and derivations in the trace', async () => {
+    const { paths } = await run();
+    const text = await readFile(join(paths.evidence, 'discovery', 'run_000001', 'trace.jsonl'), 'utf8');
+
+    const kinds = new Set(text.trim().split('\n').map((line): unknown => Reflect.get(JSON.parse(line), 't')));
+    expect([...kinds].map(String).sort()).toEqual(['action', 'authorization', 'decision', 'derivation', 'observation']);
+  });
+
+  it('records the exchange as a cassette that drives the same run offline, and never overwrites a cassette', async () => {
+    const cassettePath = join(root, 'cassette.json');
+
+    const recorded = await run({ extraArgs: ['--cassette', cassettePath] });
+    expect(recorded.code, recorded.stderr).toBe(0);
+    expect(Cassette.parse(JSON.parse(await readFile(cassettePath, 'utf8'))).exchanges).toHaveLength(5);
+
+    const again = await run({ extraArgs: ['--cassette', cassettePath] });
+    expect([again.code, again.leases]).toEqual([2, 0]);
+
+    const offline = await run({
+      argv: (paths) => ['--request', paths.request, '--evidence', join(root, 'offline-evidence'), '--capabilities', join(root, 'offline-capabilities'), '--model-cassette', cassettePath],
+      liveModel: 'forbidden',
+      modelId: null,
+    });
+    expect(offline.code, offline.stderr).toBe(0);
+    expect(await filesUnder(join(root, 'offline-capabilities'))).toEqual(['member.readSavingsBalance@1.0.0.json']);
+  });
+
+  it('exits 3 and writes no capability when the model asks for a person', async () => {
+    const { code, stdout, paths } = await run({ turns: [call('escalate', { reason: 'The search form is not on the page.' })] });
+
+    expect(code).toBe(3);
+    expect(JSON.parse(stdout)).toMatchObject({ status: 'escalated', reason: 'ModelRequested', capability: null });
+    await expect(access(paths.capabilities)).rejects.toThrow();
+  });
+
+  it('exits 1 without a capability when the run cannot be generalized', async () => {
+    const { code, stdout } = await run({ turns: [call('done')] });
+
+    expect(code).toBe(1);
+    expect(JSON.parse(stdout)).toMatchObject({ status: 'done', capability: null, generalization: { failure: 'NoSteps' } });
+  });
+
+  it('refuses inputs passed as arguments without repeating them, and invalid inputs, before any session', async () => {
+    const onArgv = await run({ extraArgs: ['--memberId', '10001'] });
+    const invalid = await run({ stdin: '{"memberId":"abc"}' });
+
+    expect([onArgv.code, onArgv.stdout, onArgv.leases]).toEqual([2, '', 0]);
+    expect(onArgv.stderr).not.toContain('10001');
+    expect([invalid.code, invalid.leases]).toEqual([2, 0]);
+  });
+
+  it('refuses a live run with no model id or no key, before any session', async () => {
+    const noModel = await run({ modelId: null });
+    const noKey = await run({ liveModel: 'unavailable' });
+
+    expect([noModel.code, noModel.leases]).toEqual([2, 0]);
+    expect(noModel.stderr).toContain('ANTHROPIC_MODEL');
+    expect([noKey.code, noKey.leases]).toEqual([2, 0]);
+    expect(noKey.stderr).toContain('ANTHROPIC_API_KEY');
+  });
+
+  it('refuses a request file that does not validate', async () => {
+    await writeFile(join(root, 'bad.json'), JSON.stringify({ ...REQUEST, goal: '' }));
+
+    const { code, leases, stderr } = await run({ argv: (paths) => ['--request', join(root, 'bad.json'), '--evidence', paths.evidence] });
+
+    expect([code, leases]).toEqual([2, 0]);
+    expect(stderr).toContain('goal');
+  });
+});

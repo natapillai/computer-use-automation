@@ -76,3 +76,16 @@ function parseWith<S extends z.ZodType, T>(
     error: { kind: 'EnvInvalid', message: ['Invalid environment.', ...sentences].join(' '), variables },
   };
 }
+
+// Presence only, so a live discovery run cannot start by accident. The SDK reads the key
+// itself, and this check never keeps or reports more than whether it is set.
+export function checkLiveModelKey(source: EnvSource): EnvResult<{ readonly present: true }> {
+  const key = source['ANTHROPIC_API_KEY'];
+  if (key === undefined || key === '') {
+    return {
+      ok: false,
+      error: { kind: 'EnvInvalid', message: 'Invalid environment. ANTHROPIC_API_KEY is required for a live discovery run.', variables: ['ANTHROPIC_API_KEY'] },
+    };
+  }
+  return { ok: true, value: { present: true } };
+}

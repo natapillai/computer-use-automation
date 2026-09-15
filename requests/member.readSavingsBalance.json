@@ -1,0 +1,17 @@
+{
+  "id": "member.readSavingsBalance",
+  "name": "Read member savings balance",
+  "description": "Looks up a member by ID and returns the current balance of their primary savings account.",
+  "goal": "find the current balance of the savings account of the member whose member ID is {{inputs.memberId}}, and record it as the output savingsBalance.",
+  "app": { "appId": "meridian-core", "vendor": "meridian", "entryPath": "/servicing" },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "Institution member number",
+      "constraints": { "pattern": "^[0-9]{5,10}$" }
+    }
+  ]
+}

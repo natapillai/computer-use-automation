@@ -13,6 +13,7 @@ import type { IdProvider } from '../runtime/ids.js';
 import type { ProfileLoad } from '../runtime/profile.js';
 import type { GuardedSurface } from '../surface/guardedSurface.js';
 import { parseFlags } from './args.js';
+import { parseInputObject } from './io.js';
 
 // npm run replay. Deterministic, with no model anywhere on this path. Stdout carries one JSON
 // document, the caller projection of the result, with real output values for the process that
@@ -74,7 +75,7 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
     return usage('The inputs file could not be read.');
   }
   if (inputText === null) return usage('Pipe the inputs as a JSON object on stdin, or name a file with --inputs.');
-  const supplied = inputObject(inputText);
+  const supplied = parseInputObject(inputText);
   if (supplied === null) return usage('The inputs must be one JSON object keyed by input name.');
 
   const profile = await deps.loadProfile(capability.app.appId);
@@ -177,16 +178,6 @@ function summaryOf(result: ReplayResult): string {
     case 'failure':
       return result.failure.atStepId === null ? `Failed with ${result.failure.class} before the first step.` : `Failed with ${result.failure.class} at step ${result.failure.atStepId}.`;
   }
-}
-
-function inputObject(text: string): Record<string, unknown> | null {
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    return null;
-  }
-  return typeof parsed === 'object' && parsed !== null && !Array.isArray(parsed) ? Object.fromEntries(Object.entries(parsed)) : null;
 }
 
 function primitives(supplied: Readonly<Record<string, unknown>>): Record<string, InputValue> {
