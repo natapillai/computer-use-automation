@@ -1,0 +1,81 @@
+{
+  "runId": "run_84705a0a-7840-4584-b39a-035d9f9d81f8",
+  "phase": "discovery",
+  "startedAt": "2026-09-17T23:05:49.665Z",
+  "endedAt": "2026-09-17T23:06:01.883Z",
+  "capability": {
+    "id": "member.readSavingsBalance",
+    "version": "1.0.0"
+  },
+  "goal": "find the current balance of the savings account of the member whose member ID is {{inputs.memberId}}, and record it as the output savingsBalance.",
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "done",
+    "summary": "Produced member.readSavingsBalance version 1.0.0 as a draft."
+  },
+  "counts": {
+    "steps": 3,
+    "modelCalls": 5,
+    "actions": 3,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 0
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "captures/step-00-initial.png",
+      "kind": "screenshot",
+      "description": "The initial screen with member data masked"
+    },
+    {
+      "path": "captures/step-00-initial.a11y.json",
+      "kind": "snapshot",
+      "description": "The initial accessibility tree with member data masked"
+    },
+    {
+      "path": "captures/final.png",
+      "kind": "screenshot",
+      "description": "The final screen with member data masked"
+    },
+    {
+      "path": "captures/final.a11y.json",
+      "kind": "snapshot",
+      "description": "The final accessibility tree with member data masked"
+    },
+    {
+      "path": "trace.jsonl",
+      "kind": "trace",
+      "description": "Every observation, decision, authorization, action and derivation of the run"
+    },
+    {
+      "path": "transcript.jsonl",
+      "kind": "transcript",
+      "description": "The model exchange, redacted"
+    },
+    {
+      "path": "artifact.json",
+      "kind": "artifact",
+      "description": "The capability this run produced, a draft at version 1.0.0"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": "claude-sonnet-5",
+    "promptVersion": "1.0.0"
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {
+      "known": 1
+    }
+  }
+}

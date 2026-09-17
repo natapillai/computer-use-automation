@@ -5,7 +5,7 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 **Last updated.** 2026-09-17
 **Current slice.** Slice 5, Escalation
 **Next task.** S5-T01
-**Suite status.** 383 unit tests across 54 files, 45 integration tests across 9 files and 5 e2e tests across 2 files passing, typecheck clean
+**Suite status.** 386 unit tests across 54 files, 45 integration tests across 9 files and 5 e2e tests across 2 files passing, typecheck clean
 **Blocked on.** nothing
 
 ## Slice status
@@ -30,6 +30,8 @@ Newest first. Earlier detail lives in git history.
 Done: S4-T01 to S4-T10. Claude Sonnet 5 drove MERIDIAN Core to the savings balance in five model calls and three actions, and that run is committed as `evidence/discovery/run_56fc6b06.../` with its trace, its redacted transcript, masked captures of the first and final screens, and the draft it produced. The generalizer turned the run into `capabilities/member.readSavingsBalance@1.0.0.json` through five transforms. The negative probe review replayed that draft with `00000`, stopped at the failed postcondition, derived the `MEMBER_NOT_FOUND` detector from the real banner and emitted `1.1.0`. Three commands exist, `npm run discover`, `npm run review` and `npm run replay`, and none of them takes an input value as an argument. The whole thread runs offline from the exchange the live run recorded.
 Decisions: no new ADRs. A business outcome exits 0 at the replay CLI, because an exit code is the first thing a caller branches on and a non zero code there would conflate an answer with a failure. Review writes nothing until a second replay of the reviewed version returns the outcome, so a detector that does not work never reaches an artifact. Replay evidence is filed by outcome once the outcome is known, which is what `docs/EVIDENCE.md` describes. Discovery requests and reviews are committed files under `requests/`, because a goal and an outcome name are reviewable configuration and a value belongs in neither.
 Surprises: the live run exposed two defects in its own evidence, an absolute local path in the log and the allowlist email pattern matching the `id@version` file name. Both are fixed forward and the evidence is committed unedited, because a second paid run would break the one live run rule. The persisted projection of a result kept `amountMinor` after hiding the raw text, so a stored balance was still a balance, now replaced whole. The live run's observation hashes and refs matched the S2-T01 spike exactly, which is the stability ADR 0017 relies on, observed twice.
+After Gate 2, on the project owner's instruction: discovery was run live a second time on the fixed pipeline as `run_84705a0a`, and both runs are kept. The first is the record of the system surfacing defects in its own output, the second is what the README and `REPORT.md` point at, and `evidence/README.md` explains the pair. The artifact lineage, the review, the cassette and both replays were regenerated from the second run so one thread is committed rather than two halves. The project owner approved `1.1.0` under the handle `nata`. Observation hashes are identical across all three live runs, the spike, the first and the second, which is worth a line in `REPORT.md` because it is what ADR 0017 relies on.
+
 Next: S5-T01.
 
 ### 2026-09-15, Slice 3 closed, Harden
@@ -69,7 +71,7 @@ Repository restructure, ADRs 0011 to 0018, attribution hook, replans down to for
 
 * **What `contextual` means on a redaction pattern.** No document defines it. The redactor applies a contextual pattern everywhere, which over redacts and fails closed. Decide whether it narrows to a nearby keyword before any real account data is in scope.
 * **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decided at S5-T06.
-* **Who approves the reviewed capability.** `member.readSavingsBalance@1.1.0` is committed as a draft. `npm run review -- --capability capabilities/member.readSavingsBalance@1.1.0.json --approve <handle>` writes `status`, `approvedBy` and `approvedAt`, and I left it unrun, because an approval nobody gave is not evidence of a review. Either run it under a handle you choose, or leave the capability a draft and say so in `README.md`.
+* **What demonstrates the lifecycle gate.** `1.1.0` is approved, and both committed replays record that they ran against an approved version. The gate approval actually unlocks, unattended replay of a `write` step without confirmation, is still undemonstrated, because this capability is read only and `authorize` lets every read through whatever the lifecycle says. `member.openSubAccount` at S5-T06 is where that gets exercised.
 
 ## Deferred and cut
 

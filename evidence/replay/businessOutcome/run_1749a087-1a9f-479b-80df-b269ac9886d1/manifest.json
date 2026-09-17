@@ -1,8 +1,8 @@
 {
-  "runId": "run_f5726ece-8253-482d-bbe3-708e09969c3b",
+  "runId": "run_1749a087-1a9f-479b-80df-b269ac9886d1",
   "phase": "replay",
-  "startedAt": "2026-09-17T22:15:13.832Z",
-  "endedAt": "2026-09-17T22:15:16.400Z",
+  "startedAt": "2026-09-17T23:07:11.546Z",
+  "endedAt": "2026-09-17T23:07:12.787Z",
   "capability": {
     "id": "member.readSavingsBalance",
     "version": "1.1.0"
@@ -13,13 +13,14 @@
     "baseUrl": "http://localhost:4010"
   },
   "result": {
-    "status": "success",
-    "summary": "Returned savingsBalance."
+    "status": "business_outcome",
+    "code": "MEMBER_NOT_FOUND",
+    "summary": "Ended with the business outcome MEMBER_NOT_FOUND."
   },
   "counts": {
     "steps": 3,
     "modelCalls": 0,
-    "actions": 3,
+    "actions": 2,
     "recoveries": 0,
     "drift": 0,
     "escalations": 0

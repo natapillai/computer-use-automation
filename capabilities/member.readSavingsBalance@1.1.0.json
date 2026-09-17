@@ -438,8 +438,8 @@
     "maxTotalDurationMs": 120000
   },
   "provenance": {
-    "recordedAt": "2026-09-15T08:07:23.574Z",
-    "discoveryRunId": "run_56fc6b06-577b-4f04-86c0-4fba6cc659bf",
+    "recordedAt": "2026-09-17T23:06:01.845Z",
+    "discoveryRunId": "run_84705a0a-7840-4584-b39a-035d9f9d81f8",
     "model": "claude-sonnet-5",
     "promptVersion": "1.0.0",
     "recorderVersion": "1.0.0",
@@ -451,6 +451,8 @@
     }
   },
   "lifecycle": {
-    "status": "draft"
+    "status": "approved",
+    "approvedBy": "nata",
+    "approvedAt": "2026-09-17T23:07:00.805Z"
   }
 }
