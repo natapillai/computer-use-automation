@@ -96,6 +96,8 @@ describe('runReplayCommand', () => {
     expect(evidence.files).toEqual(['replay/success/run_000001/log.jsonl', 'replay/success/run_000001/manifest.json']);
     expect(evidence.text).not.toMatch(/10001|4,250\.75|425075/);
     expect(evidence.text).toContain('"status": "success"');
+    // The lifecycle the run replayed under, so an approved run reads differently from a draft.
+    expect(evidence.text).toContain('"capability":{"id":"member.readSavingsBalance","version":"1.0.0","status":"draft"}');
   });
 
   it('files a business outcome and a failure in their own directories, so evidence reads by outcome', async () => {

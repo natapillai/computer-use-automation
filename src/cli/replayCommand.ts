@@ -86,7 +86,12 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
   const runId = deps.ids.next('run');
   const startedAt = deps.clock.now().toISOString();
   const sink = await createEvidenceSink({ root: flags.values['evidence'] ?? 'evidence', phase: 'replay', runId, redactor: deps.redactor, clock: deps.clock });
-  await sink.log('info', 'replay.started', { capability: { id: capability.id, version: capability.version }, inputNames: Object.keys(supplied).sort() });
+  // The lifecycle the run replayed under, so evidence of an approved run reads differently from
+  // evidence of a draft one.
+  await sink.log('info', 'replay.started', {
+    capability: { id: capability.id, version: capability.version, status: capability.lifecycle.status },
+    inputNames: Object.keys(supplied).sort(),
+  });
 
   const base = (): ResultBaseInput => ({
     runId,
