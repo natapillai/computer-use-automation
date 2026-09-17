@@ -278,9 +278,19 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
     evidence: sink.directory,
   };
 
+  // The persisted copy names the capability by id and version and the evidence by its place in
+  // the evidence tree. A local path is not evidence, and an id@version file name reads to the
+  // email pattern as an address.
+  const persisted = {
+    ...summary,
+    capability: capability === null ? null : { id: capability.id, version: capability.version },
+    cassette: recorded,
+    evidence: `discovery/${runId}`,
+  };
+
   const exit = capability !== null ? DISCOVER_EXIT.produced : result.status === 'escalated' ? DISCOVER_EXIT.escalated : DISCOVER_EXIT.failure;
   const code = result.status !== 'done' ? result.reason : (refusal?.failure ?? storeRefusal?.failure);
-  await sink.log(exit === DISCOVER_EXIT.produced ? 'info' : 'error', 'discovery.finished', summary);
+  await sink.log(exit === DISCOVER_EXIT.produced ? 'info' : 'error', 'discovery.finished', persisted);
   await sink.close({
     capability: capability === null ? null : { id: capability.id, version: capability.version },
     goal: request.goal,
@@ -290,7 +300,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       ...(code === undefined ? {} : { code }),
       summary:
         capability !== null
-          ? `Produced ${capability.id}@${capability.version} as a draft.`
+          ? `Produced ${capability.id} version ${capability.version} as a draft.`
           : result.status === 'done'
             ? `The model finished and no capability was written, ${code ?? 'for no recorded reason'}.`
             : `Ended as ${result.status} with ${result.reason}.`,

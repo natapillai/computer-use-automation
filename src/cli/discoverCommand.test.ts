@@ -134,6 +134,18 @@ describe('runDiscoverCommand', () => {
     expect(scan.hits).toEqual([]);
   });
 
+  it('persists a summary with no local path and no capability file name for a pattern to mistake, and prints the full path', async () => {
+    const { stdout, paths } = await run();
+    const directory = join(paths.evidence, 'discovery', 'run_000001');
+    const persisted = [await readFile(join(directory, 'log.jsonl'), 'utf8'), await readFile(join(directory, 'manifest.json'), 'utf8')].join('\n');
+
+    expect(persisted).not.toContain(root);
+    expect(persisted).not.toContain(JSON.stringify(root).slice(1, -1));
+    expect(persisted).not.toContain('[redacted:');
+    expect(persisted).toContain('"evidence":"discovery/run_000001"');
+    expect(JSON.parse(stdout)).toMatchObject({ capability: { path: join(paths.capabilities, 'member.readSavingsBalance@1.0.0.json') } });
+  });
+
   it('keeps observation hashes, decisions, authorization verdicts, actions and derivations in the trace', async () => {
     const { paths } = await run();
     const text = await readFile(join(paths.evidence, 'discovery', 'run_000001', 'trace.jsonl'), 'utf8');
