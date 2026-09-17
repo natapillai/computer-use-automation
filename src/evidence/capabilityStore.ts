@@ -18,12 +18,19 @@ export type CapabilityRead =
   | { readonly ok: true; readonly capability: Capability }
   | { readonly ok: false; readonly failure: 'NotFound' | 'InvalidReference' | 'SchemaIncompatible' | 'CapabilityInvalid'; readonly detail: string };
 
+export type CapabilityApproval =
+  | { readonly ok: true; readonly path: string; readonly capability: Capability }
+  | { readonly ok: false; readonly failure: 'NotFound' | 'InvalidReference' | 'NotDraft' | 'CapabilityInvalid' | 'SchemaIncompatible'; readonly detail: string };
+
 export interface CapabilityStore {
   // inputValues are the values the producing run supplied, so a literal that escaped
   // templating is recognised exactly rather than by pattern.
   write(capability: unknown, context: { readonly inputValues: Readonly<Record<string, InputValue>> }): Promise<CapabilityWrite>;
   read(id: string, version: string): Promise<CapabilityRead>;
   readFile(path: string): Promise<CapabilityRead>;
+  // Lifecycle is the one part of a stored version that may change, because approval is a fact
+  // about a version rather than a change to it.
+  approve(id: string, version: string, approval: { readonly approvedBy: string; readonly approvedAt: string }): Promise<CapabilityApproval>;
   pathFor(id: string, version: string): string;
 }
 
@@ -67,6 +74,23 @@ export function createFileCapabilityStore(options: FileCapabilityStoreOptions): 
   return {
     pathFor,
     readFile: readAt,
+    approve: async (id, version, approval) => {
+      if (!ID.test(id) || !SEMVER.test(version)) {
+        return { ok: false, failure: 'InvalidReference', detail: 'A capability is named by a dotted lower camel case id and a semantic version.' };
+      }
+      const path = pathFor(id, version);
+      const stored = await readAt(path);
+      if (!stored.ok) return { ok: false, failure: stored.failure, detail: stored.detail };
+      if (stored.capability.lifecycle.status !== 'draft') {
+        return { ok: false, failure: 'NotDraft', detail: `${id} version ${version} is ${stored.capability.lifecycle.status}, and only a draft is approved.` };
+      }
+      const approved = Capability.safeParse({ ...stored.capability, lifecycle: { status: 'approved', approvedBy: approval.approvedBy, approvedAt: approval.approvedAt } });
+      if (!approved.success) {
+        return { ok: false, failure: 'CapabilityInvalid', detail: approved.error.issues.map((issue) => `${issue.path.join('.')} ${issue.message}`).join('. ') };
+      }
+      await writeFile(path, canonicalCapabilityJson(approved.data));
+      return { ok: true, path, capability: approved.data };
+    },
     read: async (id, version) => {
       if (!ID.test(id) || !SEMVER.test(version)) {
         return { ok: false, failure: 'InvalidReference', detail: 'A capability is named by a dotted lower camel case id and a semantic version.' };

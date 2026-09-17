@@ -93,6 +93,25 @@ describe('FileCapabilityStore', () => {
     expect(await store.write(readSavingsBalanceFixture(), { inputValues })).toMatchObject({ ok: true });
   });
 
+  it('approves a draft by writing only its lifecycle', async () => {
+    await store.write(readSavingsBalanceFixture(), { inputValues });
+    const before = await readFile(join(directory, FILE), 'utf8');
+
+    const approved = await store.approve('member.readSavingsBalance', '1.0.0', { approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' });
+
+    expect(approved).toMatchObject({ ok: true, capability: { lifecycle: { status: 'approved', approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' } } });
+    const after = await readFile(join(directory, FILE), 'utf8');
+    expect(JSON.parse(after)).toEqual({ ...JSON.parse(before), lifecycle: { status: 'approved', approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' } });
+  });
+
+  it('refuses to approve a version that is missing or already approved', async () => {
+    await store.write(readSavingsBalanceFixture(), { inputValues });
+    await store.approve('member.readSavingsBalance', '1.0.0', { approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' });
+
+    expect(await store.approve('member.readSavingsBalance', '1.0.0', { approvedBy: 'operator-8', approvedAt: '2026-09-16T11:00:00.000Z' })).toMatchObject({ ok: false, failure: 'NotDraft' });
+    expect(await store.approve('member.none', '1.0.0', { approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' })).toMatchObject({ ok: false, failure: 'NotFound' });
+  });
+
   it('reads a missing version as NotFound, a future schema as SchemaIncompatible, and refuses a reference outside the directory', async () => {
     await writeFile(join(directory, 'member.future@1.0.0.json'), JSON.stringify({ schemaVersion: '9.0.0' }));
 

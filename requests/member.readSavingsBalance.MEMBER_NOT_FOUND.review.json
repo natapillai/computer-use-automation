@@ -1,0 +1,6 @@
+{
+  "code": "MEMBER_NOT_FOUND",
+  "description": "No member exists with the supplied ID.",
+  "terminal": true,
+  "elementText": "No records found."
+}
