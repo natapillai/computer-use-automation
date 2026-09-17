@@ -50,6 +50,8 @@ export interface InterventionStore {
   list(): readonly InterventionRequest[];
   status(id: string): InterventionState | null;
   settle(id: string, state: InterventionState): void;
+  // How a blocked run learns that a person answered. Returns the way to stop listening.
+  subscribe(listener: (id: string, state: InterventionState) => void): () => void;
 }
 
 export interface RaiseContext {
@@ -79,8 +81,15 @@ export interface RaiseContext {
 
 export function createInterventionStore(): InterventionStore {
   const items = new Map<string, { readonly request: InterventionRequest; readonly state: InterventionState }>();
+  const listeners = new Set<(id: string, state: InterventionState) => void>();
 
   return {
+    subscribe: (listener) => {
+      listeners.add(listener);
+      return () => {
+        listeners.delete(listener);
+      };
+    },
     add: (request) => {
       items.set(request.id, { request, state: 'open' });
       return request;
@@ -92,6 +101,7 @@ export function createInterventionStore(): InterventionStore {
       const entry = items.get(id);
       if (entry === undefined) throw new TypeError(`There is no intervention ${id} to settle.`);
       items.set(id, { request: entry.request, state });
+      for (const listener of [...listeners]) listener(id, state);
     },
   };
 }

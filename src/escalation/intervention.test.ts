@@ -101,6 +101,19 @@ describe('createInterventionStore', () => {
     expect(store.get(raised.id)).not.toBeNull();
   });
 
+  it('tells a listener when an intervention settles, which is how a blocked run learns it can go on', () => {
+    const store = createInterventionStore();
+    raiseIntervention(context({ store }));
+    const seen: [string, string][] = [];
+    const stop = store.subscribe((id, state) => seen.push([id, state]));
+
+    store.settle('int_000001', 'claimed');
+    stop();
+    store.settle('int_000001', 'released');
+
+    expect(seen).toEqual([['int_000001', 'claimed']]);
+  });
+
   it('knows nothing about an id it never issued', () => {
     const store = createInterventionStore();
 
