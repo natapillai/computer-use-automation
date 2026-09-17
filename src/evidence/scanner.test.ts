@@ -20,6 +20,20 @@ describe('canariesFromSeed', () => {
 
     expect(canaries).toEqual(expect.arrayContaining(['10001', 'Test Member One', '$4,250.75', '1980.40 USD', '(125.00)', '$0.00', '4111 1111 1111 1111', '4111111111111111']));
   });
+
+  it('lists every form a seeded value takes after parsing, because a leak is rarely in display form', async () => {
+    const canaries = await canariesFromSeed('apps/target/seed.json');
+
+    // The balance the brief's example reads, as minor units, as a plain decimal and as text.
+    expect(canaries).toEqual(expect.arrayContaining(['425075', '4250.75', '$4,250.75']));
+    expect(canaries).toEqual(expect.arrayContaining(['198040', '1980.40']));
+    // A negative balance, both ways round.
+    expect(canaries).toEqual(expect.arrayContaining(['12500', '-12500', '125.00']));
+    // A card as a formatter might group it.
+    expect(canaries).toEqual(expect.arrayContaining(['4111-1111-1111-1111']));
+    // Zero is not a canary. It would match the fraction of every confidence in every bundle.
+    expect(canaries).not.toContain('0');
+  });
 });
 
 describe('evidence scanner', () => {
@@ -41,6 +55,24 @@ describe('evidence scanner', () => {
     expect(scan.filesScanned).toBe(2);
     expect(scan.directoriesFound).toEqual(['evidence', 'tests/fixtures/cassettes']);
     expect(scan.hits).toEqual([{ file: 'evidence/replay/success/run_1/log.jsonl', line: 2, kind: 'canary' }]);
+  });
+
+  it('fails on a balance written as minor units, which is the form a parsed money value is stored in', async () => {
+    await mkdir(join(root, 'evidence', 'replay', 'success', 'run_1'), { recursive: true });
+    await writeFile(join(root, 'evidence', 'replay', 'success', 'run_1', 'log.jsonl'), '{"savingsBalance":{"type":"money","amountMinor":425075,"currency":"USD","raw":"[redacted:pii]"}}\n');
+
+    const scan = await scanDirectories(root, GUARDED_DIRECTORIES, await rules());
+
+    expect(scan.hits).toEqual([{ file: 'evidence/replay/success/run_1/log.jsonl', line: 1, kind: 'canary' }]);
+  });
+
+  it('does not fire on a timestamp, which a zero balance in decimal form would match', async () => {
+    await mkdir(join(root, 'evidence', 'replay', 'success', 'run_1'), { recursive: true });
+    await writeFile(join(root, 'evidence', 'replay', 'success', 'run_1', 'log.jsonl'), '{"at":"2026-09-15T09:00:00.000Z","level":"info","event":"replay.started"}\n');
+
+    const scan = await scanDirectories(root, GUARDED_DIRECTORIES, await rules());
+
+    expect(scan.hits).toEqual([]);
   });
 
   it('skips screenshots, whose masking is proven by reading pixels back', async () => {

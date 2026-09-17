@@ -1,6 +1,7 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { extname, join, relative } from 'node:path';
 import { z } from 'zod';
+import { parseMoney } from '../core/outcome/money.js';
 import { scanText, type ScanHit, type ScanRules } from '../core/redaction/scan.js';
 
 // Walks the committed directories that hold anything produced by running code or a model.
@@ -61,19 +62,40 @@ const Seed = z.object({
     .min(1),
 });
 
-// The seed's distinctive strings, per docs/TARGET_APP.md section 6. A card number is listed
-// with and without its spaces.
+// The seed's distinctive strings in every form a value takes after parsing, per
+// docs/TARGET_APP.md section 6 and docs/EVIDENCE.md section 5. A balance leaks as minor units
+// or as a plain decimal at least as often as it leaks in display form, because that is what a
+// parsed money value carries, and a scanner that knew only the display form missed exactly
+// that. A card is listed grouped, bare and hyphenated.
 export async function canariesFromSeed(path: string): Promise<readonly string[]> {
   const seed = Seed.parse(JSON.parse(await readFile(path, 'utf8')));
   const canaries = new Set<string>();
+  // Zero is never a canary. It would match the fraction of every confidence in every bundle.
+  const add = (value: string): void => {
+    if (value.trim() !== '' && value !== '0') canaries.add(value);
+  };
+
   for (const member of seed.members) {
-    canaries.add(member.id);
-    canaries.add(member.name);
+    add(member.id);
+    add(member.name);
     if (member.card !== undefined) {
-      canaries.add(member.card);
-      canaries.add(member.card.replace(/\s/g, ''));
+      add(member.card);
+      add(member.card.replace(/\s/g, ''));
+      add(member.card.replace(/\s+/g, '-'));
     }
-    for (const account of member.accounts) canaries.add(account.balance);
+    for (const account of member.accounts) for (const form of moneyForms(account.balance)) add(form);
   }
   return [...canaries];
+}
+
+// A zero balance contributes only its display form. Its other forms are 0.00 and 0, which match
+// the fraction of every timestamp and every confidence, and a canary that matches everything is
+// the same as no canary at all. The cost is that a zero balance leaks only as text.
+function moneyForms(balance: string): string[] {
+  const parsed = parseMoney(balance, 'USD');
+  if (!parsed.ok || parsed.value.amountMinor === 0) return [balance];
+
+  const minor = parsed.value.amountMinor;
+  const plain = balance.replace(/[$,()]/g, '').replace(/\s*[A-Z]{3}\s*$/, '').trim();
+  return [balance, plain, String(Math.abs(minor)), ...(minor < 0 ? [String(minor)] : [])];
 }
