@@ -1,5 +1,6 @@
 import Fastify, { type FastifyReply, type FastifyRequest } from 'fastify';
 import type { SessionControl } from '../control/controlPlane.js';
+import type { HumanActionRecord, HumanInputPort } from './humanInput.js';
 import type { InterventionStore } from './intervention.js';
 import { OPERATOR_PAGE } from './operatorPage.js';
 
@@ -13,6 +14,10 @@ export interface OperatorApiOptions {
   readonly control: SessionControl;
   // Already masked. There is no unmasked screenshot anywhere in this system.
   readonly screenshot: (sessionId: string) => Promise<Uint8Array>;
+  // How a person acts on the live session. Without it the run shows a screenshot and takes no
+  // input, which is a console that can only watch.
+  readonly input?: HumanInputPort;
+  readonly onHumanAction?: (record: HumanActionRecord) => void;
   readonly host?: string;
   readonly port?: number;
 }
@@ -67,6 +72,25 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
   app.get<WithId>('/sessions/:id/screenshot', async (request, reply) => {
     if (request.params.id !== options.control.snapshot().sessionId) return reply.code(404).send({ error: 'No such session.' });
     return reply.type('image/png').send(Buffer.from(await options.screenshot(request.params.id)));
+  });
+
+  // The forwarding path. It never goes through act(), so the holder check here is the only
+  // thing standing between a stale operator and the live page.
+  app.post<{ Params: { id: string }; Body: { kind?: string; x?: number; y?: number; key?: string } }>('/sessions/:id/input', async (request, reply) => {
+    if (request.params.id !== options.control.snapshot().sessionId || options.input === undefined) return reply.code(404).send({ error: 'No such session.' });
+    if (!holds(request, reply)) return reply;
+
+    const body = request.body ?? {};
+    const record =
+      body.kind === 'press' && typeof body.key === 'string'
+        ? await options.input.press(body.key)
+        : typeof body.x === 'number' && typeof body.y === 'number'
+          ? await options.input.click({ x: body.x, y: body.y })
+          : null;
+    if (record === null) return reply.code(400).send({ error: 'Input is a click with x and y, or a press with a key.' });
+
+    options.onHumanAction?.(record);
+    return reply.send(record);
   });
 
   app.post<WithId>('/interventions/:id/claim', async (request, reply) => {

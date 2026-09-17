@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { createSessionControl, type SessionControl } from '../control/controlPlane.js';
+import type { LocatorBundle } from '../core/locator/schema.js';
 import { createRedactor } from '../core/redaction/redactor.js';
+import type { HumanActionRecord } from './humanInput.js';
 import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createInterventionStore, raiseIntervention, type InterventionStore } from './intervention.js';
@@ -12,15 +14,25 @@ import { createOperatorApi, type OperatorApi } from './operatorApi.js';
 
 const PNG = new Uint8Array([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
 const redactor = createRedactor({ neverPersist: [], redactPatterns: [] });
+const SEARCH_BUNDLE: LocatorBundle = {
+  framePath: ['content'],
+  strategies: [{ kind: 'role-name', role: 'cell', name: 'Search', exact: true, confidence: 0.9 }],
+  matchPolicy: 'unique',
+  describedAs: 'cell Search',
+};
 
 describe('createOperatorApi', () => {
   let store: InterventionStore;
   let control: SessionControl;
   let api: OperatorApi;
   let screenshots = 0;
+  let forwarded: { kind: string; x?: number; y?: number; key?: string }[] = [];
+  let recorded: HumanActionRecord[] = [];
 
   beforeEach(async () => {
     screenshots = 0;
+    forwarded = [];
+    recorded = [];
     store = createInterventionStore();
     control = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: createTestClock('2026-09-17T09:00:00.000Z'), runId: 'run_000001' });
     control.apply('start');
@@ -32,6 +44,17 @@ describe('createOperatorApi', () => {
         screenshots += 1;
         return PNG;
       },
+      input: {
+        click: async ({ x, y }) => {
+          forwarded.push({ kind: 'click', x, y });
+          return { at: '2026-09-17T09:00:01.000Z', kind: 'click', target: { describedAs: 'cell Search', bundle: SEARCH_BUNDLE }, url: 'http://localhost:4010/servicing/search' };
+        },
+        press: async (key) => {
+          forwarded.push({ kind: 'press', key });
+          return { at: '2026-09-17T09:00:02.000Z', kind: 'press', target: null, url: 'http://localhost:4010/servicing/search', key };
+        },
+      },
+      onHumanAction: (record) => recorded.push(record),
     });
 
     raiseIntervention({
@@ -148,6 +171,50 @@ describe('createOperatorApi', () => {
     expect(shot.headers['content-type']).toContain('image/png');
     expect(new Uint8Array(shot.rawPayload)).toEqual(PNG);
     expect(screenshots).toBe(1);
+  });
+
+  it('forwards a click into the live session, but only for the person holding it', async () => {
+    const unheld = await api.inject({ method: 'POST', url: '/sessions/sess_000001/input', payload: { kind: 'click', x: 120, y: 240 } });
+    expect(unheld.statusCode).toBe(403);
+    expect(forwarded).toEqual([]);
+
+    const token = await claim();
+    const forwardedClick = await api.inject({ method: 'POST', url: '/sessions/sess_000001/input', headers: { 'x-control-token': token }, payload: { kind: 'click', x: 120, y: 240 } });
+
+    expect(forwardedClick.statusCode).toBe(200);
+    expect(forwarded).toEqual([{ kind: 'click', x: 120, y: 240 }]);
+    expect(JSON.parse(forwardedClick.body)).toMatchObject({ kind: 'click', target: { describedAs: 'cell Search' } });
+  });
+
+  it('records a keystroke without recording what was typed', async () => {
+    const token = await claim();
+
+    const pressed = await api.inject({ method: 'POST', url: '/sessions/sess_000001/input', headers: { 'x-control-token': token }, payload: { kind: 'press', key: 'Enter' } });
+
+    expect(pressed.statusCode).toBe(200);
+    const record: unknown = JSON.parse(pressed.body);
+    expect(record).toMatchObject({ kind: 'press', key: 'Enter' });
+    expect(JSON.stringify(record)).not.toContain('value');
+    expect(recorded.map((item) => item.kind)).toEqual(['press']);
+  });
+
+  it('refuses a stale token once control has moved on', async () => {
+    const token = await claim();
+    await api.inject({ method: 'POST', url: '/interventions/int_000001/release', headers: { 'x-control-token': token }, payload: { outcome: 'resumed' } });
+
+    const late = await api.inject({ method: 'POST', url: '/sessions/sess_000001/input', headers: { 'x-control-token': token }, payload: { kind: 'click', x: 10, y: 10 } });
+
+    expect(late.statusCode).toBe(403);
+    expect(forwarded).toEqual([]);
+  });
+
+  it('forwards nothing to another session', async () => {
+    const token = await claim();
+
+    const other = await api.inject({ method: 'POST', url: '/sessions/sess_000002/input', headers: { 'x-control-token': token }, payload: { kind: 'click', x: 10, y: 10 } });
+
+    expect(other.statusCode).toBe(404);
+    expect(forwarded).toEqual([]);
   });
 
   it('serves a screenshot of no other session', async () => {

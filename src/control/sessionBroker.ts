@@ -3,7 +3,11 @@ import type { Allowlist } from '../core/policy/allowlist.js';
 import { checkUrl, type PolicyContext } from '../core/policy/authorize.js';
 import { authorizeRequest, type AppProfile } from '../core/policy/profile.js';
 import type { IdProvider } from '../runtime/ids.js';
+import { createRedactor } from '../core/redaction/redactor.js';
+import type { HumanInputPort } from '../escalation/humanInput.js';
+import { systemClock, type Clock } from '../runtime/clock.js';
 import { createGuardedSurface, type GuardedSurface } from '../surface/guardedSurface.js';
+import { createWebHumanInput } from '../surface/web/humanInput.js';
 import { createStepScope } from '../surface/stepScope.js';
 import { createWebSurfaceDriver } from '../surface/web/webSurfaceDriver.js';
 import { createControlTokens, type SessionControlTokens } from './controlToken.js';
@@ -30,6 +34,7 @@ export interface SessionBrokerOptions {
   readonly baseUrl: string;
   readonly login: FormLogin;
   readonly ids: IdProvider;
+  readonly clock?: Clock;
   readonly actionTimeoutMs?: number;
 }
 
@@ -42,6 +47,8 @@ export interface Lease {
   readonly sessionId: string;
   readonly surface: GuardedSurface;
   readonly tokens: SessionControlTokens;
+  // How a person acts on this session while they hold it, see docs/ESCALATION.md section 6.
+  readonly human: HumanInputPort;
   // The rule behind each request the network guard refused, in order. Never the url.
   refusedRequests(): readonly string[];
   release(): Promise<void>;
@@ -118,6 +125,7 @@ export function createSessionBroker(options: SessionBrokerOptions): SessionBroke
           sessionId,
           surface: createGuardedSurface({ driver, policy: { allowlist, ...request.policy }, runId: request.runId, baseUrl, scope }),
           tokens,
+          human: createWebHumanInput({ page, observe: driver.observe, profile, redactor: createRedactor(allowlist.data), clock: options.clock ?? systemClock }),
           refusedRequests: () => scope.refusals().map((refusal) => refusal.rule),
           release: () => context.close(),
         },
