@@ -137,7 +137,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
   * Test: unit, a byte stable round trip and a refused sensitive literal. E2E, the replay CLI exits 0 on success and non zero on failure, with valid JSON output.
 * [x] **S4-T08** The live discovery run. Commit its evidence.
   * Accept: a real key against the S1-T06 app. `evidence/discovery/<runId>/` holds the redacted transcript, the trace, screenshots and the artifact at `1.0.0`, status draft. This is the brief's one non negotiable requirement.
-* [ ] **S4-T09** Negative probe review and approval, `npm run review`.
+* [x] **S4-T09** Negative probe review and approval, `npm run review`.
   * Accept: replays the draft with `00000`, stops where the postcondition fails, and lets a reviewer name `MEMBER_NOT_FOUND` while the recorder derives the detector from the real banner. Emits `1.1.0` with `provenance: 'manual'`, a minor bump by rule. The same command approves, writing `status`, `approvedBy` and `approvedAt`.
   * Test: integration, the probe produces a detector that resolves on the banner.
 * [ ] **S4-T10** Cassette E2E and the reviewed replays. **Gate, Skeleton 2.**

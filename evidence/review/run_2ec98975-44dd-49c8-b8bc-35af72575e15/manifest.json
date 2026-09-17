@@ -1,0 +1,60 @@
+{
+  "runId": "run_2ec98975-44dd-49c8-b8bc-35af72575e15",
+  "phase": "review",
+  "startedAt": "2026-09-17T22:09:23.603Z",
+  "endedAt": "2026-09-17T22:09:36.157Z",
+  "capability": {
+    "id": "member.readSavingsBalance",
+    "version": "1.1.0"
+  },
+  "goal": null,
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "declared",
+    "code": "MEMBER_NOT_FOUND",
+    "summary": "Declared MEMBER_NOT_FOUND and wrote version 1.1.0."
+  },
+  "counts": {
+    "steps": 3,
+    "modelCalls": 0,
+    "actions": 2,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 0
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "captures/stop.png",
+      "kind": "screenshot",
+      "description": "The screen the probe stopped on, with member data masked"
+    },
+    {
+      "path": "captures/stop.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree of the screen the probe stopped on, with member data masked"
+    },
+    {
+      "path": "artifact.diff.json",
+      "kind": "diff",
+      "description": "What the review added between 1.0.0 and 1.1.0"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": null,
+    "promptVersion": null
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {}
+  }
+}

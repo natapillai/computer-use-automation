@@ -1,0 +1,55 @@
+{
+  "from": "1.0.0",
+  "to": "1.1.0",
+  "changes": [
+    {
+      "path": "version",
+      "kind": "changed",
+      "before": "1.0.0",
+      "after": "1.1.0"
+    },
+    {
+      "path": "outcomes.0",
+      "kind": "added",
+      "after": {
+        "code": "MEMBER_NOT_FOUND",
+        "description": "No member exists with the supplied ID.",
+        "terminal": true,
+        "detect": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "role-name",
+                "role": "cell",
+                "name": "No records found.",
+                "exact": true,
+                "confidence": 0.9
+              },
+              {
+                "kind": "text",
+                "text": "No records found.",
+                "exact": true,
+                "confidence": 0.7
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell No records found."
+          }
+        },
+        "provenance": "manual"
+      }
+    },
+    {
+      "path": "provenance.derivedFrom",
+      "kind": "added",
+      "after": {
+        "id": "member.readSavingsBalance",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}
