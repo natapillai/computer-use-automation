@@ -58,6 +58,12 @@ export interface DiscoveryOptions {
   // evidence is captured against refs that are current. Without it the loop takes no extra
   // observation.
   readonly capture?: (moment: 'initial' | 'final', observation: Observation) => Promise<void>;
+  // Raises a live intervention when the run stops for a person, see docs/ESCALATION.md section
+  // 3. Without it the loop still stops, because a run that does not know what to do next must
+  // not keep acting, and the result still says why.
+  readonly escalation?: {
+    raise(input: { readonly reason: 'NoProgress' | 'ModelRequested'; readonly explanation: string; readonly observation: Observation }): Promise<string>;
+  };
 }
 
 interface DiscoveryCommon {
@@ -70,7 +76,7 @@ interface DiscoveryCommon {
 
 export type DiscoveryResult =
   | (DiscoveryCommon & { readonly status: 'done' })
-  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: 'NoProgress' | 'ModelRequested'; readonly detail: string })
+  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: 'NoProgress' | 'ModelRequested'; readonly detail: string; readonly interventionId?: string })
   | (DiscoveryCommon & {
       readonly status: 'failure';
       readonly reason: 'Timeout' | 'ModelCallFailed' | 'ModelStopped' | 'PolicyDenied' | 'ControlLost' | 'SurfaceUnavailable' | 'GoalInvalid';
@@ -114,9 +120,10 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const emit = (event: DiscoveryEvent): void => options.onEvent?.(event);
   const common = (): DiscoveryCommon => ({ modelCalls, actions, extracted, exchanges, finalObservation: latest });
   const fail = (reason: FailureReason, detail: string): Finish => new Finish({ ...common(), status: 'failure', reason, detail });
-  const escalate = (reason: 'NoProgress' | 'ModelRequested', detail: string): Finish => {
+  const escalate = async (reason: 'NoProgress' | 'ModelRequested', detail: string): Promise<Finish> => {
     emit({ t: 'stuck', at: at(), detector: reason, detail });
-    return new Finish({ ...common(), status: 'escalated', reason, detail });
+    const interventionId = options.escalation === undefined || latest === null ? undefined : await options.escalation.raise({ reason, explanation: detail, observation: latest });
+    return new Finish({ ...common(), status: 'escalated', reason, detail, ...(interventionId === undefined ? {} : { interventionId }) });
   };
 
   const observe = async (): Promise<{ text: string; hash: string; progress: string; observation: Observation }> => {
@@ -284,7 +291,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       const executed = await execute(first);
       emit({ t: 'action', at: at(), tool: first.name, ok: !executed.isError, detail: executed.text });
       if (executed.terminal === 'done') throw new Finish({ ...common(), status: 'done' });
-      if (executed.terminal === 'escalated') throw escalate('ModelRequested', executed.text);
+      if (executed.terminal === 'escalated') throw await escalate('ModelRequested', executed.text);
 
       seen = await observe();
       if (executed.recordedIndex !== undefined) {
@@ -293,7 +300,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (acting) {
         unchanged = seen.progress === before ? unchanged + 1 : 0;
         if (unchanged >= NO_PROGRESS_LIMIT) {
-          throw escalate('NoProgress', `The page did not change across ${NO_PROGRESS_LIMIT} consecutive actions.`);
+          throw await escalate('NoProgress', `The page did not change across ${NO_PROGRESS_LIMIT} consecutive actions.`);
         }
       }
 

@@ -60,6 +60,7 @@ interface RunOptions {
   readonly goal?: string;
   readonly recorder?: Recorder;
   readonly capture?: DiscoveryOptions['capture'];
+  readonly escalation?: DiscoveryOptions['escalation'];
 }
 
 async function discover(options: RunOptions) {
@@ -89,6 +90,7 @@ async function discover(options: RunOptions) {
     onEvent: (event) => events.push(event),
     ...(options.recorder === undefined ? {} : { recorder: options.recorder }),
     ...(options.capture === undefined ? {} : { capture: options.capture }),
+    ...(options.escalation === undefined ? {} : { escalation: options.escalation }),
   });
   return { result, driver, model, events };
 }
@@ -238,6 +240,45 @@ describe('runDiscovery', () => {
 
     const denied = await discover({ turns: [call('navigate', { path: '/__control__/reset', framePath: ['content'] }), call('done')] });
     expect(denied.events).toContainEqual(expect.objectContaining({ t: 'authorization', tool: 'navigate', verdict: 'deny', rule: 'deniedPath' }));
+  });
+
+  it('raises a live intervention when the model asks for a person, and reports the id it raised', async () => {
+    const raised: { reason: string; explanation: string; url: string | undefined }[] = [];
+    const { result } = await discover({
+      turns: [call('escalate', { reason: 'The search form is not on the page.' })],
+      escalation: {
+        raise: async (input) => {
+          raised.push({ reason: input.reason, explanation: input.explanation, url: input.observation.frames.find((frame) => frame.framePath.length === 0)?.url });
+          return 'int_000001';
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ status: 'escalated', reason: 'ModelRequested', interventionId: 'int_000001' });
+    expect(raised).toEqual([{ reason: 'ModelRequested', explanation: 'The search form is not on the page.', url: 'http://localhost:4010/servicing' }]);
+  });
+
+  it('raises a live intervention when nothing the model does changes the page', async () => {
+    const reasons: string[] = [];
+    const { result } = await discover({
+      turns: [call('click', { ref: 'n1' }), call('click', { ref: 'n1' }), call('click', { ref: 'n1' }), call('done')],
+      escalation: {
+        raise: async (input) => {
+          reasons.push(input.reason);
+          return 'int_000002';
+        },
+      },
+    });
+
+    expect(result).toMatchObject({ status: 'escalated', reason: 'NoProgress', interventionId: 'int_000002' });
+    expect(reasons).toEqual(['NoProgress']);
+  });
+
+  it('escalates without an intervention when no escalation channel is wired, because the loop still has to stop', async () => {
+    const { result } = await discover({ turns: [call('escalate', { reason: 'No way forward.' })] });
+
+    expect(result).toMatchObject({ status: 'escalated', reason: 'ModelRequested' });
+    expect(result.status === 'escalated' && result.interventionId).toBeUndefined();
   });
 
   it('captures the first observation and a fresh one at the end, and ends the run on that fresh observation', async () => {
