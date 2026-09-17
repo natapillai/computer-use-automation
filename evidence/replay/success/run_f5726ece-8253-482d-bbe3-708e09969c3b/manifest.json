@@ -1,0 +1,44 @@
+{
+  "runId": "run_f5726ece-8253-482d-bbe3-708e09969c3b",
+  "phase": "replay",
+  "startedAt": "2026-09-17T22:15:13.832Z",
+  "endedAt": "2026-09-17T22:15:16.400Z",
+  "capability": {
+    "id": "member.readSavingsBalance",
+    "version": "1.1.0"
+  },
+  "goal": null,
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "success",
+    "summary": "Returned savingsBalance."
+  },
+  "counts": {
+    "steps": 3,
+    "modelCalls": 0,
+    "actions": 3,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 0
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": null,
+    "promptVersion": null
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {}
+  }
+}

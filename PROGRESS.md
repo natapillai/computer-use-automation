@@ -2,10 +2,10 @@
 
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
-**Last updated.** 2026-09-15
-**Current slice.** Slice 4, Discovery
-**Next task.** S4-T01
-**Suite status.** 239 unit tests across 32 files and 43 integration tests across 7 files passing, typecheck clean
+**Last updated.** 2026-09-17
+**Current slice.** Slice 5, Escalation
+**Next task.** S5-T01
+**Suite status.** 383 unit tests across 54 files, 45 integration tests across 9 files and 5 e2e tests across 2 files passing, typecheck clean
 **Blocked on.** nothing
 
 ## Slice status
@@ -16,7 +16,7 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 | S1 Thread | 10 | done |
 | S2 Perception spike | 1 | done |
 | S3 Harden | 5 | done |
-| S4 Discovery | 10 | not started |
+| S4 Discovery | 10 | done |
 | S5 Escalation | 7 | not started |
 | S6 Error breadth | 4 | not started |
 | S7 Seams | 2 | not started |
@@ -25,6 +25,12 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-17, Slice 4 closed at Gate 2, Skeleton 2
+Done: S4-T01 to S4-T10. Claude Sonnet 5 drove MERIDIAN Core to the savings balance in five model calls and three actions, and that run is committed as `evidence/discovery/run_56fc6b06.../` with its trace, its redacted transcript, masked captures of the first and final screens, and the draft it produced. The generalizer turned the run into `capabilities/member.readSavingsBalance@1.0.0.json` through five transforms. The negative probe review replayed that draft with `00000`, stopped at the failed postcondition, derived the `MEMBER_NOT_FOUND` detector from the real banner and emitted `1.1.0`. Three commands exist, `npm run discover`, `npm run review` and `npm run replay`, and none of them takes an input value as an argument. The whole thread runs offline from the exchange the live run recorded.
+Decisions: no new ADRs. A business outcome exits 0 at the replay CLI, because an exit code is the first thing a caller branches on and a non zero code there would conflate an answer with a failure. Review writes nothing until a second replay of the reviewed version returns the outcome, so a detector that does not work never reaches an artifact. Replay evidence is filed by outcome once the outcome is known, which is what `docs/EVIDENCE.md` describes. Discovery requests and reviews are committed files under `requests/`, because a goal and an outcome name are reviewable configuration and a value belongs in neither.
+Surprises: the live run exposed two defects in its own evidence, an absolute local path in the log and the allowlist email pattern matching the `id@version` file name. Both are fixed forward and the evidence is committed unedited, because a second paid run would break the one live run rule. The persisted projection of a result kept `amountMinor` after hiding the raw text, so a stored balance was still a balance, now replaced whole. The live run's observation hashes and refs matched the S2-T01 spike exactly, which is the stability ADR 0017 relies on, observed twice.
+Next: S5-T01.
 
 ### 2026-09-15, Slice 3 closed, Harden
 Done: S3-T01 to S3-T05. One SurfaceDriver contract suite passes on the fake and the web driver. The Redactor and sensitivity propagation redact provenance first and patterns second. The evidence sink redacts every text byte at the sink, writes a manifest with redaction counts and never values, and takes screenshots that Playwright masks before the bytes exist, which a pixel test proves inside the content frame. The MERIDIAN Core profile classifies routes and marks sensitive fields, and the network guard enforces it per step. The evidence scanner guards evidence, capabilities and cassettes, and the pre Harden exclusions are gone.
@@ -63,6 +69,7 @@ Repository restructure, ADRs 0011 to 0018, attribution hook, replans down to for
 
 * **What `contextual` means on a redaction pattern.** No document defines it. The redactor applies a contextual pattern everywhere, which over redacts and fails closed. Decide whether it narrows to a nearby keyword before any real account data is in scope.
 * **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decided at S5-T06.
+* **Who approves the reviewed capability.** `member.readSavingsBalance@1.1.0` is committed as a draft. `npm run review -- --capability capabilities/member.readSavingsBalance@1.1.0.json --approve <handle>` writes `status`, `approvedBy` and `approvedAt`, and I left it unrun, because an approval nobody gave is not evidence of a review. Either run it under a handle you choose, or leave the capability a draft and say so in `README.md`.
 
 ## Deferred and cut
 

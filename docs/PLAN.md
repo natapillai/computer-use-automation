@@ -140,7 +140,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 * [x] **S4-T09** Negative probe review and approval, `npm run review`.
   * Accept: replays the draft with `00000`, stops where the postcondition fails, and lets a reviewer name `MEMBER_NOT_FOUND` while the recorder derives the detector from the real banner. Emits `1.1.0` with `provenance: 'manual'`, a minor bump by rule. The same command approves, writing `status`, `approvedBy` and `approvedAt`.
   * Test: integration, the probe produces a detector that resolves on the banner.
-* [ ] **S4-T10** Cassette E2E and the reviewed replays. **Gate, Skeleton 2.**
+* [x] **S4-T10** Cassette E2E and the reviewed replays. **Gate, Skeleton 2.**
   * Accept: the cassette recorded from S4-T08 drives the full thread offline. `evidence/replay/success/` for `10001` and `evidence/replay/businessOutcome/` for `00000` returning `business_outcome`, both from the discovered `1.1.0` and not the S1-T10 fixture.
   * Test: e2e, the thread runs with no network and no key.
 

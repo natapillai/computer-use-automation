@@ -1,3 +1,5 @@
+import { mkdir, rename } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import type { ControlToken } from '../control/controlToken.js';
 import { validateInputs, type InputValue } from '../core/capability/inputs.js';
 import type { Capability } from '../core/capability/schema.js';
@@ -137,8 +139,26 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
     environment: { ...deps.environment, model: null, promptVersion: null },
   });
 
-  deps.stdout(`${JSON.stringify(result, null, 2)}\n`);
+  const runDirectory = await fileByOutcome(sink.directory, result.status);
+  deps.stdout(`${JSON.stringify({ ...result, evidence: { runDirectory } }, null, 2)}\n`);
   return exitFor(result);
+}
+
+// Evidence is filed by outcome once the outcome is known, so evidence/replay/success and
+// evidence/replay/businessOutcome read as docs/EVIDENCE.md section 1 describes them. The sink
+// writes during the run, when the outcome is not known yet, so the directory moves at the end.
+const FOLDER: Readonly<Record<ReplayResult['status'], string>> = {
+  success: 'success',
+  business_outcome: 'businessOutcome',
+  escalated: 'escalated',
+  failure: 'failure',
+};
+
+async function fileByOutcome(directory: string, status: ReplayResult['status']): Promise<string> {
+  const filed = join(dirname(directory), FOLDER[status], basename(directory));
+  await mkdir(dirname(filed), { recursive: true });
+  await rename(directory, filed);
+  return filed;
 }
 
 function exitFor(result: ReplayResult): number {

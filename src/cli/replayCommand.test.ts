@@ -89,13 +89,28 @@ describe('runReplayCommand', () => {
     expect(stderr).toBe('');
   });
 
-  it('writes a manifest and a log that hold neither the member id nor the balance', async () => {
+  it('files the evidence under the outcome of the run and holds neither the member id nor the balance', async () => {
     const { paths } = await run();
     const evidence = await evidenceText(paths.evidence);
 
-    expect(evidence.files).toEqual(['replay/run_000001/log.jsonl', 'replay/run_000001/manifest.json']);
+    expect(evidence.files).toEqual(['replay/success/run_000001/log.jsonl', 'replay/success/run_000001/manifest.json']);
     expect(evidence.text).not.toMatch(/10001|4,250\.75|425075/);
     expect(evidence.text).toContain('"status": "success"');
+  });
+
+  it('files a business outcome and a failure in their own directories, so evidence reads by outcome', async () => {
+    const outcome = await run({ script: { searchLeadsTo: 'noRecords', memberId: '00000' }, stdin: '{"memberId":"00000"}' });
+    const failure = await run({ script: { searchLeadsTo: 'wrongPage' } });
+
+    // Both runs share one evidence root here, which is also how the two directories are proven
+    // not to collide when two runs carry the same run id.
+    expect([outcome.code, failure.code]).toEqual([0, 1]);
+    expect((await evidenceText(failure.paths.evidence)).files).toEqual([
+      'replay/businessOutcome/run_000001/log.jsonl',
+      'replay/businessOutcome/run_000001/manifest.json',
+      'replay/failure/run_000001/log.jsonl',
+      'replay/failure/run_000001/manifest.json',
+    ]);
   });
 
   it('exits 0 with a typed business outcome, because no such member is not a failure', async () => {

@@ -1,0 +1,45 @@
+{
+  "runId": "run_edbc3c8f-bff5-40e5-a6e6-33c10e324316",
+  "phase": "replay",
+  "startedAt": "2026-09-17T22:15:21.270Z",
+  "endedAt": "2026-09-17T22:15:22.450Z",
+  "capability": {
+    "id": "member.readSavingsBalance",
+    "version": "1.1.0"
+  },
+  "goal": null,
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "business_outcome",
+    "code": "MEMBER_NOT_FOUND",
+    "summary": "Ended with the business outcome MEMBER_NOT_FOUND."
+  },
+  "counts": {
+    "steps": 3,
+    "modelCalls": 0,
+    "actions": 2,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 0
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": null,
+    "promptVersion": null
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {}
+  }
+}

@@ -8,20 +8,22 @@ import { canariesFromSeed, scanDirectories } from '../../src/evidence/scanner.js
 import { loadAllowlist } from '../../src/runtime/allowlist.js';
 import { REPOSITORY, runCli, startTarget, stopTarget } from './harness.js';
 
-// The discover bin driven by the model exchange recorded in the S2-T01 live spike, against
-// MERIDIAN Core, with no key and no model variables. It proves the bin wires a real browser,
-// the broker, the loop, the generalizer and the store together before a live run spends
-// anything, and the draft it writes is replayed by the replay bin.
+// Skeleton 2. The whole thread offline against MERIDIAN Core, with no key and no model
+// variables, driven by the model exchange recorded during the live run at S4-T08. Discovery
+// writes the draft, the negative probe review declares MEMBER_NOT_FOUND from the real banner,
+// and the reviewed version replays both ways. The model's decisions are real, they are frozen.
 
-const SPIKE_CASSETTE = 'tests/fixtures/cassettes/discovery.readSavingsBalance.json';
+const CASSETTE = 'tests/fixtures/cassettes/discover.member.readSavingsBalance.json';
+const REQUEST = 'requests/member.readSavingsBalance.json';
+const REVIEW = 'requests/member.readSavingsBalance.MEMBER_NOT_FOUND.review.json';
 
-describe('npm run discover driven by the recorded spike exchange', () => {
+describe('the discovery thread, offline from the recorded live exchange', () => {
   let server: Server | undefined;
   let root = '';
 
   beforeAll(async () => {
-    server = await startTarget('e2e-discover');
-    root = await mkdtemp(join(tmpdir(), 'discover-e2e-'));
+    server = await startTarget('e2e-thread');
+    root = await mkdtemp(join(tmpdir(), 'thread-e2e-'));
   });
 
   afterAll(async () => {
@@ -29,29 +31,40 @@ describe('npm run discover driven by the recorded spike exchange', () => {
     if (root !== '') await rm(root, { recursive: true, force: true });
   });
 
-  it('discovers member.readSavingsBalance, leaves no member data behind, and the draft replays to 425075 USD', async () => {
-    const discovered = await runCli(
-      'src/cli/discover.ts',
-      ['--request', 'requests/member.readSavingsBalance.json', '--evidence', join(root, 'evidence'), '--capabilities', join(root, 'capabilities'), '--model-cassette', SPIKE_CASSETTE],
-      '{"memberId":"10001"}',
-    );
+  it(
+    'discovers, reviews and replays both ways, and leaves no member data behind',
+    async () => {
+      const evidence = join(root, 'evidence');
+      const capabilities = join(root, 'capabilities');
 
-    expect(discovered.code, discovered.stderr).toBe(0);
-    expect(JSON.parse(discovered.stdout)).toMatchObject({ status: 'done', modelCalls: 5, capability: { id: 'member.readSavingsBalance', version: '1.0.0' } });
+      const discovered = await runCli('src/cli/discover.ts', ['--request', REQUEST, '--evidence', evidence, '--capabilities', capabilities, '--model-cassette', CASSETTE], '{"memberId":"10001"}');
+      expect(discovered.code, discovered.stderr).toBe(0);
+      expect(JSON.parse(discovered.stdout)).toMatchObject({ status: 'done', modelCalls: 5, capability: { id: 'member.readSavingsBalance', version: '1.0.0' } });
 
-    const path = join(root, 'capabilities', 'member.readSavingsBalance@1.0.0.json');
-    const capability = Capability.parse(JSON.parse(await readFile(path, 'utf8')));
-    expect(capability.steps.map((step) => step.action.kind)).toEqual(['fill', 'click', 'click']);
-    expect(capability.lifecycle.status).toBe('draft');
+      const draft = join(capabilities, 'member.readSavingsBalance@1.0.0.json');
+      const reviewed = await runCli('src/cli/review.ts', ['--capability', draft, '--decision', REVIEW, '--evidence', evidence], '{"memberId":"00000"}');
+      expect(reviewed.code, reviewed.stderr).toBe(0);
+      expect(JSON.parse(reviewed.stdout)).toMatchObject({ status: 'declared', code: 'MEMBER_NOT_FOUND', verification: { status: 'business_outcome' } });
 
-    const loaded = await loadAllowlist(join(REPOSITORY, 'policy/allowlist.yaml'));
-    if (!loaded.ok) throw new Error(loaded.message);
-    const scan = await scanDirectories(root, ['evidence', 'capabilities'], { canaries: await canariesFromSeed(join(REPOSITORY, 'apps/target/seed.json')), patterns: loaded.allowlist.data.redactPatterns });
-    expect(scan.filesScanned).toBeGreaterThan(5);
-    expect(scan.hits).toEqual([]);
+      const path = join(capabilities, 'member.readSavingsBalance@1.1.0.json');
+      const capability = Capability.parse(JSON.parse(await readFile(path, 'utf8')));
+      expect(capability.steps.map((step) => step.action.kind)).toEqual(['fill', 'click', 'click']);
+      expect(capability.outcomes.map((outcome) => outcome.code)).toEqual(['MEMBER_NOT_FOUND']);
 
-    const replayed = await runCli('src/cli/replay.ts', ['--capability', path, '--evidence', join(root, 'evidence')], '{"memberId":"10001"}');
-    expect(replayed.code, replayed.stderr).toBe(0);
-    expect(JSON.parse(replayed.stdout)).toMatchObject({ status: 'success', outputs: { savingsBalance: { type: 'money', amountMinor: 425075, currency: 'USD' } } });
-  });
+      const success = await runCli('src/cli/replay.ts', ['--capability', path, '--evidence', evidence], '{"memberId":"10001"}');
+      expect(success.code, success.stderr).toBe(0);
+      expect(JSON.parse(success.stdout)).toMatchObject({ status: 'success', outputs: { savingsBalance: { type: 'money', amountMinor: 425075, currency: 'USD' } } });
+
+      const outcome = await runCli('src/cli/replay.ts', ['--capability', path, '--evidence', evidence], '{"memberId":"00000"}');
+      expect(outcome.code, outcome.stderr).toBe(0);
+      expect(JSON.parse(outcome.stdout)).toMatchObject({ status: 'business_outcome', outcome: { code: 'MEMBER_NOT_FOUND', terminal: true } });
+
+      const loaded = await loadAllowlist(join(REPOSITORY, 'policy/allowlist.yaml'));
+      if (!loaded.ok) throw new Error(loaded.message);
+      const scan = await scanDirectories(root, ['evidence', 'capabilities'], { canaries: await canariesFromSeed(join(REPOSITORY, 'apps/target/seed.json')), patterns: loaded.allowlist.data.redactPatterns });
+      expect(scan.filesScanned).toBeGreaterThan(10);
+      expect(scan.hits).toEqual([]);
+    },
+    300_000,
+  );
 });
