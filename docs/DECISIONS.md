@@ -298,6 +298,8 @@ The first run reported F5 as failed. The snapshot showed the node was present, a
 
 **Rejected.** Inferring outcomes from page text at replay time, already rejected by ADR 0005 and still unreviewable. Hand authoring the fixture and presenting it as the discovered artifact, which breaks the thread the brief asks for.
 
+**Amendment, 2026-09-17.** The decision left open how a reviewer points at the element without writing a selector. A review is a committed file, `requests/<id>.<CODE>.review.json`, carrying the code, the description, whether the outcome is terminal, and the visible text of the element. That text only selects the element. It must match exactly one node on the screen the probe stopped on, or the review is refused as `NoMatchingElement` or `AmbiguousElement`, and a refusal counts elements without repeating the text, because a banner can carry member data. The detector is then derived from that node by `deriveBundle`, so the ladder, the uniqueness check and the sensitive text drops all apply to it. Nothing is written until the reviewed version replays the probe input and returns the declared outcome, so a detector that does not work never reaches an artifact.
+
 ---
 
 ## Template for new ADRs
