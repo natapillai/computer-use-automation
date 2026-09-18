@@ -44,7 +44,7 @@ export type Generalization =
   | { readonly ok: true; readonly capability: Capability }
   | {
       readonly ok: false;
-      readonly failure: 'NoSteps' | 'NoPostcondition' | 'SuccessNotObserved' | 'SensitiveLiteral' | 'CapabilityInvalid' | 'HumanCompleted';
+      readonly failure: 'NoSteps' | 'NoPostcondition' | 'SuccessNotObserved' | 'SensitiveLiteral' | 'CapabilityInvalid' | 'HumanCompleted' | 'WriteNotPerformed';
       readonly detail: string;
     };
 
@@ -71,6 +71,14 @@ export async function generalize(trace: RunTrace, options: GeneralizeOptions): P
   const completedByHand = trace.events.find((event) => event.t === 'handback' && event.reason !== 'PolicyConfirmation');
   if (completedByHand !== undefined) {
     return fail('HumanCompleted', 'A person took the session over during this run, and their actions are not steps, so no artifact is produced.');
+  }
+
+  // 0b. Refuse a run whose write was declared and never happened, because a person refused it
+  // or the guard did. Pruning would quietly drop that action and the artifact would describe a
+  // flow that stops one step short of the thing it exists to do.
+  const refused = trace.actions.find((action) => action.submits && action.ok !== true);
+  if (refused !== undefined) {
+    return fail('WriteNotPerformed', 'The run declared a write that never ran, so there is no completed flow to generalize.');
   }
 
   // 1. Prune. A failed attempt or an action that changed nothing is not part of the flow. An

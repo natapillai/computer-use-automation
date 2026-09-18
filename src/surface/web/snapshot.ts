@@ -15,6 +15,7 @@ interface SnapshotNode {
   readonly active?: boolean | undefined;
   readonly disabled?: boolean | undefined;
   readonly checked?: boolean | 'mixed' | undefined;
+  readonly selected?: boolean | undefined;
   readonly box?: Box | undefined;
   readonly children?: readonly (string | SnapshotNode)[] | undefined;
 }
@@ -35,6 +36,7 @@ const SnapshotNode: z.ZodType<SnapshotNode> = z.lazy(() =>
     active: z.boolean().optional(),
     disabled: z.boolean().optional(),
     checked: z.union([z.boolean(), z.literal('mixed')]).optional(),
+    selected: z.boolean().optional(),
     box: SnapshotBox.optional(),
     children: z.array(z.union([z.string(), SnapshotNode])).optional(),
   }),
@@ -82,6 +84,16 @@ function topLevel(snapshot: unknown): readonly SnapshotEntry[] {
   return Array.isArray(parsed.data) ? parsed.data : [parsed.data];
 }
 
+// The name of the option a list is showing. Chromium marks exactly one, and a list with
+// nothing chosen still marks its first option, so this never invents a value.
+function selectedOption(children: readonly (string | SnapshotNode)[] | undefined): string | undefined {
+  for (const child of children ?? []) {
+    if (typeof child === 'string' || child.role !== 'option') continue;
+    if (child.selected === true) return child.name ?? '';
+  }
+  return undefined;
+}
+
 function convert(entry: SnapshotEntry, index: number, parent: Parent, frameNames: ReadonlyMap<string, string>): Converted {
   // A bare text fragment has no ref and no box of its own. It takes its parent's box, and
   // a ref with a character Playwright never emits, so acting on it can only miss.
@@ -108,12 +120,17 @@ function convert(entry: SnapshotEntry, index: number, parent: Parent, frameNames
   const children = (entry.children ?? []).map((child, i) => convert(child, i, { ref, box, framePath: childFramePath }, frameNames));
   const activeBelow = children.some((child) => child.active);
   const holdsValue = VALUE_ROLES.has(role);
+  // A native list carries no text of its own. What it holds is the option marked selected,
+  // which is also what a person reads off the screen. Without this the tree says a list is
+  // empty however it was set, so a choice is invisible to progress, to checkpoints and to the
+  // generalizer, which then drops the step that made it.
+  const chosen = entry.text ?? selectedOption(entry.children);
 
   const node: UINode = {
     ref,
     role,
     name: entry.name ?? (holdsValue ? '' : (entry.text ?? '')),
-    ...(holdsValue && entry.text !== undefined ? { value: entry.text } : {}),
+    ...(holdsValue && chosen !== undefined ? { value: chosen } : {}),
     state: {
       disabled: entry.disabled === true,
       visible: isVisible(box),

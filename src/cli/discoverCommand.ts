@@ -13,7 +13,7 @@ import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent, type Discover
 import { Cassette, CassetteMismatch, createCassetteModelClient } from '../discovery/cassetteModelClient.js';
 import { generalize, PROMPT_VERSION, type Generalization } from '../discovery/generalizer.js';
 import type { ModelClient } from '../discovery/modelClient.js';
-import { buildGoal, SYSTEM_PROMPT } from '../discovery/prompt.js';
+import { buildGoal, systemPrompt } from '../discovery/prompt.js';
 import { createRecorder } from '../discovery/recorder.js';
 import { toolsFor } from '../discovery/tools.js';
 import { buildTrace } from '../discovery/trace.js';
@@ -297,7 +297,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
           source: 'npm run discover',
           runId,
           model: modelId,
-          system: SYSTEM_PROMPT,
+          system: systemPrompt({ writes: request.allowWrites === true }),
           goal: goal.ok ? goal.text : request.goal,
           inputNames: Object.keys(inputs),
           tools: toolsFor(Object.keys(inputs), { writes: request.allowWrites === true }),

@@ -89,6 +89,13 @@ describe('generalize', () => {
     expect(approved.ok).toBe(true);
   });
 
+  it('refuses a run whose declared write never ran, so a refused submit cannot become a capability', async () => {
+    const trace = await happyTrace();
+    const refused = withActions(trace, (actions) => actions.map((action) => (action.index === 1 ? { ...action, submits: true, ok: false, changed: false } : action)));
+
+    expect(await generalize(refused, options)).toMatchObject({ ok: false, failure: 'WriteNotPerformed' });
+  });
+
   it('produces exactly the reviewed draft for the fixture trace', async () => {
     const expected: unknown = JSON.parse(readFileSync(new URL('../../tests/fixtures/discovery/expectedDraft.json', import.meta.url), 'utf8'));
 

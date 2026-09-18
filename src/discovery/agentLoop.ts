@@ -17,7 +17,7 @@ import type { Clock } from '../runtime/clock.js';
 import type { GuardedOutcome, GuardedSurface } from '../surface/guardedSurface.js';
 import type { ModelClient } from './modelClient.js';
 import { buildObservation } from './observation.js';
-import { buildGoal, SYSTEM_PROMPT } from './prompt.js';
+import { buildGoal, systemPrompt } from './prompt.js';
 import type { RecordedAction, Recorder } from './recorder.js';
 import { toolsFor } from './tools.js';
 
@@ -140,7 +140,9 @@ class Finish {
 export async function runDiscovery(options: DiscoveryOptions): Promise<DiscoveryResult> {
   const { surface, model, clock, budgets } = options;
   const started = clock.now().getTime();
-  const tools = toolsFor(Object.keys(options.inputs), { writes: options.allowWrites === true });
+  const writes = options.allowWrites === true;
+  const tools = toolsFor(Object.keys(options.inputs), { writes });
+  const system = systemPrompt({ writes });
   const extracted: Record<string, { ref: string; text: string }> = {};
   const exchanges: DiscoveryExchange[] = [];
   let modelCalls = 0;
@@ -382,7 +384,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       const params: Anthropic.MessageCreateParamsNonStreaming = {
         model: options.modelId,
         max_tokens: MAX_TOKENS,
-        system: [{ type: 'text', text: SYSTEM_PROMPT, cache_control: { type: 'ephemeral' } }],
+        system: [{ type: 'text', text: system, cache_control: { type: 'ephemeral' } }],
         tools,
         tool_choice: { type: 'auto', disable_parallel_tool_use: true },
         // A snapshot, so a request that was sent or recorded never changes as the loop goes on.

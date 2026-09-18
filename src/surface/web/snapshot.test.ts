@@ -37,6 +37,17 @@ const snapshot = [
               { role: 'textbox', active: true, ref: 'f3e13', text: '10001', box: at(110, 36, 121, 21) },
               { role: 'cell', name: 'Search', ref: 'f3e24', cursor: 'pointer', box: at(110, 90, 76, 27) },
               { role: 'checkbox', name: 'Joint', checked: true, disabled: true, ref: 'f3e30', box: at(8, 130, 13, 13) },
+              // A native select. Playwright reports the chosen option as a child, not as text.
+              {
+                role: 'combobox',
+                ref: 'f3e40',
+                box: at(110, 200, 98, 19),
+                children: [
+                  { role: 'option', name: 'Select', box: at(0, 0, 0, 0) },
+                  { role: 'option', name: 'Holiday Club', selected: true, box: at(0, 0, 0, 0) },
+                ],
+              },
+              { role: 'combobox', ref: 'f3e41', box: at(110, 230, 98, 19), children: [{ role: 'option', name: 'Select', selected: true, box: at(0, 0, 0, 0) }] },
               { role: 'paragraph', text: 'Invalid user name or password.', ref: 'f3e31', box: at(8, 150, 300, 16) },
               { role: 'cell', ref: 'f3e32', box: at(8, 170, 120, 20), children: ['Balance ', { role: 'strong', name: 'due', ref: 'f3e33', box: at(60, 172, 30, 16) }] },
             ],
@@ -69,7 +80,7 @@ describe('toUINodeTree', () => {
   it('keeps refs, roles, names and boxes in document order', () => {
     expect(tree.ref).toBe('e1');
     expect([...walkNodes(tree)].map((n) => n.ref)).toEqual([
-      'e1', 'e4', 'f2e8', 'e5', 'f3e1', 'f3e2', 'f3e11', 'f3e13', 'f3e24', 'f3e30', 'f3e31', 'f3e32', 'f3e32~0', 'f3e33', 'e9', 'f4e1',
+      'e1', 'e4', 'f2e8', 'e5', 'f3e1', 'f3e2', 'f3e11', 'f3e13', 'f3e24', 'f3e30', 'f3e40', 'f3e40~0', 'f3e40~1', 'f3e41', 'f3e41~0', 'f3e31', 'f3e32', 'f3e32~0', 'f3e33', 'e9', 'f4e1',
     ]);
     expect(node(tree, 'f3e2')).toMatchObject({ role: 'heading', name: 'Member Search', box: at(8, 8, 837, 17) });
   });
@@ -107,6 +118,14 @@ describe('toUINodeTree', () => {
 
   it('treats a node without a box as not visible', () => {
     expect(node(tree, 'f4e1').state.visible).toBe(false);
+  });
+
+  it('reads a list value from the option that is selected, because a select carries no text', () => {
+    expect(node(tree, 'f3e40').value).toBe('Holiday Club');
+  });
+
+  it('leaves a list with nothing chosen holding the empty option, and never guesses', () => {
+    expect(node(tree, 'f3e41').value).toBe('Select');
   });
 
   it('refuses something that is not a snapshot', () => {

@@ -1,5 +1,21 @@
 import { describe, expect, it } from 'vitest';
-import { buildGoal, SYSTEM_PROMPT } from './prompt.js';
+import { buildGoal, systemPrompt, SYSTEM_PROMPT } from './prompt.js';
+
+describe('systemPrompt', () => {
+  it('says nothing about declaring a write when the run may not write', () => {
+    expect(systemPrompt()).toBe(SYSTEM_PROMPT);
+    expect(SYSTEM_PROMPT).not.toContain('submits');
+  });
+
+  it('tells a run that may write to declare the one action that submits, and only that one', () => {
+    const writing = systemPrompt({ writes: true });
+
+    expect(writing).toContain('submits');
+    expect(writing).toContain('approve');
+    // Everything the read only prompt says still applies.
+    expect(writing.startsWith(SYSTEM_PROMPT)).toBe(true);
+  });
+});
 
 describe('buildGoal', () => {
   it('keeps a templated goal and lists the inputs the model can type by name', () => {
