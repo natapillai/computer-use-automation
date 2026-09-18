@@ -51,7 +51,10 @@ export async function createRunConsole(options: RunConsoleOptions): Promise<RunC
     ...(options.host === undefined ? {} : { host: options.host }),
     port: options.port,
   });
-  const baseUrl = await api.listen();
+  // A known port is a convenience, not a contract. Two runs at once, or one started before the
+  // last has let go of the socket, must not end over which port the console got. The run prints
+  // the URL it actually bound, so nothing downstream assumes the number.
+  const baseUrl = await listenSomewhere(api, options.port);
 
   const escalation = createEscalationChannel({
     store,
@@ -67,4 +70,13 @@ export async function createRunConsole(options: RunConsoleOptions): Promise<RunC
   });
 
   return { baseUrl, escalation, store, close: () => api.close() };
+}
+
+async function listenSomewhere(api: OperatorApi, port: number): Promise<string> {
+  try {
+    return await api.listen();
+  } catch (error) {
+    if (port === 0 || (error as NodeJS.ErrnoException).code !== 'EADDRINUSE') throw error;
+    return api.listen(0);
+  }
 }

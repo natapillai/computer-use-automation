@@ -20,9 +20,9 @@ import { REVIEW_EXIT, runReviewCommand } from './reviewCommand.js';
 //   npm run review -- --capability capabilities/<id>@1.1.0.json --approve <reviewer>
 
 // While it runs it hosts the operator console on :4022. A probe that stops for a person prints
-// the URL of the intervention on stderr and waits there.
+// the URL of the intervention on stderr and waits there, for as long as
+// INTERVENTION_CLAIM_TIMEOUT_MS allows.
 const OPERATOR_PORT = 4022;
-const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -80,7 +80,7 @@ async function main(): Promise<number> {
       environment: { driver: 'web', driverVersion: '1.0.0' },
       // A review of a capability that writes stops for a person exactly as a replay of it does,
       // so it hosts the same console. Its own port, so a review and a replay can both be open.
-      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
+      console: { port: OPERATOR_PORT, claimTimeoutMs: target.value.interventionClaimTimeoutMs },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

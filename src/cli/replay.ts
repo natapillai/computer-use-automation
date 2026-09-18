@@ -19,10 +19,10 @@ import { REPLAY_EXIT, runReplayCommand } from './replayCommand.js';
 //   echo '{"memberId":"10001"}' | npm run replay -- --capability capabilities/<id>@<version>.json
 //
 // While it runs it hosts the operator console on :4020. A run that stops for a person prints
-// the URL of the intervention on stderr and waits there.
+// the URL of the intervention on stderr and waits there, for as long as
+// INTERVENTION_CLAIM_TIMEOUT_MS allows.
 
 const OPERATOR_PORT = 4020;
-const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -85,7 +85,7 @@ async function main(): Promise<number> {
       target: { baseUrl: targetBaseUrl },
       environment: { driver: 'web', driverVersion: '1.0.0' },
       // The operator console of CLAUDE.md section 5, hosted for as long as the run lives.
-      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
+      console: { port: OPERATOR_PORT, claimTimeoutMs: target.value.interventionClaimTimeoutMs },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

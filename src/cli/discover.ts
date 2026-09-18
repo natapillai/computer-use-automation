@@ -21,10 +21,10 @@ import { readPipedStdin } from './io.js';
 // A live run needs ANTHROPIC_MODEL and ANTHROPIC_API_KEY. A run with --model-cassette needs neither.
 //
 // While it runs it hosts the operator console on :4021. A run that stops for a person prints
-// the URL of the intervention on stderr and waits there.
+// the URL of the intervention on stderr and waits there, for as long as
+// INTERVENTION_CLAIM_TIMEOUT_MS allows.
 
 const OPERATOR_PORT = 4021;
-const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -93,7 +93,7 @@ async function main(): Promise<number> {
       environment: { driver: 'web', driverVersion: '1.0.0' },
       // The operator console, hosted for as long as the run lives. A different port from the
       // one replay uses, so a discovery run and a replay can both be open.
-      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
+      console: { port: OPERATOR_PORT, claimTimeoutMs: target.value.interventionClaimTimeoutMs },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

@@ -12,7 +12,7 @@ import { createRunConsole, type RunConsole } from './runConsole.js';
 
 const CLOCK = '2026-09-17T09:00:00.000Z';
 
-async function console_(announce: (line: string) => void, claimWindow: () => Promise<void>): Promise<{ run: RunConsole; tokens: ReturnType<typeof createControlTokens> }> {
+async function console_(announce: (line: string) => void, claimWindow: () => Promise<void>, port = 0): Promise<{ run: RunConsole; tokens: ReturnType<typeof createControlTokens> }> {
   const tokens = createControlTokens('sess_000001', createSequentialIds());
   const control = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: createTestClock(CLOCK), runId: 'run_000001', tokens });
   control.apply('start');
@@ -24,7 +24,7 @@ async function console_(announce: (line: string) => void, claimWindow: () => Pro
     clock: createTestClock(CLOCK),
     ids: createSequentialIds(),
     claimTimeoutMs: 60_000,
-    port: 0,
+    port,
     announce,
     claimWindow,
   });
@@ -103,6 +103,24 @@ describe('createRunConsole', () => {
     await run.close();
 
     await expect(fetch(`${base}/interventions`)).rejects.toThrow();
+  });
+  it('binds somewhere else when its port is taken, rather than ending the run over a port', async () => {
+    const first = await console_(() => undefined, () => new Promise<void>(() => undefined));
+    const port = Number(new URL(first.run.baseUrl).port);
+
+    try {
+      // The same port, already held. A run that stops for a person has to reach one, and a
+      // console is a convenience on a known port rather than a contract about which port.
+      const second = await console_(() => undefined, () => new Promise<void>(() => undefined), port);
+      try {
+        expect(second.run.baseUrl).not.toBe(first.run.baseUrl);
+        expect((await fetch(`${second.run.baseUrl}/interventions`)).ok).toBe(true);
+      } finally {
+        await second.run.close();
+      }
+    } finally {
+      await first.run.close();
+    }
   });
 });
 

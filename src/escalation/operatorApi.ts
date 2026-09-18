@@ -39,7 +39,9 @@ export interface InjectedRequest {
 export interface OperatorApi {
   // In process, for tests and for the mock operator. No socket is opened.
   inject(request: InjectedRequest): Promise<InjectedResponse>;
-  listen(): Promise<string>;
+  // Returns the url it actually bound. A port may be given to override the configured one,
+  // which is how a caller retries on a free port when the preferred one is held.
+  listen(port?: number): Promise<string>;
   close(): Promise<void>;
 }
 
@@ -162,7 +164,7 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
       });
       return { statusCode: response.statusCode, headers: response.headers, body: response.body, rawPayload: response.rawPayload };
     },
-    listen: () => app.listen({ host: options.host ?? '127.0.0.1', port: options.port ?? 4020 }),
+    listen: (port) => app.listen({ host: options.host ?? '127.0.0.1', port: port ?? options.port ?? 4020 }),
     close: async () => {
       await app.close();
     },
