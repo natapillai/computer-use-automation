@@ -1,7 +1,11 @@
 // The operator console, one static page. This is the deliberately bare part, see
 // docs/ESCALATION.md section 5. It polls the masked screenshot, shows the context the run sent,
-// and offers the three things a person can do. The API beneath it is real and tested, and the
-// same endpoints are driven headlessly by the integration suite.
+// and offers the things a person can do. The API beneath it is real and tested, and the same
+// endpoints are driven headlessly by the integration suite.
+//
+// Approving and releasing are separate buttons on purpose. A run stopped for a write is asking
+// one question, and a person who hands the session back without answering it has refused the
+// write. Releasing with an approval attached must be a deliberate click, not the default.
 
 export const OPERATOR_PAGE = `<!doctype html>
 <html lang="en">
@@ -27,6 +31,7 @@ export const OPERATOR_PAGE = `<!doctype html>
   <h1>Operator console</h1>
   <dl id="context"></dl>
   <button id="claim">Claim</button>
+  <button id="approve" disabled hidden>Approve and release</button>
   <button id="release" disabled>Release</button>
   <button id="abort" disabled>Abort</button>
   <p id="status">Loading the open interventions.</p>
@@ -54,6 +59,11 @@ export const OPERATOR_PAGE = `<!doctype html>
       ['Step', full.atStep ? full.atStep.intent : 'before the first step'],
       ['Claim expires', full.expiresAt],
     ].map(([term, value]) => '<dt>' + term + '</dt><dd>' + String(value ?? '') + '</dd>').join('');
+    if (full.reason === 'PolicyConfirmation') {
+      const approve = document.getElementById('approve');
+      approve.hidden = false;
+      approve.title = 'The run performs this one action itself, once.';
+    }
     say('Claim the session to take control.');
   }
 
@@ -75,19 +85,26 @@ export const OPERATOR_PAGE = `<!doctype html>
     if (!claimed.ok) { say('That intervention is already claimed.'); return; }
     token = (await claimed.json()).humanToken;
     document.getElementById('claim').disabled = true;
+    document.getElementById('approve').disabled = false;
     document.getElementById('release').disabled = false;
     document.getElementById('abort').disabled = false;
     say('You hold the session. The automation cannot act until you release it.');
   });
 
-  document.getElementById('release').addEventListener('click', async () => {
+  async function release(approval) {
     await fetch('/interventions/' + intervention.id + '/release', {
       method: 'POST',
       headers: { 'content-type': 'application/json', 'x-control-token': token },
-      body: JSON.stringify({ outcome: 'resumed' }),
+      body: JSON.stringify({ outcome: 'resumed', approval }),
     });
-    say('Control is back with the automation, which will re observe before it acts.');
-  });
+    for (const id of ['approve', 'release', 'abort']) document.getElementById(id).disabled = true;
+    say(approval
+      ? 'Approved. The automation has the session back and performs that one action, once.'
+      : 'Control is back with the automation, which will re observe before it acts. Nothing was approved.');
+  }
+
+  document.getElementById('approve').addEventListener('click', () => release(true));
+  document.getElementById('release').addEventListener('click', () => release(false));
 
   document.getElementById('abort').addEventListener('click', async () => {
     await fetch('/interventions/' + intervention.id + '/abort', { method: 'POST', headers: { 'x-control-token': token } });
