@@ -1,5 +1,5 @@
+import type { ChildProcess } from 'node:child_process';
 import { mkdtemp, readFile, rm } from 'node:fs/promises';
-import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -18,7 +18,7 @@ const REQUEST = 'requests/member.readSavingsBalance.json';
 const REVIEW = 'requests/member.readSavingsBalance.MEMBER_NOT_FOUND.review.json';
 
 describe('the discovery thread, offline from the recorded live exchange', () => {
-  let server: Server | undefined;
+  let server: ChildProcess | undefined;
   let root = '';
 
   beforeAll(async () => {

@@ -161,6 +161,21 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
 
   const events: DiscoveryEvent[] = [];
   const recorder = createRecorder({ profile: profile.profile, redactor: deps.redactor, inputs });
+  const TRACE = 'Every observation, decision, authorization, action and derivation of the run';
+
+  // Written as they happen rather than collected and written at the end. A run that stops for a
+  // person can sit there for a quarter of an hour, and one that is killed while it waits used to
+  // leave a directory with nothing in it but the opening log line. That is what
+  // docs/ESCALATION.md section 9 claims evidence does not do.
+  //
+  // Nothing streamed here carries a value. Events carry hashes, refs and input names, and an
+  // exchange has already been through the observation builder, which masks before any text
+  // exists. The derivations are appended at the end because they carry a masked neighbourhood
+  // the recorder only finishes once the action has run.
+  let writing: Promise<void> = Promise.resolve();
+  const stream = (path: string, kind: 'trace' | 'transcript', description: string, value: unknown): void => {
+    writing = writing.then(() => sink.appendJsonLine(path, kind, description, value));
+  };
   const unreached = (reason: 'SurfaceUnavailable' | 'ModelCallFailed', detail: string): DiscoveryResult => ({
     status: 'failure',
     reason,
@@ -223,7 +238,9 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
         allowWrites: request.allowWrites === true,
         onEvent: (event) => {
           events.push(event);
+          stream('trace.jsonl', 'trace', TRACE, event);
         },
+        onExchange: (exchange) => stream('transcript.jsonl', 'transcript', 'The model exchange, redacted', exchange),
         recorder,
         capture,
         escalation: runConsole.escalation,
@@ -256,10 +273,8 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
   known.push(...extracted);
   sink.addKnown({ known: extracted });
 
-  const TRACE = 'Every observation, decision, authorization, action and derivation of the run';
-  for (const event of events) await sink.appendJsonLine('trace.jsonl', 'trace', TRACE, event);
+  await writing;
   for (const action of recorder.actions()) await sink.appendJsonLine('trace.jsonl', 'trace', TRACE, { t: 'derivation', ...action });
-  for (const exchange of result.exchanges) await sink.appendJsonLine('transcript.jsonl', 'transcript', 'The model exchange, redacted', exchange);
 
   let generalization: Generalization | null = null;
   let written: CapabilityWrite | null = null;

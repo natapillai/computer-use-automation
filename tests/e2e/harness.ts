@@ -1,10 +1,12 @@
-import { spawn } from 'node:child_process';
-import type { Server } from 'node:http';
+import { spawn, type ChildProcess } from 'node:child_process';
 import { resolve } from 'node:path';
-import { createTargetApp } from '../../apps/target/src/app.js';
 
 // What every e2e file shares. MERIDIAN Core runs on the port the committed allowlist names, so
 // a CLI runs under the real policy unchanged, and each CLI runs as its own process.
+//
+// The app is started the way the README tells a person to start it, as its own process running
+// apps/target/src/server.ts. Creating it in process was a shortcut that left the one command
+// every demo begins with covered by nothing.
 
 export const REPOSITORY = resolve(import.meta.dirname, '../..');
 export const TARGET_PORT = 4010;
@@ -15,19 +17,43 @@ export interface CliRun {
   readonly stderr: string;
 }
 
-export function startTarget(idSeed: string): Promise<Server> {
-  const app = createTargetApp({ username: 'operator', password: 'meridian-fixture', testMode: false, idSeed });
-  return new Promise<Server>((listening, reject) => {
-    const bound = app.listen(TARGET_PORT, '127.0.0.1');
-    bound.once('listening', () => listening(bound));
-    bound.once('error', (error: NodeJS.ErrnoException) =>
-      reject(error.code === 'EADDRINUSE' ? new Error(`Port ${TARGET_PORT} is in use. Stop npm run target first, because this suite starts its own app on the port the allowlist names.`) : error),
-    );
+export function startTarget(idSeed: string): Promise<ChildProcess> {
+  const child = spawn(process.execPath, ['--import', 'tsx', 'apps/target/src/server.ts'], {
+    cwd: REPOSITORY,
+    env: {
+      ...process.env,
+      TARGET_BASE_URL: `http://localhost:${TARGET_PORT}`,
+      TARGET_USERNAME: 'operator',
+      TARGET_PASSWORD: 'meridian-fixture',
+      TARGET_ID_SEED: idSeed,
+    },
+    stdio: ['ignore', 'pipe', 'pipe'],
+  });
+
+  return new Promise<ChildProcess>((listening, reject) => {
+    let said = '';
+    const settle = (chunk: string): void => {
+      said += chunk;
+      if (said.includes('listening on')) listening(child);
+      // The port the allowlist names is the one a person's own npm run target would be on, so
+      // the clash is worth naming rather than timing out on.
+      if (said.includes('EADDRINUSE') || said.includes('could not listen')) {
+        reject(new Error(`Port ${TARGET_PORT} is in use. Stop npm run target first, because this suite starts its own app on the port the allowlist names.`));
+      }
+    };
+    child.stdout?.setEncoding('utf8').on('data', settle);
+    child.stderr?.setEncoding('utf8').on('data', settle);
+    child.once('error', reject);
+    child.once('exit', (code) => reject(new Error(`MERIDIAN Core exited with ${code} before it was listening. ${said}`)));
   });
 }
 
-export async function stopTarget(server: Server | undefined): Promise<void> {
-  if (server !== undefined) await new Promise<void>((closed) => server.close(() => closed()));
+export async function stopTarget(child: ChildProcess | undefined): Promise<void> {
+  if (child === undefined || child.exitCode !== null) return;
+  await new Promise<void>((stopped) => {
+    child.once('exit', () => stopped());
+    child.kill();
+  });
 }
 
 // The child gets no model variables, so nothing an e2e test starts can reach the API.

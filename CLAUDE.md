@@ -102,13 +102,13 @@ Each script lands in `package.json` with the task that makes it work, as listed 
 ```
 npm run test              vitest, unit and contract, the fast loop
 npm run test:watch        the TDD loop
-npm run test:integration  needs the target app, starts it automatically
+npm run test:integration  every file starts its own app on a free port, so nothing has to be running
 npm run test:e2e          full thread with the recorded model transcript
 npm run typecheck         tsc --noEmit
 npm run target            start the local banking app on :4010
-npm run discover          CLI, real model, writes a capability and evidence
-npm run review            CLI, negative probe review and approval
-npm run replay            CLI, deterministic, hosts the operator console on :4020 while it runs
+npm run discover          CLI, real model, writes a capability and evidence, console on :4021
+npm run review            CLI, negative probe review and approval, console on :4022
+npm run replay            CLI, deterministic, console on :4020
 ```
 
 ## 6. The working loop

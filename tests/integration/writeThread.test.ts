@@ -114,7 +114,7 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
     return Reflect.get(state as object, 'submissions');
   }
 
-  async function discover(plans: readonly ConsolePlan[]): Promise<{ code: number; stdout: string; stderr: string; evidence: string; visits: string[] }> {
+  async function discover(plans: readonly ConsolePlan[], watch?: (runDirectory: string) => Promise<void>): Promise<{ code: number; stdout: string; stderr: string; evidence: string; visits: string[] }> {
     await fetch(`${base}/__control__/reset`);
     const evidence = join(root, 'evidence');
     const out: string[] = [];
@@ -123,6 +123,7 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
     const redactor = createRedactor({ neverPersist: ['password'], redactPatterns: [] });
     let working: Promise<unknown> = Promise.resolve();
     let visited = 0;
+    let runDirectory = '';
 
     const code = await runDiscoverCommand({
       argv: ['--request', REQUEST, '--evidence', evidence, '--capabilities', join(root, 'capabilities')],
@@ -138,6 +139,7 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
         visited += 1;
         if (plan === undefined) return;
         working = working.then(async () => {
+          if (watch !== undefined) await watch(runDirectory);
           const visit = await personAtTheConsole(browser, url, plan);
           visits.push(visit.reason);
         });
@@ -158,6 +160,7 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
         const session = createSessionControl({ sessionId: leased.lease.sessionId, ids: createSequentialIds(), clock: systemClock, runId, tokens: leased.lease.tokens });
         const control = session.apply('start').token;
         if (control === null) return { ok: false, detail: 'The session issued no token to start with.' };
+        runDirectory = join(evidence, 'discovery', runId);
         return { ok: true, lease: { surface: leased.lease.surface, control, session, grants, human: leased.lease.human, release: () => leased.lease.release() } };
       },
       liveModel: () => ({ ok: true, client: scriptedModel(STUCK_THEN_FORM) }),
@@ -176,13 +179,24 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
   }
 
   it('lets a person unstick the run from the console, then approve the write it reaches', async () => {
+    const midRun: string[] = [];
     const result = await discover([
       // Stuck on the member page. The person sends the frame to the form, which is the only
       // way to reach a page nothing links to, and hands the session back.
       { work: async (session) => session.navigate('/member/10001/subaccount'), finish: 'release' },
       // At the submit. Nothing to do but decide.
       { finish: 'approve' },
-    ]);
+    ],
+    // Read while the run is paused and a person is holding it. A run killed here has to leave
+    // behind what it has already done, which is the whole reason evidence is streamed.
+    async (runDirectory) => {
+      midRun.push(await readFile(join(runDirectory, 'trace.jsonl'), 'utf8'));
+      midRun.push(await readFile(join(runDirectory, 'transcript.jsonl'), 'utf8'));
+    });
+
+    expect(midRun[0]).toContain('"t":"observation"');
+    expect(midRun[0]).toContain('"t":"decision"');
+    expect(midRun[1]).toContain('"observationHash"');
 
     expect(result.visits).toEqual(['NoProgress', 'PolicyConfirmation']);
     expect(await submissions()).toEqual([{ memberId: '10001', accountType: 'Holiday Club', suffix: 'H01', balance: '$250.00' }]);

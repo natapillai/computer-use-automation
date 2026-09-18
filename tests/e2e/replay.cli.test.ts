@@ -1,5 +1,5 @@
+import type { ChildProcess } from 'node:child_process';
 import { mkdtemp, rm } from 'node:fs/promises';
-import type { Server } from 'node:http';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
@@ -13,7 +13,7 @@ import { REPOSITORY, runCli, startTarget, stopTarget } from './harness.js';
 // checked is what a caller sees, the exit code and one JSON document on stdout.
 
 describe('npm run replay against MERIDIAN Core', () => {
-  let server: Server | undefined;
+  let server: ChildProcess | undefined;
   let root = '';
   let capabilityPath = '';
 

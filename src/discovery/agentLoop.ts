@@ -73,6 +73,9 @@ export interface DiscoveryOptions {
   // write, because raising an action's effect is always the safe direction.
   readonly allowWrites?: boolean;
   readonly onEvent?: (event: DiscoveryEvent) => void;
+  // Called as each exchange comes back, so the transcript is on disk while the run is still
+  // going. A run that is killed at an intervention would otherwise leave nothing behind.
+  readonly onExchange?: (exchange: DiscoveryExchange) => void;
   readonly recorder?: Recorder;
   // Called with the first observation, and with a fresh observation taken as the run ends, so
   // evidence is captured against refs that are current. Without it the loop takes no extra
@@ -395,7 +398,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (!answer.ok) throw fail('ModelCallFailed', answer.detail);
 
       const response = answer.response;
-      exchanges.push({ index: exchanges.length, observationHash: seen.hash, observationText: seen.text, response });
+      const exchange: DiscoveryExchange = { index: exchanges.length, observationHash: seen.hash, observationText: seen.text, response };
+      exchanges.push(exchange);
+      options.onExchange?.(exchange);
       messages.push({ role: 'assistant', content: response.content });
 
       const stop: string = response.stop_reason ?? 'none';
