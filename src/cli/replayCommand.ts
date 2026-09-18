@@ -5,7 +5,7 @@ import type { ControlToken } from '../control/controlToken.js';
 import { validateInputs, type InputValue } from '../core/capability/inputs.js';
 import type { Capability } from '../core/capability/schema.js';
 import { failureResult, type ReplayResult, type ResultBaseInput } from '../core/outcome/result.js';
-import { sensitiveFields, type AppProfile } from '../core/policy/profile.js';
+import type { AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 import { persistedResult } from '../core/redaction/resultProjection.js';
 import type { GrantLedger } from '../core/policy/authorize.js';
@@ -13,6 +13,7 @@ import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput
 import { createRunConsole } from '../escalation/runConsole.js';
 import type { CapabilityStore } from '../evidence/capabilityStore.js';
 import { interventionCaptures } from '../evidence/interventionCapture.js';
+import { maskedScreenshot } from '../evidence/maskedScreenshot.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import { replay } from '../replay/executor.js';
 import type { Clock } from '../runtime/clock.js';
@@ -139,7 +140,7 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
       const humanActions: HumanActionRecord[] = [];
       const console_ = await createRunConsole({
         control: session,
-        screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+        screenshot: maskedScreenshot(surface, profile.profile),
         ...(human === undefined ? {} : { input: human }),
         onHumanAction: (record) => humanActions.push(record),
         redactor: deps.redactor,

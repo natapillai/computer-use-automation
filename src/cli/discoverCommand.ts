@@ -21,6 +21,7 @@ import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput
 import { createRunConsole } from '../escalation/runConsole.js';
 import { createFileCapabilityStore, type CapabilityWrite } from '../evidence/capabilityStore.js';
 import { interventionCaptures } from '../evidence/interventionCapture.js';
+import { maskedScreenshot } from '../evidence/maskedScreenshot.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import type { Clock } from '../runtime/clock.js';
 import type { IdProvider } from '../runtime/ids.js';
@@ -207,7 +208,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
     const humanActions: HumanActionRecord[] = [];
     const runConsole = await createRunConsole({
       control: leased.lease.session,
-      screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+      screenshot: maskedScreenshot(surface, profile.profile),
       ...(leased.lease.human === undefined ? {} : { input: leased.lease.human }),
       onHumanAction: (record) => humanActions.push(record),
       redactor: deps.redactor,

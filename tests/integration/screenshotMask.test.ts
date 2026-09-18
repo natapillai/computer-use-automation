@@ -2,7 +2,16 @@ import type { Server } from 'node:http';
 import { chromium, type Browser, type Page } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTargetApp } from '../../apps/target/src/app.js';
+import { createSessionControl } from '../../src/control/controlPlane.js';
 import { createControlTokens } from '../../src/control/controlToken.js';
+import { createGrantLedger } from '../../src/core/policy/authorize.js';
+import { createRedactor } from '../../src/core/redaction/redactor.js';
+import { createRunConsole } from '../../src/escalation/runConsole.js';
+import { maskedScreenshot } from '../../src/evidence/maskedScreenshot.js';
+import { systemClock } from '../../src/runtime/clock.js';
+import { createGuardedSurface } from '../../src/surface/guardedSurface.js';
+import { allowlistFor } from '../fixtures/policy/allowlist.js';
+import { meridianProfile } from '../fixtures/profile.js';
 import { matchStrategy } from '../../src/core/surfaceModel/match.js';
 import { createSequentialIds } from '../../src/runtime/ids.js';
 import { createWebSurfaceDriver } from '../../src/surface/web/webSurfaceDriver.js';
@@ -85,5 +94,62 @@ describe('masked screenshots of member detail', { timeout: 30_000 }, () => {
     expect(await pixelAt(decoder, masked, ...centre(nameBox))).not.toEqual([255, 0, 255]);
 
     await context.close();
+  });
+  it('serves the console the same masked image, which is what a person is actually shown', async () => {
+    const context = await browser.newContext({ viewport: { width: 1024, height: 700 } });
+    await context.request.post(`${base}/auth/login`, { form: { username: 'operator', password: 'meridian-fixture' }, maxRedirects: 0 });
+    const page = await context.newPage();
+    const decoder = await context.newPage();
+    const profile = await meridianProfile();
+    const tokens = createControlTokens('sess_console', createSequentialIds());
+    const driver = createWebSurfaceDriver({ page, sessionId: 'sess_console', control: tokens, baseUrl: base });
+    const surface = createGuardedSurface({
+      driver,
+      policy: { allowlist: allowlistFor(base), phase: 'replay', capabilityStatus: 'approved', allowUnattendedReplay: false, grants: createGrantLedger() },
+      runId: 'run_000001',
+      baseUrl: base,
+    });
+    const control = createSessionControl({ sessionId: 'sess_console', ids: createSequentialIds(), clock: systemClock, runId: 'run_000001', tokens });
+    const token = control.apply('start').token;
+    if (token === null) throw new Error('A started session was issued no token.');
+    await surface.perform({ action: { kind: 'navigate', path: '/servicing', framePath: [] }, framePath: [], stepId: 'entry', effect: 'read', targetKey: null }, token);
+    await surface.perform({ action: { kind: 'navigate', path: '/member/10001', framePath: ['content'] }, framePath: ['content'], stepId: 'entry', effect: 'read', targetKey: null }, token);
+
+    const observation = await surface.observe();
+    const [balanceRef] = matchStrategy(
+      observation,
+      { kind: 'anchor-relative', anchor: { kind: 'text', text: 'Savings', exact: true, confidence: 1 }, relation: 'rightOf', role: 'cell', confidence: 1 },
+      ['content'],
+    );
+    if (balanceRef === undefined) throw new Error('The balance cell did not resolve.');
+    const balanceBox = await page.locator(`aria-ref=${balanceRef}`).boundingBox();
+    if (balanceBox === null) throw new Error('The balance cell has no box on the page.');
+
+    const run = await createRunConsole({
+      control,
+      // Exactly what the three commands hand it, rather than a copy of the expression.
+      screenshot: maskedScreenshot(surface, profile),
+      redactor: createRedactor({ neverPersist: [], redactPatterns: [] }),
+      known: [],
+      clock: systemClock,
+      ids: createSequentialIds(),
+      claimTimeoutMs: 60_000,
+      port: 0,
+      announce: () => undefined,
+      claimWindow: () => new Promise<void>(() => undefined),
+    });
+
+    try {
+      // Over HTTP, from the endpoint the console page polls.
+      const served = await fetch(`${run.baseUrl}/sessions/sess_console/screenshot`);
+      expect(served.ok).toBe(true);
+      const bytes = new Uint8Array(await served.arrayBuffer());
+
+      const centre = [balanceBox.x + balanceBox.width / 2, balanceBox.y + balanceBox.height / 2] as const;
+      expect(await pixelAt(decoder, bytes, centre[0], centre[1])).toEqual([255, 0, 255]);
+    } finally {
+      await run.close();
+      await context.close();
+    }
   });
 });

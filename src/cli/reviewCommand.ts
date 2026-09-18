@@ -19,6 +19,7 @@ import type { GrantLedger } from '../core/policy/authorize.js';
 import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput.js';
 import { createRunConsole } from '../escalation/runConsole.js';
 import { interventionCaptures } from '../evidence/interventionCapture.js';
+import { maskedScreenshot } from '../evidence/maskedScreenshot.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import { replay, type ReplayContext } from '../replay/executor.js';
 import type { Clock } from '../runtime/clock.js';
@@ -180,7 +181,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
     const { surface } = lease;
     const opened = await createRunConsole({
       control: lease.session,
-      screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+      screenshot: maskedScreenshot(surface, profile.profile),
       ...(lease.human === undefined ? {} : { input: lease.human }),
       onHumanAction: (record) => humanActions.push(record),
       redactor: deps.redactor,
