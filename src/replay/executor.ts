@@ -485,6 +485,18 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
           retryable: entrant.code === 'SurfaceUnavailable' && step.idempotent,
         });
       }
+      // A recoverable condition on a step that cannot be repeated is not recoverable here. The
+      // bounded retry lands at S6-T02 and will only ever apply to a step that declares itself
+      // idempotent, because repeating a submit risks posting it twice.
+      if (entrant.classify === 'recoverable' && !step.idempotent) {
+        throw fail({
+          class: 'SurfaceUnavailable',
+          expected: step.postcondition.description,
+          observed: `The ${layer} condition ${entrant.code} holds, and this step is not idempotent, so nothing was retried.`,
+          retryable: true,
+        });
+      }
+
       throw fail({
         class: 'Internal',
         expected: `A handler for the ${entrant.classify} classification of ${entrant.code}.`,

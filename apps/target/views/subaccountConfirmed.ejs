@@ -1,0 +1,22 @@
+<html>
+<head>
+<title>Sub Account Opened</title>
+<style>
+body { font-family: Tahoma, Verdana, sans-serif; font-size: 11px; background: #ece9d8; margin: 8px; }
+h1 { font-size: 14px; margin: 0 0 8px 0; }
+td.lbl { text-align: right; padding-right: 6px; white-space: pre; }
+td.amt { text-align: right; font-family: "Courier New", monospace; }
+td.ok { color: #004000; font-weight: bold; padding-bottom: 8px; }
+</style>
+</head>
+<body>
+<h1>Sub Account Opened</h1>
+<table border="0" cellpadding="3" cellspacing="0">
+  <tr><td class="ok" colspan="2">The sub account was opened.</td></tr>
+  <tr><td class="lbl">Member No:</td><td><%= member.id %></td></tr>
+  <tr><td class="lbl">Suffix:</td><td><%= suffix %></td></tr>
+  <tr><td class="lbl">Account:</td><td><%= accountType %></td></tr>
+  <tr><td class="lbl">Balance:</td><td class="amt"><%= balance %></td></tr>
+</table>
+</body>
+</html>

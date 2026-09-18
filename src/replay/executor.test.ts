@@ -278,6 +278,16 @@ describe('replay', () => {
     expect(driver.performed).toHaveLength(4);
   });
 
+  it('ends as SurfaceUnavailable when a transient load lands on a step that cannot be repeated', async () => {
+    const { result, driver } = await run({ script: { resultsStatus: 503 } });
+    const failure = failureOf(result);
+
+    expect(failure).toMatchObject({ class: 'SurfaceUnavailable', atStepId: 'submitSearch', retryable: true });
+    expect(failure.observed).toContain('not idempotent');
+    // Submitted once. Repeating a submit that may already have posted is the danger here.
+    expect(driver.performed.filter((action) => action.kind === 'click')).toHaveLength(1);
+  });
+
   it('fails with Timeout naming the awaited condition when the surface never changes', async () => {
     const { result, elapsedMs } = await run({ script: { searchLeadsTo: 'nowhere' } });
     const failure = failureOf(result);
@@ -378,12 +388,16 @@ describe('replay', () => {
     });
 
     it('fails as Internal, naming the classification, when a condition fires that no handler covers yet', async () => {
-      const { result } = await run({ script: { resultsStatus: 503 } });
+      // A step rule that asks for a person is classified, so it is not the unclassified dialog
+      // case, and the result contract has no escalation reason for it. It fails as our own gap
+      // rather than being quietly swallowed.
+      const capability = withSearchRules([{ when: noRecordsBanner(), classify: 'escalate', code: 'SUPERVISOR_REVIEW' }]);
+      const { result } = await run({ memberId: '00000', capability, script: { searchLeadsTo: 'noRecords' } });
       const failure = failureOf(result);
 
       expect(failure).toMatchObject({ class: 'Internal', atStepId: 'submitSearch' });
-      expect(failure.observed).toContain('TransientLoad');
-      expect(failure.observed).toContain('recoverable');
+      expect(failure.observed).toContain('SUPERVISOR_REVIEW');
+      expect(failure.observed).toContain('escalate');
     });
   });
 

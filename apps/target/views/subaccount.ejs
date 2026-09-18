@@ -1,0 +1,51 @@
+<html>
+<head>
+<title>Open Sub Account</title>
+<style>
+body { font-family: Tahoma, Verdana, sans-serif; font-size: 11px; background: #ece9d8; margin: 8px; }
+h1 { font-size: 14px; margin: 0 0 8px 0; }
+td.lbl { text-align: right; padding-right: 6px; white-space: pre; }
+td.btn { background: #d4d0c8; border: 2px outset #ffffff; padding: 2px 12px; cursor: pointer; }
+td.msg { color: #800000; font-weight: bold; padding-top: 10px; }
+</style>
+</head>
+<body>
+<h1>Open Sub Account</h1>
+<table border="0" cellpadding="3" cellspacing="0">
+  <tr><td class="lbl">Member No:</td><td><%= member.id %></td></tr>
+  <tr><td class="lbl">Name:</td><td><%= member.name %></td></tr>
+</table>
+<form id="sub" name="ctl01" method="post" action="/member/<%= member.id %>/subaccount">
+<table border="0" cellpadding="3" cellspacing="0">
+  <tr>
+    <td class="lbl">Account  Type:</td>
+    <td>
+      <select id="<%= fields.accountType.id %>" name="<%= fields.accountType.name %>">
+        <option value="">Select</option>
+<% for (const type of types) { %>
+        <option value="<%= type %>"<%= values.accountType === type ? ' selected' : '' %>><%= type %></option>
+<% } %>
+      </select>
+    </td>
+  </tr>
+  <tr>
+    <td class="lbl">Opening Amount:</td>
+    <td><input type="text" id="<%= fields.openingAmount.id %>" name="<%= fields.openingAmount.name %>" size="12" maxlength="12" value="<%= values.openingAmount %>"></td>
+  </tr>
+  <tr>
+    <td></td>
+    <td>
+      <table border="0" cellpadding="0" cellspacing="0">
+        <tr><td class="btn" onclick="document.forms['ctl01'].submit()">Open Account</td></tr>
+      </table>
+    </td>
+  </tr>
+</table>
+</form>
+<% if (error !== null) { %>
+<table border="0" cellpadding="0" cellspacing="0">
+  <tr><td class="msg"><%= error %></td></tr>
+</table>
+<% } %>
+</body>
+</html>

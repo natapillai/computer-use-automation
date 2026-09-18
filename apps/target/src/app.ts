@@ -61,6 +61,10 @@ function formField(body: unknown, name: string): string {
   return typeof value === 'string' ? value : '';
 }
 
+function formatMoney(amount: number): string {
+  return `$${amount.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ',')}`;
+}
+
 function surnameOf(member: Member): string {
   return member.name.split(' ').at(-1) ?? '';
 }
@@ -88,6 +92,21 @@ export function createTargetApp(options: TargetAppOptions): Express {
   const fields = {
     memberId: generatedField(options.idSeed, 'memberId'),
     surname: generatedField(options.idSeed, 'surname'),
+  };
+
+  // The write flow. Opening a sub account is the only thing in this app that changes anything,
+  // which is why the app profile classifies its POST as a write.
+  const subaccountFields = {
+    accountType: generatedField(options.idSeed, 'accountType'),
+    openingAmount: generatedField(options.idSeed, 'openingAmount'),
+  };
+  const accountTypes = ['Savings', 'Checking', 'Holiday Club'];
+  const minimumOpening = 25;
+  const submissions: { memberId: string; accountType: string; suffix: string; balance: string }[] = [];
+
+  const nextSuffix = (member: Member, type: string): string => {
+    const letter = (type[0] ?? 'S').toUpperCase();
+    return `${letter}${String(member.accounts.filter((account) => account.suffix.startsWith(letter)).length + 1).padStart(2, '0')}`;
   };
 
   const hasSession = (req: Request): boolean => {
@@ -136,10 +155,11 @@ export function createTargetApp(options: TargetAppOptions): Express {
       members = loadSeed();
       faults = [];
       requests.length = 0;
+      submissions.length = 0;
       res.json({ reset: true });
     });
     app.get('/__control__/state', (_req, res) => {
-      res.json({ faults, sessions: sessions.size, requests });
+      res.json({ faults, sessions: sessions.size, requests, submissions });
     });
     // Arms one fault on one route, for a number of responses. Nothing here is reachable by the
     // automation, because the allowlist denies /__control__ outright.
@@ -194,6 +214,54 @@ export function createTargetApp(options: TargetAppOptions): Express {
       values.memberId !== '' ? member.id === values.memberId : surnameOf(member).toLowerCase() === values.surname.toLowerCase(),
     );
     res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null, dialog });
+  });
+
+  app.get('/member/:id/subaccount', (req, res) => {
+    const member = members.find((candidate) => candidate.id === req.params.id);
+    if (member === undefined) {
+      res.status(404).render('notFound');
+      return;
+    }
+    res.render('subaccount', { member, fields: subaccountFields, types: accountTypes, values: { accountType: '', openingAmount: '' }, error: null });
+  });
+
+  app.post('/member/:id/subaccount', (req, res) => {
+    const member = members.find((candidate) => candidate.id === req.params.id);
+    if (member === undefined) {
+      res.status(404).render('notFound');
+      return;
+    }
+
+    // Armed against the wildcard route, because the real path carries a member id. The 503
+    // happens before anything is opened, so a run that retried it would open two accounts.
+    if (consumeFault('flaky503', '/member/*/subaccount', 'POST')) {
+      res.status(503).render('unavailable');
+      return;
+    }
+
+    const values = {
+      accountType: formField(req.body, subaccountFields.accountType.name).trim(),
+      openingAmount: formField(req.body, subaccountFields.openingAmount.name).trim(),
+    };
+    const amount = Number(values.openingAmount.replace(/[$,\s]/g, ''));
+    const error =
+      values.accountType === ''
+        ? 'Choose an account type.'
+        : !Number.isFinite(amount) || amount < minimumOpening
+          ? `The opening amount must be at least ${formatMoney(minimumOpening)}.`
+          : null;
+    if (error !== null) {
+      res.render('subaccount', { member, fields: subaccountFields, types: accountTypes, values, error });
+      return;
+    }
+
+    const suffix = nextSuffix(member, values.accountType);
+    const balance = formatMoney(amount);
+    members = members.map((candidate) =>
+      candidate.id === member.id ? { ...candidate, accounts: [...candidate.accounts, { suffix, type: values.accountType, balance }] } : candidate,
+    );
+    submissions.push({ memberId: member.id, accountType: values.accountType, suffix, balance });
+    res.render('subaccountConfirmed', { member, suffix, accountType: values.accountType, balance });
   });
 
   app.get('/member/:id', (req, res) => {
