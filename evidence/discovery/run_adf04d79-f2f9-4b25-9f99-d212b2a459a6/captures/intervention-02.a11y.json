@@ -1,0 +1,1055 @@
+{
+  "root": {
+    "ref": "e1",
+    "role": "generic",
+    "name": "",
+    "state": {
+      "disabled": false,
+      "visible": true,
+      "focused": false
+    },
+    "framePath": [],
+    "box": {
+      "x": 0,
+      "y": 0,
+      "width": 1024,
+      "height": 700
+    },
+    "clickableHint": false,
+    "children": [
+      {
+        "ref": "e2",
+        "role": "iframe",
+        "name": "",
+        "state": {
+          "disabled": false,
+          "visible": true,
+          "focused": false
+        },
+        "framePath": [],
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 26
+        },
+        "clickableHint": false,
+        "children": [
+          {
+            "ref": "f1e2",
+            "role": "table",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": false
+            },
+            "framePath": [
+              "status"
+            ],
+            "box": {
+              "x": 6,
+              "y": 3,
+              "width": 1012,
+              "height": 19
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f1e3",
+                "role": "rowgroup",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "status"
+                ],
+                "box": {
+                  "x": 6,
+                  "y": 3,
+                  "width": 1012,
+                  "height": 19
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f1e4",
+                    "role": "row",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "status"
+                    ],
+                    "box": {
+                      "x": 6,
+                      "y": 3,
+                      "width": 1012,
+                      "height": 19
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f1e5",
+                        "role": "cell",
+                        "name": "MERIDIAN Core 9.4.2",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "status"
+                        ],
+                        "box": {
+                          "x": 6,
+                          "y": 3,
+                          "width": 482,
+                          "height": 19
+                        },
+                        "clickableHint": false,
+                        "children": []
+                      },
+                      {
+                        "ref": "f1e6",
+                        "role": "cell",
+                        "name": "Session active 09:00:00",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "status"
+                        ],
+                        "box": {
+                          "x": 488,
+                          "y": 3,
+                          "width": 530,
+                          "height": 19
+                        },
+                        "clickableHint": false,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "ref": "e3",
+        "role": "generic",
+        "name": "",
+        "state": {
+          "disabled": false,
+          "visible": true,
+          "focused": false
+        },
+        "framePath": [],
+        "box": {
+          "x": 0,
+          "y": 27,
+          "width": 1024,
+          "height": 673
+        },
+        "clickableHint": false,
+        "children": [
+          {
+            "ref": "e4",
+            "role": "iframe",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": true
+            },
+            "framePath": [],
+            "box": {
+              "x": 0,
+              "y": 27,
+              "width": 170,
+              "height": 673
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f2e2",
+                "role": "table",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "nav"
+                ],
+                "box": {
+                  "x": 4,
+                  "y": 4,
+                  "width": 162,
+                  "height": 92
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f2e3",
+                    "role": "rowgroup",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "nav"
+                    ],
+                    "box": {
+                      "x": 4,
+                      "y": 4,
+                      "width": 162,
+                      "height": 92
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f2e4",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 4,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e5",
+                            "role": "cell",
+                            "name": "SERVICING",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 4,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e6",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 27,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e7",
+                            "role": "cell",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 27,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f2e8",
+                                "role": "link",
+                                "name": "Member Search",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "nav"
+                                ],
+                                "box": {
+                                  "x": 6,
+                                  "y": 29,
+                                  "width": 110,
+                                  "height": 19
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e9",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 50,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e10",
+                            "role": "cell",
+                            "name": "Transactions",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 50,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e11",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 73,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e12",
+                            "role": "cell",
+                            "name": "Reports",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 73,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "ref": "e5",
+            "role": "iframe",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": false
+            },
+            "framePath": [],
+            "box": {
+              "x": 171,
+              "y": 27,
+              "width": 853,
+              "height": 673
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f3e1",
+                "role": "generic",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "content"
+                ],
+                "box": {
+                  "x": 8,
+                  "y": 8,
+                  "width": 837,
+                  "height": 657
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f3e2",
+                    "role": "heading",
+                    "name": "Member Detail",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 8,
+                      "width": 837,
+                      "height": 17
+                    },
+                    "clickableHint": false,
+                    "children": []
+                  },
+                  {
+                    "ref": "f3e3",
+                    "role": "table",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 33,
+                      "width": 257,
+                      "height": 75
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f3e4",
+                        "role": "rowgroup",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "content"
+                        ],
+                        "box": {
+                          "x": 8,
+                          "y": 33,
+                          "width": 257,
+                          "height": 75
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f3e5",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 33,
+                              "width": 257,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e6",
+                                "role": "cell",
+                                "name": "Member No:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 33,
+                                  "width": 96,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e7",
+                                "role": "cell",
+                                "name": "{{inputs.memberId}}",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 104,
+                                  "y": 33,
+                                  "width": 161,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e8",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 58,
+                              "width": 257,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e9",
+                                "role": "cell",
+                                "name": "Name:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 58,
+                                  "width": 96,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e10",
+                                "role": "cell",
+                                "name": "[redacted:pii]",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 104,
+                                  "y": 58,
+                                  "width": 161,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e11",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 83,
+                              "width": 257,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e12",
+                                "role": "cell",
+                                "name": "Card:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 83,
+                                  "width": 96,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e13",
+                                "role": "cell",
+                                "name": "[redacted:pii]",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 104,
+                                  "y": 83,
+                                  "width": 161,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "f3e14",
+                    "role": "table",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 118,
+                      "width": 238,
+                      "height": 73
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f3e15",
+                        "role": "rowgroup",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "content"
+                        ],
+                        "box": {
+                          "x": 9,
+                          "y": 119,
+                          "width": 237,
+                          "height": 72
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f3e16",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 9,
+                              "y": 119,
+                              "width": 237,
+                              "height": 24
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e17",
+                                "role": "cell",
+                                "name": "Suffix",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 9,
+                                  "y": 119,
+                                  "width": 60,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e18",
+                                "role": "cell",
+                                "name": "Account",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 69,
+                                  "y": 119,
+                                  "width": 78,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e19",
+                                "role": "cell",
+                                "name": "Balance",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 146,
+                                  "y": 119,
+                                  "width": 99,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e20",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 9,
+                              "y": 143,
+                              "width": 237,
+                              "height": 24
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e21",
+                                "role": "cell",
+                                "name": "S01",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 9,
+                                  "y": 143,
+                                  "width": 60,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e22",
+                                "role": "cell",
+                                "name": "Savings",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 69,
+                                  "y": 143,
+                                  "width": 78,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e23",
+                                "role": "cell",
+                                "name": "[redacted:pii]",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 146,
+                                  "y": 143,
+                                  "width": 99,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e24",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 9,
+                              "y": 167,
+                              "width": 237,
+                              "height": 24
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e25",
+                                "role": "cell",
+                                "name": "C01",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 9,
+                                  "y": 167,
+                                  "width": 60,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e26",
+                                "role": "cell",
+                                "name": "Checking",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 69,
+                                  "y": 167,
+                                  "width": 78,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e27",
+                                "role": "cell",
+                                "name": "[redacted:pii]",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 146,
+                                  "y": 167,
+                                  "width": 99,
+                                  "height": 24
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "frames": [
+    {
+      "framePath": [],
+      "url": "http://localhost:4010/servicing",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "status"
+      ],
+      "url": "http://localhost:4010/servicing/status",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "nav"
+      ],
+      "url": "http://localhost:4010/servicing/nav",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "content"
+      ],
+      "url": "http://localhost:4010/member/{{inputs.memberId}}",
+      "lastStatus": 200
+    }
+  ],
+  "dialogOpen": false
+}
