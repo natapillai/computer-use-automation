@@ -97,6 +97,26 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
     return reply.send(record);
   });
 
+  // Clicking cannot reach a page nothing links to, so a person who holds the session can send
+  // a named frame to a path. The same allowlist bounds it and the top window is never moved,
+  // both decided under the port rather than here, and a refusal says which rule stopped it.
+  app.post<{ Params: { id: string }; Body: { path?: string; framePath?: unknown } }>('/sessions/:id/navigate', async (request, reply) => {
+    if (request.params.id !== options.control.snapshot().sessionId || options.input === undefined) return reply.code(404).send({ error: 'No such session.' });
+    if (!holds(request, reply)) return reply;
+
+    const path = request.body?.path;
+    const framePath = request.body?.framePath;
+    if (typeof path !== 'string' || !Array.isArray(framePath) || !framePath.every((segment) => typeof segment === 'string')) {
+      return reply.code(400).send({ error: 'A navigation is a path and a framePath of frame names.' });
+    }
+
+    const sent = await options.input.navigate({ path, framePath });
+    if (!sent.ok) return reply.code(409).send({ reason: sent.reason, error: sent.detail });
+
+    options.onHumanAction?.(sent.record);
+    return reply.send(sent.record);
+  });
+
   app.post<WithId>('/interventions/:id/claim', async (request, reply) => {
     const intervention = options.store.get(request.params.id);
     if (intervention === null) return reply.code(404).send({ error: 'No such intervention.' });

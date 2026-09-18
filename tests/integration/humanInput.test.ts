@@ -95,6 +95,34 @@ describe('forwarding a person input into the live session', () => {
     expect(answered).toBe(true);
   });
 
+  it('sends a frame to a path nothing links to, which is the only way a person reaches one', async () => {
+    const sent = await lease.human.navigate({ path: '/member/10001/subaccount', framePath: ['content'] });
+
+    expect(sent).toMatchObject({ ok: true, record: { kind: 'navigate', framePath: ['content'] } });
+    const after = await lease.surface.observe();
+    expect(after.frames.find((frame) => frame.framePath.join('/') === 'content')?.url).toContain('/member/10001/subaccount');
+  });
+
+  it('refuses to move the top window, because the frameset is the session', async () => {
+    const before = await lease.surface.observe();
+
+    const sent = await lease.human.navigate({ path: '/servicing/search', framePath: [] });
+
+    expect(sent).toMatchObject({ ok: false, reason: 'topLevel' });
+    const after = await lease.surface.observe();
+    expect(after.frames.map((frame) => frame.url)).toEqual(before.frames.map((frame) => frame.url));
+  });
+
+  it('refuses a path the allowlist does not cover, and says so rather than doing nothing', async () => {
+    const sent = await lease.human.navigate({ path: '/admin/users', framePath: ['content'] });
+
+    expect(sent).toMatchObject({ ok: false, reason: 'notAllowed' });
+  });
+
+  it('refuses a frame that is not there', async () => {
+    expect(await lease.human.navigate({ path: '/servicing/search', framePath: ['nowhere'] })).toMatchObject({ ok: false, reason: 'noFrame' });
+  });
+
   it('records a keystroke with no element and no value', async () => {
     const record = await lease.human.press('Tab');
 

@@ -1,10 +1,12 @@
-import type { CDPSession, Page } from 'playwright';
+import type { CDPSession, Frame, Page } from 'playwright';
+import type { Allowlist } from '../../core/policy/allowlist.js';
+import { checkUrl } from '../../core/policy/authorize.js';
 import { deriveBundle } from '../../core/locator/derive.js';
 import { sensitiveFields, type AppProfile } from '../../core/policy/profile.js';
 import type { Redactor } from '../../core/redaction/redactor.js';
 import { walkNodes } from '../../core/surfaceModel/tree.js';
 import type { Observation, UINode } from '../../core/surfaceModel/types.js';
-import type { HumanActionRecord, HumanInputPort } from '../../escalation/humanInput.js';
+import type { HumanActionRecord, HumanInputPort, HumanNavigation } from '../../escalation/humanInput.js';
 import type { Clock } from '../../runtime/clock.js';
 
 // Input forwarding for a person holding the session, see docs/ESCALATION.md section 6. The
@@ -24,6 +26,11 @@ export interface WebHumanInputOptions {
   readonly profile: AppProfile;
   readonly redactor: Redactor;
   readonly clock: Clock;
+  // A navigation a person asks for is judged by the same allowlist every request is judged by,
+  // before it is attempted rather than after it has already left.
+  readonly allowlist: Allowlist;
+  readonly baseUrl: string;
+  readonly navigationTimeoutMs?: number;
 }
 
 // What the hit test learned about the element under the point. The role is deliberately not
@@ -100,7 +107,52 @@ export function createWebHumanInput(options: WebHumanInputOptions): HumanInputPo
       await options.page.keyboard.press(key);
       return record('press', null, null, key);
     },
+    navigate: async ({ path, framePath }): Promise<HumanNavigation> => {
+      // The frameset is the session. Moving the top window would replace every frame the run
+      // is holding refs into, so a person is given the frames and never the window.
+      if (framePath.length === 0) {
+        return { ok: false, reason: 'topLevel', detail: 'The top window is the session itself, so only a named frame can be moved.' };
+      }
+      let href: string;
+      try {
+        href = new URL(path, options.baseUrl).href;
+      } catch {
+        return { ok: false, reason: 'notAllowed', detail: 'That is not a path this session can resolve.' };
+      }
+      const allowed = checkUrl(options.allowlist, href);
+      if (!allowed.allowed) return { ok: false, reason: 'notAllowed', detail: allowed.reason };
+
+      const frame = frameAt(options.page, framePath);
+      if (frame === null) return { ok: false, reason: 'noFrame', detail: 'There is no frame at that frame path.' };
+      try {
+        await frame.goto(href, { timeout: options.navigationTimeoutMs ?? 10_000 });
+      } catch {
+        return { ok: false, reason: 'failed', detail: 'The navigation did not complete in time.' };
+      }
+      return {
+        ok: true,
+        record: {
+          at: options.clock.now().toISOString(),
+          kind: 'navigate',
+          target: null,
+          url: options.redactor.text(options.page.url(), { known: [] }),
+          // Redacted like the url, because a path carries a member id.
+          path: options.redactor.text(path, { known: [] }),
+          framePath: [...framePath],
+        },
+      };
+    },
   };
+}
+
+function frameAt(page: Page, framePath: readonly string[]): Frame | null {
+  let frame = page.mainFrame();
+  for (const segment of framePath) {
+    const child = frame.childFrames().find((candidate) => candidate.name() === segment);
+    if (child === undefined) return null;
+    frame = child;
+  }
+  return frame;
 }
 
 function describe(observation: Observation, hit: HitNode, options: WebHumanInputOptions): HumanActionRecord['target'] {

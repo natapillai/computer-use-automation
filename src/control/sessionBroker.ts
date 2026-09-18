@@ -125,7 +125,7 @@ export function createSessionBroker(options: SessionBrokerOptions): SessionBroke
           sessionId,
           surface: createGuardedSurface({ driver, policy: { allowlist, ...request.policy }, runId: request.runId, baseUrl, scope }),
           tokens,
-          human: createWebHumanInput({ page, observe: driver.observe, profile, redactor: createRedactor(allowlist.data), clock: options.clock ?? systemClock }),
+          human: createWebHumanInput({ page, observe: driver.observe, profile, redactor: createRedactor(allowlist.data), clock: options.clock ?? systemClock, allowlist, baseUrl }),
           refusedRequests: () => scope.refusals().map((refusal) => refusal.rule),
           release: () => context.close(),
         },

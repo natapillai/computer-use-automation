@@ -26,7 +26,7 @@ describe('createOperatorApi', () => {
   let control: SessionControl;
   let api: OperatorApi;
   let screenshots = 0;
-  let forwarded: { kind: string; x?: number; y?: number; key?: string }[] = [];
+  let forwarded: { kind: string; x?: number; y?: number; key?: string; path?: string; framePath?: string }[] = [];
   let recorded: HumanActionRecord[] = [];
 
   beforeEach(async () => {
@@ -52,6 +52,14 @@ describe('createOperatorApi', () => {
         press: async (key) => {
           forwarded.push({ kind: 'press', key });
           return { at: '2026-09-17T09:00:02.000Z', kind: 'press', target: null, url: 'http://localhost:4010/servicing/search', key };
+        },
+        navigate: async ({ path, framePath }) => {
+          forwarded.push({ kind: 'navigate', path, framePath: framePath.join('/') });
+          if (path.startsWith('/admin')) return { ok: false, reason: 'notAllowed', detail: 'The path is denied by the allowlist.' };
+          return {
+            ok: true,
+            record: { at: '2026-09-17T09:00:03.000Z', kind: 'navigate', target: null, url: 'http://localhost:4010/servicing', path, framePath: [...framePath] },
+          };
         },
       },
       onHumanAction: (record) => recorded.push(record),
@@ -91,6 +99,46 @@ describe('createOperatorApi', () => {
     if (typeof token !== 'string') throw new Error('The claim returned no human token.');
     return token;
   }
+
+  it('sends a person to a frame they name, and records where they went', async () => {
+    const claimed = await claim();
+    const sent = await api.inject({
+      method: 'POST',
+      url: '/sessions/sess_000001/navigate',
+      headers: { 'x-control-token': claimed },
+      payload: { path: '/member/10001/subaccount', framePath: ['content'] },
+    });
+
+    expect(sent.statusCode).toBe(200);
+    expect(forwarded).toContainEqual({ kind: 'navigate', path: '/member/10001/subaccount', framePath: 'content' });
+    expect(recorded.map((record) => record.kind)).toContain('navigate');
+  });
+
+  it('answers a refused navigation with the reason, rather than pretending it happened', async () => {
+    const claimed = await claim();
+    const refused = await api.inject({
+      method: 'POST',
+      url: '/sessions/sess_000001/navigate',
+      headers: { 'x-control-token': claimed },
+      payload: { path: '/admin/users', framePath: ['content'] },
+    });
+
+    expect(refused.statusCode).toBe(409);
+    expect(JSON.parse(refused.body)).toMatchObject({ reason: 'notAllowed' });
+    expect(recorded.map((record) => record.kind)).not.toContain('navigate');
+  });
+
+  it('refuses a navigation from someone who does not hold the session', async () => {
+    const refused = await api.inject({
+      method: 'POST',
+      url: '/sessions/sess_000001/navigate',
+      headers: { 'x-control-token': 'not-the-token' },
+      payload: { path: '/servicing/search', framePath: ['content'] },
+    });
+
+    expect(refused.statusCode).toBe(403);
+    expect(forwarded.filter((entry) => entry.kind === 'navigate')).toEqual([]);
+  });
 
   it('serves the console to a browser and the intervention to a machine at the same link', async () => {
     const asPerson = await api.inject({ method: 'GET', url: '/interventions/int_000001', headers: { accept: 'text/html,application/xhtml+xml' } });

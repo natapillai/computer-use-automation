@@ -4,24 +4,47 @@ import { createSessionControl, type SessionControl } from '../../src/control/con
 import { createControlTokens } from '../../src/control/controlToken.js';
 import { createRedactor } from '../../src/core/redaction/redactor.js';
 import type { Handover } from '../../src/escalation/channel.js';
+import type { HumanActionRecord, HumanInputPort, HumanNavigation } from '../../src/escalation/humanInput.js';
 import { createRunConsole, type RunConsole } from '../../src/escalation/runConsole.js';
 import { systemClock } from '../../src/runtime/clock.js';
 import { createSequentialIds } from '../../src/runtime/ids.js';
 
-// The one page a person actually uses. Everything under it is driven headlessly elsewhere, so
-// what this covers is the part no API test can reach, which is what each button sends.
+// The one page a person actually uses, driven the way they drive it. Everything under it is
+// covered headlessly elsewhere, and that is exactly why this file has to exist. An operator API
+// test that posts to /sessions/:id/input proves the endpoint works and says nothing about
+// whether the page ever calls it. It did not, and nothing caught that until a live run.
 //
-// Approving is the button that matters. A run stopped for a write is asking one question, and
-// a console that answers it by accident, in either direction, is worse than no console.
+// So every assertion here goes through the page. A click on the picture, a keystroke, a frame
+// sent to a path, and the two ways of handing the session back.
+
+const SHOT = { width: 400, height: 300 };
+
+interface Forwarded {
+  readonly kind: string;
+  readonly x?: number;
+  readonly y?: number;
+  readonly key?: string;
+  readonly path?: string;
+  readonly framePath?: string;
+}
 
 describe('the operator console page', { timeout: 60_000 }, () => {
   let browser: Browser;
   let page: Page;
   let run: RunConsole | null = null;
+  let forwarded: Forwarded[] = [];
+  let screenshot: Buffer;
 
   beforeAll(async () => {
     browser = await chromium.launch();
     page = await browser.newPage();
+    // A real screenshot of a known size, so the page's mapping from where a person clicked on
+    // the picture back into page space is checked against real numbers.
+    const source = await browser.newPage();
+    await source.setViewportSize(SHOT);
+    await source.setContent('<body style="margin:0;background:#ece9d8"></body>');
+    screenshot = await source.screenshot();
+    await source.close();
   }, 30_000);
 
   afterAll(async () => {
@@ -33,13 +56,39 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     run = null;
   });
 
-  async function stopFor(reason: 'PolicyConfirmation' | 'UnclassifiedCondition'): Promise<{ console: RunConsole; control: SessionControl; handover: Promise<Handover> }> {
+  const record = (kind: HumanActionRecord['kind'], extra: Partial<HumanActionRecord> = {}): HumanActionRecord => ({
+    at: '2026-09-18T09:00:00.000Z',
+    kind,
+    target: null,
+    url: 'http://localhost:4010/servicing',
+    ...extra,
+  });
+
+  const input: HumanInputPort = {
+    click: async ({ x, y }) => {
+      forwarded.push({ kind: 'click', x, y });
+      return record('click');
+    },
+    press: async (key) => {
+      forwarded.push({ kind: 'press', key });
+      return record('press', { key });
+    },
+    navigate: async ({ path, framePath }): Promise<HumanNavigation> => {
+      forwarded.push({ kind: 'navigate', path, framePath: framePath.join('/') });
+      if (path.startsWith('/admin')) return { ok: false, reason: 'notAllowed', detail: 'The path is denied by the allowlist.' };
+      return { ok: true, record: record('navigate', { path, framePath: [...framePath] }) };
+    },
+  };
+
+  async function stopFor(reason: 'PolicyConfirmation' | 'UnclassifiedCondition'): Promise<{ control: SessionControl; handover: Promise<Handover> }> {
+    forwarded = [];
     const tokens = createControlTokens('sess_000001', createSequentialIds());
     const control = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: systemClock, runId: 'run_000001', tokens });
     control.apply('start');
     const opened = await createRunConsole({
       control,
-      screenshot: async () => new Uint8Array(PNG),
+      screenshot: async () => new Uint8Array(screenshot),
+      input,
       redactor: createRedactor({ neverPersist: [], redactPatterns: [] }),
       known: [],
       clock: systemClock,
@@ -66,10 +115,79 @@ describe('the operator console page', { timeout: 60_000 }, () => {
       recentActions: [],
     });
     await page.goto(opened.baseUrl);
-    // The page has loaded the open intervention and is ready for a person.
     await page.locator('#status:has-text("Claim the session")').waitFor();
-    return { console: opened, control, handover };
+    // The picture is on screen before anybody clicks on it.
+    await page.waitForFunction('document.getElementById("canvas").width === 400');
+    return { control, handover };
   }
+
+  it('turns a click on the picture into a click on the live session, in page space', async () => {
+    const { handover } = await stopFor('UnclassifiedCondition');
+    await page.click('#claim');
+
+    // The middle of the shown picture, whatever size the console is drawing it at.
+    const box = await page.locator('#canvas').boundingBox();
+    if (box === null) throw new Error('The console is not showing a screen.');
+    await page.mouse.click(box.x + box.width / 2, box.y + box.height / 2);
+    await page.locator('#status:has-text("Sent")').waitFor();
+
+    const click = forwarded.find((entry) => entry.kind === 'click');
+    expect(click?.x).toBeGreaterThan(SHOT.width / 2 - 3);
+    expect(click?.x).toBeLessThan(SHOT.width / 2 + 3);
+    expect(click?.y).toBeGreaterThan(SHOT.height / 2 - 3);
+    expect(click?.y).toBeLessThan(SHOT.height / 2 + 3);
+    void handover;
+  });
+
+  it('types into the live session, one keystroke at a time', async () => {
+    const { handover } = await stopFor('UnclassifiedCondition');
+    await page.click('#claim');
+    await page.click('#canvas');
+
+    await page.keyboard.type('10001');
+    await page.keyboard.press('Enter');
+    await page.waitForFunction('document.getElementById("status").textContent.includes("Sent")');
+
+    expect(forwarded.filter((entry) => entry.kind === 'press').map((entry) => entry.key)).toEqual(['1', '0', '0', '0', '1', 'Enter']);
+    void handover;
+  });
+
+  it('sends a frame to a path, which is the only way a person reaches a page nothing links to', async () => {
+    const { handover } = await stopFor('UnclassifiedCondition');
+    await page.click('#claim');
+
+    await page.fill('#path', '/member/10001/subaccount');
+    await page.click('#go');
+    await page.locator('#status:has-text("moved")').waitFor();
+
+    expect(forwarded).toContainEqual({ kind: 'navigate', path: '/member/10001/subaccount', framePath: 'content' });
+    void handover;
+  });
+
+  it('says why a refused navigation did not happen, rather than doing nothing', async () => {
+    const { handover } = await stopFor('UnclassifiedCondition');
+    await page.click('#claim');
+
+    await page.fill('#path', '/admin/users');
+    await page.click('#go');
+
+    await page.locator('#status:has-text("refused")').waitFor();
+    void handover;
+  });
+
+  it('touches nothing before the session has been claimed', async () => {
+    const { handover } = await stopFor('UnclassifiedCondition');
+
+    const box = await page.locator('#canvas').boundingBox();
+    if (box === null) throw new Error('The console is not showing a screen.');
+    await page.mouse.click(box.x + 10, box.y + 10);
+    await page.keyboard.type('x');
+    await page.locator('#status:has-text("Claim the session before")').waitFor();
+
+    expect(forwarded).toEqual([]);
+    expect(await page.locator('#go').isDisabled()).toBe(true);
+    void handover;
+  });
 
   it('offers approval only when the run is asking for it, and sends it when the person clicks it', async () => {
     const { handover } = await stopFor('PolicyConfirmation');
@@ -105,10 +223,3 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     expect((await handover).kind).toBe('resumed');
   });
 });
-
-// A one pixel PNG, so the console has something real to paint.
-const PNG = [
-  0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0x00, 0x00, 0x00, 0x0d, 0x49, 0x48, 0x44, 0x52, 0x00, 0x00, 0x00, 0x01, 0x00, 0x00, 0x00, 0x01, 0x08, 0x06, 0x00, 0x00,
-  0x00, 0x1f, 0x15, 0xc4, 0x89, 0x00, 0x00, 0x00, 0x0a, 0x49, 0x44, 0x41, 0x54, 0x78, 0x9c, 0x63, 0x00, 0x01, 0x00, 0x00, 0x05, 0x00, 0x01, 0x0d, 0x0a, 0x2d, 0xb4,
-  0x00, 0x00, 0x00, 0x00, 0x49, 0x45, 0x4e, 0x44, 0xae, 0x42, 0x60, 0x82,
-];
