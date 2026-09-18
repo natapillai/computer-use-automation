@@ -32,6 +32,7 @@ export type EscalationReason =
   | 'UnclassifiedCondition'
   | 'ModelRequested'
   | 'PolicyConfirmation'
+  | 'RuleRequested'
   | 'resumePreconditionFailed';
 
 export interface RecoveryRecord {

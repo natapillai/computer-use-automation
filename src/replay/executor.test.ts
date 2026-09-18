@@ -387,6 +387,15 @@ describe('replay', () => {
       expect(result).toMatchObject({ status: 'business_outcome', outcome: { code: 'MEMBER_NOT_FOUND' } });
     });
 
+    it('hands a rule that asks for a person to a person, rather than calling it a defect of ours', async () => {
+      const capability = withSearchRules([{ when: noRecordsBanner(), classify: 'escalate', code: 'SUPERVISOR_REVIEW' }]);
+      const { result, raised } = await run({ memberId: '00000', capability, script: { searchLeadsTo: 'noRecords' }, handovers: [{ kind: 'aborted' }] });
+
+      expect(raised.map((input) => input.reason)).toEqual(['RuleRequested']);
+      expect(raised[0]?.explanation).toContain('SUPERVISOR_REVIEW');
+      expect(result).toMatchObject({ status: 'escalated', intervention: { reason: 'RuleRequested', disposition: 'aborted' } });
+    });
+
     it('fails as Internal, naming the classification, when a condition fires that no handler covers yet', async () => {
       // A step rule that asks for a person is classified, so it is not the unclassified dialog
       // case, and the result contract has no escalation reason for it. It fails as our own gap

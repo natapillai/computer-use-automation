@@ -28,7 +28,7 @@ import type { ActionResult, Observation, ResolvedAction } from '../core/surfaceM
 import type { Clock } from '../runtime/clock.js';
 import type { GuardedSurface } from '../surface/guardedSurface.js';
 import { extractOutput } from './extract.js';
-import { race, type Contender } from './race.js';
+import { race, type Contender, type RaceOutcome } from './race.js';
 
 // Deterministic replay, see docs/ARCHITECTURE.md section 7. No model is constructed on
 // this path. Each step resolves its target, is authorized and performed through the
@@ -355,6 +355,40 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     }
   };
 
+  // Whether this is a moment a person has to look at, and what to tell them when it is.
+  const personNeededFor = async (
+    outcome: RaceOutcome<Entrant>,
+    contenders: readonly Contender<Entrant>[],
+  ): Promise<{ readonly reason: EscalationReason; readonly explanation: string; readonly suggestedAction: string } | null> => {
+    if (context.escalation === undefined) return null;
+
+    if (outcome.kind === 'expired') {
+      if (!outcome.observation.dialogOpen) return null;
+      const unclaimed = await unclassifiedDialog({
+        observation: outcome.observation,
+        conditions: contenders.map((contender) => contender.condition),
+        match: (strategy, framePath) => surface.match(strategy, framePath),
+        outputResolvable,
+      });
+      return unclaimed
+        ? {
+            reason: 'UnclassifiedCondition',
+            explanation: 'A dialog is open that nothing in this capability or the app profile claims, so the run stopped rather than clicking it.',
+            suggestedAction: 'Deal with the dialog, leave the session where this step can carry on, and hand it back.',
+          }
+        : null;
+    }
+    if (outcome.kind !== 'fired') return null;
+
+    const entrant = outcome.entrant;
+    if ((entrant.kind !== 'rule' && entrant.kind !== 'profile') || entrant.classify !== 'escalate') return null;
+    return {
+      reason: 'RuleRequested',
+      explanation: `The ${entrant.kind === 'rule' ? 'step' : 'app profile'} condition ${entrant.code} says a person should decide what happens next.`,
+      suggestedAction: 'Look at what the screen is showing, deal with it, and hand the session back.',
+    };
+  };
+
   const collectOutputs = async (observation: Observation, specs: readonly OutputSpec[]): Promise<void> => {
     for (const spec of specs) {
       const target = templated(templateBundle(spec.source.target, values(), allowedEnv), `the source of output ${spec.name}`);
@@ -422,37 +456,31 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     const timeoutMs = Math.min(step.postcondition.timeoutMs, step.timeoutMs);
     const stopWhenRefused = (): boolean => surface.refusalsFor(step.id).length > 0;
     let settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
+
+    // Two things stop a step for a person. A dialog nobody declared, which is the case where the
+    // system does not know what to do next, and a rule that says a person should decide. Either
+    // way the step only counts afterwards when its own postcondition holds, so the wait runs
+    // again on whatever page they left behind. One handoff per step here, and handOver bounds
+    // the handing back that follows.
+    for (let handoffs = 0; handoffs < 2; handoffs += 1) {
+      failIfRefused(step.id);
+      if (settled.kind === 'stopped') {
+        throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
+      }
+
+      const needsPerson = await personNeededFor(settled, contenders);
+      if (needsPerson === null) break;
+
+      const resumption = await handOver(needsPerson.reason, needsPerson.explanation, needsPerson.suggestedAction);
+      await resume(resumption, prepared, step.id, step.effect, step.idempotent);
+      settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
+    }
+
+    // The last wait of the loop is checked here, which is also what stops the run from reading a
+    // refusal as an ordinary timeout.
     failIfRefused(step.id);
     if (settled.kind === 'stopped') {
       throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
-    }
-
-    // A dialog nobody declared is the case where the system does not know what to do next.
-    // Clicking it to find out is exactly what a back office automation must never do, so the
-    // run stops for a person instead. A dialog some rule claims never reaches here, because
-    // that rule wins the race.
-    if (settled.kind === 'expired' && settled.observation.dialogOpen && context.escalation !== undefined) {
-      const unclaimed = await unclassifiedDialog({
-        observation: settled.observation,
-        conditions: contenders.map((contender) => contender.condition),
-        match: (strategy, framePath) => surface.match(strategy, framePath),
-        outputResolvable,
-      });
-      if (unclaimed) {
-        const resumption = await handOver(
-          'UnclassifiedCondition',
-          'A dialog is open that nothing in this capability or the app profile claims, so the run stopped rather than clicking it.',
-          'Deal with the dialog, leave the session where this step can carry on, and hand it back.',
-        );
-        await resume(resumption, prepared, step.id, step.effect, step.idempotent);
-
-        // Whatever was done to the page, the step only counts when its own postcondition holds.
-        settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
-        failIfRefused(step.id);
-        if (settled.kind === 'stopped') {
-          throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
-        }
-      }
     }
 
     if (settled.kind === 'expired') {

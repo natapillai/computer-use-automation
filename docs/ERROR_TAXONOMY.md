@@ -179,6 +179,8 @@ Precedence is one total order and not two rules that can disagree. Step detector
 
 The app profile layer may classify recoverable, escalate or failure. It may not declare a business outcome, because an outcome code that is not in the capability contract would reach a calling agent that has no way to know it exists.
 
+A rule classified `escalate` raises an intervention with the reason `RuleRequested`, so a condition someone declared reaches a person rather than reporting as a defect of ours.
+
 ## 7. Waiting
 
 There is exactly one wait primitive and it takes a condition.

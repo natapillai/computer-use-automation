@@ -68,7 +68,7 @@ Budget exhaustion is not stuck either. Max steps and max duration end the run as
 ```ts
 type EscalationReason =
   | 'NoProgress' | 'UnclassifiedCondition' | 'ModelRequested'
-  | 'PolicyConfirmation' | 'resumePreconditionFailed';
+  | 'PolicyConfirmation' | 'RuleRequested' | 'resumePreconditionFailed';
 
 interface InterventionRequest {
   id: string;
