@@ -5,8 +5,8 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 **Last updated.** 2026-09-18
 **Current slice.** Slice 5, Escalation
 **Next task.** S5-T06, the live write run, which is the project owner's to run
-**Suite status.** 476 unit tests across 62 files, 64 integration tests across 17 files and 5 e2e tests across 2 files passing, typecheck clean
-**Blocked on.** the live write run at Gate 3. Everything under it is built and rehearsed offline.
+**Suite status.** 484 unit tests across 63 files, 77 integration tests across 18 files and 5 e2e tests across 2 files passing, typecheck clean
+**Blocked on.** the live write run at Gate 3, once the project owner is satisfied with the rehearsal.
 
 ## Slice status
 
@@ -25,6 +25,12 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-18, the console audit
+The first live write run found that the operator console could show a person the session and could not let them touch it. The canvas was a polled screenshot with no handlers, and the input endpoint under it, the CDP hit test and the record it produces were all real and all tested. Every test posted to `/sessions/:id/input` directly, which is the layer beneath the thing a person uses.
+Fixed: the canvas takes clicks, mapped from where they landed on the drawn picture back into page space, and keystrokes one at a time. A person can also send a named frame to a path, bounded by the same allowlist every request is bounded by and never the top window, because clicking cannot reach a page nothing links to and the sub account form is exactly such a page. `tests/integration/operatorPage.test.ts` drives the page in a browser and asserts through it.
+The project owner asked where else a test drives the layer beneath what a person or a grader touches. Six more, all now closed. The trace and the transcript were collected in memory and written when the loop returned, so the killed live run left one log line, while `docs/ESCALATION.md` claimed evidence survives. The target app was created in process by every test, so `apps/target/src/server.ts`, the command every demo begins with, was executed by nothing. The screenshot masking expression was copied into three commands and asserted only one layer down, so passing an empty list would have shown a person an unmasked member record with the suite green. `INTERVENTION_CLAIM_TIMEOUT_MS` was documented, shipped and read by nothing. The committed requests were parsed by nothing, which is how a goal that named no route to the form reached a paid run. And hosting the console on a fixed port made the port a hard dependency of the run, which showed up as a one in four flake in the e2e thread.
+Also fixed: a run handed back three times that still cannot carry on reported `PolicyDenied`, which is wrong because nothing refused it, and is now `PreconditionFailed`.
 
 ### 2026-09-18, Slice 5, escalation and the write path
 Done: S5-T01 to S5-T05 and S5-T07, and S5-T06 up to the live run. The control plane, the intervention store, the operator API and the console are wired into both CLIs, which host it on :4020 for replay and :4021 for discovery. A run that stops prints one link, and opening it gives a person the console while anything else gets the intervention. `tests/integration/handoff.test.ts` drives the whole round trip against the real application with a headless operator that has nothing but that link. On the write path a discovery request may set `allowWrites`, which offers the model a `submits` flag on click and press. Declaring it raises the step's effect, policy answers confirm, the run stops for a person, and an approval is spent as a one shot grant on exactly one action before the loop carries on.
