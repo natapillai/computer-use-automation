@@ -92,6 +92,17 @@ describe('createOperatorApi', () => {
     return token;
   }
 
+  it('serves the console to a browser and the intervention to a machine at the same link', async () => {
+    const asPerson = await api.inject({ method: 'GET', url: '/interventions/int_000001', headers: { accept: 'text/html,application/xhtml+xml' } });
+    const asMachine = await api.inject({ method: 'GET', url: '/interventions/int_000001' });
+
+    // The link the run prints is the one a person is given, so opening it has to show them the
+    // console rather than a page of JSON.
+    expect(asPerson.headers['content-type']).toContain('text/html');
+    expect(asPerson.body).toContain('Operator console');
+    expect(JSON.parse(asMachine.body)).toMatchObject({ id: 'int_000001' });
+  });
+
   it('serves the operator page with a canvas and the three buttons a person needs', async () => {
     const page = await api.inject({ method: 'GET', url: '/' });
 

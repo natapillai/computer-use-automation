@@ -64,9 +64,13 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
 
   app.get('/interventions', async () => options.store.list());
 
+  // One link for both readers. The run prints this URL, and a person opening it in a browser
+  // gets the console while anything else gets the intervention itself.
   app.get<WithId>('/interventions/:id', async (request, reply) => {
     const intervention = options.store.get(request.params.id);
-    return intervention === null ? reply.code(404).send({ error: 'No such intervention.' }) : reply.send(intervention);
+    if (intervention === null) return reply.code(404).send({ error: 'No such intervention.' });
+    const wantsPage = (request.headers.accept ?? '').includes('text/html');
+    return wantsPage ? reply.type('text/html; charset=utf-8').send(OPERATOR_PAGE) : reply.send(intervention);
   });
 
   app.get<WithId>('/sessions/:id/screenshot', async (request, reply) => {
