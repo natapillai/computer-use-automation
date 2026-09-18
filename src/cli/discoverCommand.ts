@@ -95,7 +95,7 @@ export interface DiscoverCommandDeps {
   readonly target: { readonly baseUrl: string };
   readonly environment: { readonly driver: string; readonly driverVersion: string };
   // Where the run hosts its operator console, and how long it waits for somebody to claim.
-  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number };
+  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number; readonly claimWindow?: () => Promise<void> };
 }
 
 type Loaded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly problem: string };
@@ -216,6 +216,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       clock: deps.clock,
       ids: deps.ids,
       claimTimeoutMs: deps.console.claimTimeoutMs,
+      ...(deps.console.claimWindow === undefined ? {} : { claimWindow: deps.console.claimWindow }),
       ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
       port: deps.console.port,
       // Stderr, because stdout carries one JSON summary and nothing else.

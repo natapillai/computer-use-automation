@@ -107,7 +107,8 @@ describe('runReviewCommand', () => {
       target: { baseUrl: 'http://localhost:4010' },
       environment: { driver: 'fake', driverVersion: '1.0.0' },
       // Port 0, so every run in this suite binds a free port of its own.
-      console: { port: 0, claimTimeoutMs: 60_000 },
+      // Nobody is coming, and nothing here waits to find that out.
+      console: { port: 0, claimTimeoutMs: 60_000, claimWindow: async () => undefined },
     });
     return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, patterns: loaded.allowlist.data.redactPatterns };
   }

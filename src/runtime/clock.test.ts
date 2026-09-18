@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { createTestClock, systemClock } from './clock.js';
+import { createTestClock, expireAfter, systemClock } from './clock.js';
 
 describe('createTestClock', () => {
   it('returns the start time until something advances it', () => {
@@ -36,5 +36,30 @@ describe('systemClock', () => {
     await vi.advanceTimersByTimeAsync(1);
     await pending;
     expect(resolved).toBe(true);
+  });
+});
+
+describe('expireAfter', () => {
+  it('waits without holding the process open, so a deadline nobody is waiting on cannot delay an exit', async () => {
+    const handles: { hasRef(): boolean }[] = [];
+    const real = globalThis.setTimeout;
+    const spy = ((handler: () => void, ms?: number) => {
+      const handle = real(handler, ms);
+      handles.push(handle as unknown as { hasRef(): boolean });
+      return handle;
+    }) as typeof globalThis.setTimeout;
+    globalThis.setTimeout = spy;
+
+    try {
+      await expireAfter(1);
+    } finally {
+      globalThis.setTimeout = real;
+    }
+
+    // The claim window outlives the answer it was waiting for. A referenced timer there keeps a
+    // command sitting at the shell for the rest of the window after a person has already
+    // approved, which is what this asserts cannot happen.
+    expect(handles).toHaveLength(1);
+    expect(handles[0]?.hasRef()).toBe(false);
   });
 });

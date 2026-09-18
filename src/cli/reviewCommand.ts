@@ -81,7 +81,7 @@ export interface ReviewCommandDeps {
   readonly target: { readonly baseUrl: string };
   readonly environment: { readonly driver: string; readonly driverVersion: string };
   // Where the run hosts its operator console, and how long it waits for somebody to claim.
-  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number };
+  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number; readonly claimWindow?: () => Promise<void> };
 }
 
 // What a console hands a replay. Named, because three commands now pass the same three things.
@@ -189,6 +189,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
       clock: deps.clock,
       ids: deps.ids,
       claimTimeoutMs: deps.console.claimTimeoutMs,
+      ...(deps.console.claimWindow === undefined ? {} : { claimWindow: deps.console.claimWindow }),
       ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
       port: deps.console.port,
       // Stderr, because stdout carries one JSON summary and nothing else.

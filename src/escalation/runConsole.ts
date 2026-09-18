@@ -1,6 +1,6 @@
 import type { SessionControl } from '../control/controlPlane.js';
 import type { KnownValue, Redactor } from '../core/redaction/redactor.js';
-import type { Clock } from '../runtime/clock.js';
+import { expireAfter, type Clock } from '../runtime/clock.js';
 import type { IdProvider } from '../runtime/ids.js';
 import { createEscalationChannel, type EscalationChannel } from './channel.js';
 import type { HumanActionRecord, HumanInputPort } from './humanInput.js';
@@ -30,6 +30,9 @@ export interface RunConsoleOptions {
   readonly host?: string;
   readonly port: number;
   readonly announce: (line: string) => void;
+  // How long a claim may take to arrive. The default does not hold the process open, so a run
+  // that has already been answered does not sit at the shell for the rest of the window. A
+  // caller driving a test clock passes its own, because nothing in this repository waits.
   readonly claimWindow?: () => Promise<void>;
 }
 
@@ -66,7 +69,7 @@ export async function createRunConsole(options: RunConsoleOptions): Promise<RunC
     consoleBaseUrl: baseUrl,
     claimTimeoutMs: options.claimTimeoutMs,
     announce: options.announce,
-    ...(options.claimWindow === undefined ? {} : { claimWindow: options.claimWindow }),
+    claimWindow: options.claimWindow ?? (() => expireAfter(options.claimTimeoutMs)),
   });
 
   return { baseUrl, escalation, store, close: () => api.close() };

@@ -32,3 +32,14 @@ export function createTestClock(start: string | Date): TestClock {
     },
   };
 }
+
+// A deadline that does not by itself keep the process alive. The claim window is one. It only
+// matters while a run is sitting there waiting for a person, and the run has a browser and a
+// console holding the loop open for exactly that long. Once the person has answered and
+// everything is closed, a referenced timer would leave the command at the shell for the rest of
+// the window with nothing left to decide.
+export function expireAfter(ms: number): Promise<void> {
+  return new Promise<void>((done) => {
+    setTimeout(done, ms).unref();
+  });
+}

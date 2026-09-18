@@ -17,6 +17,12 @@ export interface CliRun {
   readonly stderr: string;
 }
 
+// Every wait on another process is bounded. An e2e suite that hangs is worse than one that
+// fails, because a hang looks like slowness until somebody has lost an afternoon to it, and
+// the only run of this suite that ever hung took forty seven minutes to say so.
+const START_DEADLINE_MS = 30_000;
+const STOP_DEADLINE_MS = 10_000;
+
 export function startTarget(idSeed: string): Promise<ChildProcess> {
   const child = spawn(process.execPath, ['--import', 'tsx', 'apps/target/src/server.ts'], {
     cwd: REPOSITORY,
@@ -32,26 +38,45 @@ export function startTarget(idSeed: string): Promise<ChildProcess> {
 
   return new Promise<ChildProcess>((listening, reject) => {
     let said = '';
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      reject(new Error(`MERIDIAN Core did not say it was listening within ${START_DEADLINE_MS}ms. ${said}`));
+    }, START_DEADLINE_MS);
+    const done = (settle: () => void): void => {
+      clearTimeout(deadline);
+      settle();
+    };
     const settle = (chunk: string): void => {
       said += chunk;
-      if (said.includes('listening on')) listening(child);
+      if (said.includes('listening on')) done(() => listening(child));
       // The port the allowlist names is the one a person's own npm run target would be on, so
       // the clash is worth naming rather than timing out on.
       if (said.includes('EADDRINUSE') || said.includes('could not listen')) {
-        reject(new Error(`Port ${TARGET_PORT} is in use. Stop npm run target first, because this suite starts its own app on the port the allowlist names.`));
+        done(() =>
+          reject(new Error(`Port ${TARGET_PORT} is in use. Stop npm run target first, because this suite starts its own app on the port the allowlist names.`)),
+        );
       }
     };
     child.stdout?.setEncoding('utf8').on('data', settle);
     child.stderr?.setEncoding('utf8').on('data', settle);
-    child.once('error', reject);
-    child.once('exit', (code) => reject(new Error(`MERIDIAN Core exited with ${code} before it was listening. ${said}`)));
+    child.once('error', (error) => done(() => reject(error)));
+    child.once('exit', (code) => done(() => reject(new Error(`MERIDIAN Core exited with ${code} before it was listening. ${said}`))));
   });
 }
 
 export async function stopTarget(child: ChildProcess | undefined): Promise<void> {
   if (child === undefined || child.exitCode !== null) return;
   await new Promise<void>((stopped) => {
-    child.once('exit', () => stopped());
+    // A process that ignores the first ask is killed outright. The next file in the suite needs
+    // the port, and waiting politely for a process that is never going to answer is the hang.
+    const deadline = setTimeout(() => {
+      child.kill('SIGKILL');
+      stopped();
+    }, STOP_DEADLINE_MS);
+    child.once('exit', () => {
+      clearTimeout(deadline);
+      stopped();
+    });
     child.kill();
   });
 }
