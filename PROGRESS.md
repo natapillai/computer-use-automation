@@ -2,11 +2,11 @@
 
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
-**Last updated.** 2026-09-17
+**Last updated.** 2026-09-18
 **Current slice.** Slice 5, Escalation
-**Next task.** S5-T01
-**Suite status.** 386 unit tests across 54 files, 45 integration tests across 9 files and 5 e2e tests across 2 files passing, typecheck clean
-**Blocked on.** nothing
+**Next task.** S5-T06, the live write run, which is the project owner's to run
+**Suite status.** 476 unit tests across 62 files, 64 integration tests across 17 files and 5 e2e tests across 2 files passing, typecheck clean
+**Blocked on.** the live write run at Gate 3. Everything under it is built and rehearsed offline.
 
 ## Slice status
 
@@ -17,7 +17,7 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 | S2 Perception spike | 1 | done |
 | S3 Harden | 5 | done |
 | S4 Discovery | 10 | done |
-| S5 Escalation | 7 | not started |
+| S5 Escalation | 7 | S5-T01 to S5-T05 and S5-T07 done, S5-T06 waiting on the live run |
 | S6 Error breadth | 4 | not started |
 | S7 Seams | 2 | not started |
 | S8 Deliverables, reserved | 4 | not started |
@@ -26,13 +26,19 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 
 Newest first. Earlier detail lives in git history.
 
+### 2026-09-18, Slice 5, escalation and the write path
+Done: S5-T01 to S5-T05 and S5-T07, and S5-T06 up to the live run. The control plane, the intervention store, the operator API and the console are wired into both CLIs, which host it on :4020 for replay and :4021 for discovery. A run that stops prints one link, and opening it gives a person the console while anything else gets the intervention. `tests/integration/handoff.test.ts` drives the whole round trip against the real application with a headless operator that has nothing but that link. On the write path a discovery request may set `allowWrites`, which offers the model a `submits` flag on click and press. Declaring it raises the step's effect, policy answers confirm, the run stops for a person, and an approval is spent as a one shot grant on exactly one action before the loop carries on.
+Decisions: the model declares the write rather than the system inferring it, because nothing in an accessibility tree says whether a cell submits a form and inferring it from button text is the regex over button names `docs/SAFETY.md` already rejects. The flag cannot be a bypass in either direction. Declaring is the strictest path because it sends the action to a person, and omitting it leaves the step a read so the network guard refuses the request before it lands. The write capability navigates to the form by path rather than following a link, because the member page carries no link to it and adding one would change an observation the committed cassette asserts. Approving one action is kept distinct from a person finishing a run, so an approved run still produces an artifact and a run somebody completed by hand does not.
+Surprises: rehearsing the thread offline found three defects that would otherwise have landed in the paid live run. A native select reports its chosen option as a child rather than as text, so the tree said every list was empty, the select step looked like an action that changed nothing, and the generalizer pruned it. The console's Release button sent no approval, so a person who took the session, read the screen and handed it back would have been recorded as refusing the write. A run whose declared write was refused still produced a capability describing a flow that stops one step short. All three are fixed with tests. Separately, a run handed back three times that still cannot carry on was reporting `PolicyDenied`, which is wrong because nothing refused it, and is now `PreconditionFailed`.
+Next: the live write run, then the replay tests against the artifact it produces.
+
 ### 2026-09-17, Slice 4 closed at Gate 2, Skeleton 2
 Done: S4-T01 to S4-T10. Claude Sonnet 5 drove MERIDIAN Core to the savings balance in five model calls and three actions, and that run is committed as `evidence/discovery/run_56fc6b06.../` with its trace, its redacted transcript, masked captures of the first and final screens, and the draft it produced. The generalizer turned the run into `capabilities/member.readSavingsBalance@1.0.0.json` through five transforms. The negative probe review replayed that draft with `00000`, stopped at the failed postcondition, derived the `MEMBER_NOT_FOUND` detector from the real banner and emitted `1.1.0`. Three commands exist, `npm run discover`, `npm run review` and `npm run replay`, and none of them takes an input value as an argument. The whole thread runs offline from the exchange the live run recorded.
 Decisions: no new ADRs. A business outcome exits 0 at the replay CLI, because an exit code is the first thing a caller branches on and a non zero code there would conflate an answer with a failure. Review writes nothing until a second replay of the reviewed version returns the outcome, so a detector that does not work never reaches an artifact. Replay evidence is filed by outcome once the outcome is known, which is what `docs/EVIDENCE.md` describes. Discovery requests and reviews are committed files under `requests/`, because a goal and an outcome name are reviewable configuration and a value belongs in neither.
 Surprises: the live run exposed two defects in its own evidence, an absolute local path in the log and the allowlist email pattern matching the `id@version` file name. Both are fixed forward and the evidence is committed unedited, because a second paid run would break the one live run rule. The persisted projection of a result kept `amountMinor` after hiding the raw text, so a stored balance was still a balance, now replaced whole. The live run's observation hashes and refs matched the S2-T01 spike exactly, which is the stability ADR 0017 relies on, observed twice.
 After Gate 2, on the project owner's instruction: discovery was run live a second time on the fixed pipeline as `run_84705a0a`, and both runs are kept. The first is the record of the system surfacing defects in its own output, the second is what the README and `REPORT.md` point at, and `evidence/README.md` explains the pair. The artifact lineage, the review, the cassette and both replays were regenerated from the second run so one thread is committed rather than two halves. The project owner approved `1.1.0` under the handle `nata`. Observation hashes are identical across all three live runs, the spike, the first and the second, which is worth a line in `REPORT.md` because it is what ADR 0017 relies on.
 
-Next: S5-T01.
+Next: Slice 5.
 
 ### 2026-09-15, Slice 3 closed, Harden
 Done: S3-T01 to S3-T05. One SurfaceDriver contract suite passes on the fake and the web driver. The Redactor and sensitivity propagation redact provenance first and patterns second. The evidence sink redacts every text byte at the sink, writes a manifest with redaction counts and never values, and takes screenshots that Playwright masks before the bytes exist, which a pixel test proves inside the content frame. The MERIDIAN Core profile classifies routes and marks sensitive fields, and the network guard enforces it per step. The evidence scanner guards evidence, capabilities and cassettes, and the pre Harden exclusions are gone.
