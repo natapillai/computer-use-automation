@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { chromium, type Browser } from 'playwright';
+import { createSessionControl } from '../control/controlPlane.js';
 import { createSessionBroker } from '../control/sessionBroker.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { createRedactor } from '../core/redaction/redactor.js';
@@ -18,6 +19,12 @@ import { readPipedStdin } from './io.js';
 //   echo '{"memberId":"10001"}' | npm run discover -- --request requests/member.readSavingsBalance.json
 //
 // A live run needs ANTHROPIC_MODEL and ANTHROPIC_API_KEY. A run with --model-cassette needs neither.
+//
+// While it runs it hosts the operator console on :4021. A run that stops for a person prints
+// the URL of the intervention on stderr and waits there.
+
+const OPERATOR_PORT = 4021;
+const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -65,7 +72,12 @@ async function main(): Promise<number> {
         const grants = createGrantLedger();
         const leased = await broker.lease({ runId, policy: { phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants } });
         if (!leased.ok) return { ok: false, detail: leased.detail };
-        return { ok: true, lease: { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), grants, release: () => leased.lease.release() } };
+        // The control plane rotates the tokens the live session already gates on, so a person
+        // who claims it can act and the run gets a token back that the driver accepts.
+        const session = createSessionControl({ sessionId: leased.lease.sessionId, ids: systemIds, clock: systemClock, runId, tokens: leased.lease.tokens });
+        const control = session.apply('start').token;
+        if (control === null) return { ok: false, detail: 'The session issued no token to start with.' };
+        return { ok: true, lease: { surface: leased.lease.surface, control, session, grants, human: leased.lease.human, release: () => leased.lease.release() } };
       },
       liveModel: () => {
         const key = checkLiveModelKey(process.env);
@@ -79,6 +91,9 @@ async function main(): Promise<number> {
       ids: systemIds,
       target: { baseUrl: targetBaseUrl },
       environment: { driver: 'web', driverVersion: '1.0.0' },
+      // The operator console, hosted for as long as the run lives. A different port from the
+      // one replay uses, so a discovery run and a replay can both be open.
+      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

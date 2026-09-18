@@ -101,6 +101,16 @@ describe('createInterventionStore', () => {
     expect(store.get(raised.id)).not.toBeNull();
   });
 
+  it('tells a listener the moment one opens, so nothing has to poll to find out somebody is needed', () => {
+    const store = createInterventionStore();
+    const seen: [string, string][] = [];
+    store.subscribe((id, state) => seen.push([id, state]));
+
+    raiseIntervention(context({ store }));
+
+    expect(seen).toEqual([['int_000001', 'open']]);
+  });
+
   it('tells a listener when an intervention settles, which is how a blocked run learns it can go on', () => {
     const store = createInterventionStore();
     raiseIntervention(context({ store }));

@@ -1,13 +1,18 @@
 import { mkdir, rename } from 'node:fs/promises';
 import { basename, dirname, join } from 'node:path';
+import type { SessionControl } from '../control/controlPlane.js';
 import type { ControlToken } from '../control/controlToken.js';
 import { validateInputs, type InputValue } from '../core/capability/inputs.js';
 import type { Capability } from '../core/capability/schema.js';
 import { failureResult, type ReplayResult, type ResultBaseInput } from '../core/outcome/result.js';
-import type { AppProfile } from '../core/policy/profile.js';
+import { sensitiveFields, type AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 import { persistedResult } from '../core/redaction/resultProjection.js';
+import type { GrantLedger } from '../core/policy/authorize.js';
+import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput.js';
+import { createRunConsole } from '../escalation/runConsole.js';
 import type { CapabilityStore } from '../evidence/capabilityStore.js';
+import { interventionCaptures } from '../evidence/interventionCapture.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import { replay } from '../replay/executor.js';
 import type { Clock } from '../runtime/clock.js';
@@ -31,6 +36,14 @@ const FLAGS = ['capability', 'inputs', 'evidence'] as const;
 export interface ReplayLease {
   readonly surface: GuardedSurface;
   readonly control: ControlToken;
+  // The control plane over the same tokens the live session gates on, already started, so a
+  // person who takes the session is given a token the driver accepts and the run gets a fresh
+  // one back. See docs/ESCALATION.md section 2.
+  readonly session: SessionControl;
+  // The same ledger the surface authorizes against, so one approval buys exactly one action.
+  readonly grants: GrantLedger;
+  // How a person acts on this session while they hold it. Without it the console can only watch.
+  readonly human?: HumanInputPort;
   release(): Promise<void>;
 }
 
@@ -52,6 +65,8 @@ export interface ReplayCommandDeps {
   readonly ids: IdProvider;
   readonly target: { readonly baseUrl: string };
   readonly environment: { readonly driver: string; readonly driverVersion: string };
+  // Where the run hosts its operator console, and how long it waits for somebody to claim.
+  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number };
 }
 
 export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number> {
@@ -119,11 +134,42 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
     if (!leased.ok) {
       result = failureResult(base(), { class: 'SurfaceUnavailable', atStepId: null, stepIntent: null, expected: 'A signed in session on the target app.', observed: leased.detail, retryable: true });
     } else {
+      const { surface, session, grants, human } = leased.lease;
+      const inputs = Object.fromEntries(Object.entries(validated.values).map(([name, value]) => [name, String(value)]));
+      const humanActions: HumanActionRecord[] = [];
+      const console_ = await createRunConsole({
+        control: session,
+        screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+        ...(human === undefined ? {} : { input: human }),
+        onHumanAction: (record) => humanActions.push(record),
+        redactor: deps.redactor,
+        known: [],
+        clock: deps.clock,
+        ids: deps.ids,
+        claimTimeoutMs: deps.console.claimTimeoutMs,
+        ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
+        port: deps.console.port,
+        // Stderr, because stdout carries one JSON document and nothing else.
+        announce: (line) => deps.stderr(`A person is needed. ${line}
+`),
+      });
       try {
-        result = await replay(capability, supplied, { surface: leased.lease.surface, control: leased.lease.control, clock: deps.clock, runId, profile: profile.profile });
+        result = await replay(capability, supplied, {
+          surface,
+          control: leased.lease.control,
+          clock: deps.clock,
+          runId,
+          profile: profile.profile,
+          escalation: console_.escalation,
+          grants,
+          capture: interventionCaptures({ sink, profile: profile.profile, redactor: deps.redactor, inputs, observe: () => surface.observe(), screenshot: (refs) => surface.screenshot(refs) }),
+        });
       } finally {
+        await console_.close();
         await leased.lease.release();
       }
+      // What a person did while they held the session, which never amends the artifact.
+      for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'trace', 'What a person did while they held the session', record);
     }
   }
 

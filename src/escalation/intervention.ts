@@ -84,6 +84,9 @@ export interface RaiseContext {
 export function createInterventionStore(): InterventionStore {
   const items = new Map<string, { readonly request: InterventionRequest; readonly state: InterventionState }>();
   const listeners = new Set<(id: string, state: InterventionState, details: { readonly approved: boolean }) => void>();
+  const announce = (id: string, state: InterventionState, approved: boolean): void => {
+    for (const listener of [...listeners]) listener(id, state, { approved });
+  };
 
   return {
     subscribe: (listener) => {
@@ -94,6 +97,9 @@ export function createInterventionStore(): InterventionStore {
     },
     add: (request) => {
       items.set(request.id, { request, state: 'open' });
+      // Every state an intervention reaches is announced, opening included, so a console
+      // learns somebody is needed at the moment it happens rather than by asking repeatedly.
+      announce(request.id, 'open', false);
       return request;
     },
     get: (id) => items.get(id)?.request ?? null,
@@ -103,7 +109,7 @@ export function createInterventionStore(): InterventionStore {
       const entry = items.get(id);
       if (entry === undefined) throw new TypeError(`There is no intervention ${id} to settle.`);
       items.set(id, { request: entry.request, state });
-      for (const listener of [...listeners]) listener(id, state, { approved: details?.approved === true });
+      announce(id, state, details?.approved === true);
     },
   };
 }

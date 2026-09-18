@@ -5,10 +5,11 @@ import type { GrantLedger } from '../core/policy/authorize.js';
 import { resolveTemplate } from '../core/capability/resolveTemplate.js';
 import type { AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
+import type { ActionSummary } from '../escalation/intervention.js';
 import { matchStrategy } from '../core/surfaceModel/match.js';
 import { progressHash } from '../core/surfaceModel/progressHash.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
-import type { Handover } from '../escalation/channel.js';
+import type { EscalationChannel, Handover } from '../escalation/channel.js';
 import { unclassifiedDialog } from '../escalation/unclassified.js';
 import type { EscalationReason } from '../core/outcome/result.js';
 import type { Observation, ResolvedAction } from '../core/surfaceModel/types.js';
@@ -80,9 +81,10 @@ export interface DiscoveryOptions {
   // Raises a live intervention when the run stops for a person, see docs/ESCALATION.md section
   // 3. Without it the loop still stops, because a run that does not know what to do next must
   // not keep acting, and the result still says why.
-  readonly escalation?: {
-    raise(input: { readonly reason: DiscoveryEscalation; readonly explanation: string; readonly observation: Observation }): Promise<Handover>;
-  };
+  readonly escalation?: EscalationChannel;
+  // Refs for the screenshot and snapshot an intervention points at, written by the caller. The
+  // same seam replay uses, so one console serves both phases.
+  readonly interventionCapture?: () => Promise<{ readonly screenshotRef: string; readonly snapshotRef: string }>;
 }
 
 interface DiscoveryCommon {
@@ -115,6 +117,15 @@ interface Executed {
 const ACTING_TOOLS: ReadonlySet<string> = new Set(['click', 'fill', 'select', 'press', 'navigate']);
 const NO_PROGRESS_LIMIT = 3;
 const MAX_HANDOVERS = 3;
+
+// What the console tells the person to do. One line each, because the intervention already
+// carries the explanation, the screen and what the run has just done.
+const SUGGESTED: Readonly<Record<DiscoveryEscalation, string>> = {
+  PolicyConfirmation: 'Check the screen, then release the session to approve this change, or abort to refuse it.',
+  NoProgress: 'Move the session to where the run should be, then hand it back.',
+  ModelRequested: 'Do whatever the run could not, then hand the session back.',
+  UnclassifiedCondition: 'Deal with the dialog, then hand the session back.',
+};
 const MAX_TOKENS = 8_000;
 
 // Ends the loop from any depth with a finished result. It never escapes runDiscovery.
@@ -139,6 +150,10 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   // the handover died the moment they claimed it.
   let control = options.control;
   let handovers = 0;
+  // Time a person held the session. The duration budget bounds how long the automation may
+  // run, not how long somebody takes to read a screen and decide, so a handover that outlasts
+  // the budget must not fail the run the moment it comes back.
+  let pausedMs = 0;
   // What happened while the run was paused, carried to the next thing the model is shown.
   let pausedNote = '';
 
@@ -146,6 +161,17 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const emit = (event: DiscoveryEvent): void => options.onEvent?.(event);
   const common = (): DiscoveryCommon => ({ modelCalls, actions, extracted, exchanges, finalObservation: latest });
   const fail = (reason: FailureReason, detail: string): Finish => new Finish({ ...common(), status: 'failure', reason, detail });
+  // The last few things the run did, so the person reading the console can see how it got
+  // here without opening the trace. Descriptions come from the derived bundle, which is
+  // already redacted, and never from anything the model wrote.
+  const recentActions = (): ActionSummary[] =>
+    (options.recorder?.actions() ?? []).slice(-5).map((action) => ({
+      at: at(),
+      kind: action.tool,
+      describedAs: action.bundle?.describedAs ?? null,
+      ok: action.ok === true,
+    }));
+
   const stopped = (reason: DiscoveryEscalation, detail: string, interventionId?: string): Finish =>
     new Finish({ ...common(), status: 'escalated', reason, detail, ...(interventionId === undefined ? {} : { interventionId }) });
 
@@ -159,7 +185,23 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     if (options.escalation === undefined || latest === null) throw stopped(reason, detail);
     if (handovers >= MAX_HANDOVERS) throw stopped(reason, detail);
     handovers += 1;
-    const handover = await options.escalation.raise({ reason, explanation: detail, observation: latest });
+    const pausedAt = clock.now().getTime();
+    const refs = (await options.interventionCapture?.()) ?? { screenshotRef: 'none', snapshotRef: 'none' };
+    const handover = await options.escalation.raise({
+      sessionId: surface.sessionId,
+      runId: options.runId ?? '',
+      phase: 'discovery',
+      reason,
+      explanation: detail,
+      suggestedAction: SUGGESTED[reason],
+      goal: options.goal,
+      url: latest.frames.find((frame) => frame.framePath.length === 0)?.url ?? '',
+      framePath: [],
+      screenshotRef: refs.screenshotRef,
+      snapshotRef: refs.snapshotRef,
+      recentActions: recentActions(),
+    });
+    pausedMs += clock.now().getTime() - pausedAt;
     if (handover.kind !== 'resumed') throw stopped(reason, detail, handover.interventionId);
     control = handover.token;
     emit({ t: 'handback', at: at(), interventionId: handover.interventionId, reason, approved: handover.approved });
@@ -334,7 +376,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     const messages: Anthropic.MessageParam[] = [{ role: 'user', content: `${goal.text}\n\n${opening}Observation:\n${seen.text}` }];
 
     for (;;) {
-      if (clock.now().getTime() - started > budgets.maxDurationMs) throw fail('Timeout', `The run passed its duration budget of ${budgets.maxDurationMs}ms.`);
+      if (clock.now().getTime() - started - pausedMs > budgets.maxDurationMs) throw fail('Timeout', `The run passed its duration budget of ${budgets.maxDurationMs}ms.`);
       if (modelCalls >= budgets.maxModelCalls) throw fail('Timeout', `The run spent its budget of ${budgets.maxModelCalls} model calls.`);
 
       const params: Anthropic.MessageCreateParamsNonStreaming = {

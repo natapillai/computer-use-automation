@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { chromium, type Browser } from 'playwright';
+import { createSessionControl } from '../control/controlPlane.js';
 import { createSessionBroker } from '../control/sessionBroker.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { createRedactor } from '../core/redaction/redactor.js';
@@ -16,6 +17,12 @@ import { REPLAY_EXIT, runReplayCommand } from './replayCommand.js';
 // from the repository root, where policy/, profiles/ and capabilities/ are.
 //
 //   echo '{"memberId":"10001"}' | npm run replay -- --capability capabilities/<id>@<version>.json
+//
+// While it runs it hosts the operator console on :4020. A run that stops for a person prints
+// the URL of the intervention on stderr and waits there.
+
+const OPERATOR_PORT = 4020;
+const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -59,18 +66,26 @@ async function main(): Promise<number> {
           login: { path: '/auth/login', usernameField: 'username', passwordField: 'password', username: targetUsername, password: targetPassword },
           ids: systemIds,
         });
+        const grants = createGrantLedger();
         const leased = await broker.lease({
           runId,
-          policy: { phase: 'replay', capabilityStatus: capability.lifecycle.status, allowUnattendedReplay: capability.policy.allowUnattendedReplay, grants: createGrantLedger() },
+          policy: { phase: 'replay', capabilityStatus: capability.lifecycle.status, allowUnattendedReplay: capability.policy.allowUnattendedReplay, grants },
         });
         if (!leased.ok) return { ok: false, detail: leased.detail };
-        return { ok: true, lease: { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), release: () => leased.lease.release() } };
+        // The control plane rotates the tokens the live session already gates on, so a person
+        // who claims it can act and the run gets a token back that the driver accepts.
+        const session = createSessionControl({ sessionId: leased.lease.sessionId, ids: systemIds, clock: systemClock, runId, tokens: leased.lease.tokens });
+        const control = session.apply('start').token;
+        if (control === null) return { ok: false, detail: 'The session issued no token to start with.' };
+        return { ok: true, lease: { surface: leased.lease.surface, control, session, grants, human: leased.lease.human, release: () => leased.lease.release() } };
       },
       redactor,
       clock: systemClock,
       ids: systemIds,
       target: { baseUrl: targetBaseUrl },
       environment: { driver: 'web', driverVersion: '1.0.0' },
+      // The operator console of CLAUDE.md section 5, hosted for as long as the run lives.
+      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

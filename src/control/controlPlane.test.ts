@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
-import { ControlLostError } from './controlToken.js';
+import { createControlTokens, ControlLostError } from './controlToken.js';
 import { createSessionControl, IllegalTransitionError, nextState, type ControlEvent, type ControlState } from './controlPlane.js';
 
 // The control state machine of docs/ESCALATION.md section 2, as a pure reducer plus the token
@@ -107,5 +107,20 @@ describe('createSessionControl', () => {
     expect(session.apply('timeout')).toMatchObject({ state: 'aborted', token: null });
     expect(session.current()).toBeNull();
     expect(() => session.apply('claim')).toThrow(IllegalTransitionError);
+  });
+  it('rotates the tokens the live session already gates on, so a resumed run can act again', () => {
+    const tokens = createControlTokens('sess_000001', createSequentialIds());
+    const session = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: createTestClock('2026-09-17T09:00:00.000Z'), runId: 'run_000001', tokens });
+
+    const started = session.apply('start').token;
+    session.apply('pause', { interventionId: 'int_000001' });
+    session.apply('claim');
+    session.apply('release');
+    const resumed = session.apply('resume').token;
+
+    if (started === null || resumed === null) throw new Error('A held session was issued no token.');
+    // The gate the surface driver checks, not a second set of tokens nobody enforces.
+    expect(() => tokens.assertCurrent(resumed)).not.toThrow();
+    expect(() => tokens.assertCurrent(started)).toThrow(ControlLostError);
   });
 });

@@ -168,9 +168,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 * [ ] **S5-T06** Sub account write flow, `flaky503`, and `member.openSubAccount`.
   * Accept: the form, field validation and confirmation screen in the app. The capability confirms during a draft replay and runs unattended once approved with `allowUnattendedReplay`. The submit is not idempotent, so a 503 on it is never retried and the run ends as `SurfaceUnavailable` marked retryable, with exactly one submission recorded by the app. An invalid opening amount returns a field error, declared as a business outcome carrying its message as structured data.
   * Test: integration, confirm then proceed, approved and unattended, exactly one submission under `flaky503` on the submit, and an invalid amount returned as `business_outcome`.
-* [ ] **S5-T07** Full handoff cycle and committed evidence. **Gate, Skeleton 3.**
-  * Accept: `MockOperator` drives the real API headlessly. `evidence/replay/escalated/` shows escalate, claim, a forwarded click on the live session, release, resume, and a result carrying the episode in `interventions[]`.
-  * Test: integration, the headless cycle completes and the run finishes.
+* [x] **S5-T07** Full handoff cycle, the operator console hosted by both CLIs. **Gate, Skeleton 3.**
+  * Accept: `npm run replay` hosts the console on :4020 and `npm run discover` on :4021, for as long as the run lives. A run that stops prints the intervention URL on stderr and waits there. The headless operator is given that URL and nothing else, and drives claim, screenshot, a forwarded click on the live session and release over HTTP. The result carries every episode in `interventions[]`, the screen and tree a person was shown are filed as evidence, and what they did is in `humanActions.jsonl`.
+  * Test: integration, `tests/integration/handoff.test.ts`, the resumed cycle and the aborted one.
+  * Note: a run handed back three times that still cannot carry on ends as `PreconditionFailed`, not `PolicyDenied`. Nothing refused it.
 
 ---
 
@@ -180,7 +181,7 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: route scoped and deterministic, armed with a count.
   * Test: integration, one per fault asserting its documented behaviour.
 * [ ] **S6-T02** Retry on idempotent steps, `TransientLoad` recovery, and replay budgets.
-  * Accept: bounded exponential backoff through `Clock.delay`, gated on `idempotent`. `TransientLoad` retries a 502 or 503 up to three attempts and is recorded in `recoveries`, including on success. Budget exhaustion is a `Timeout` failure.
+  * Accept: bounded exponential backoff through `Clock.delay`, gated on `idempotent`. `TransientLoad` retries a 502 or 503 up to three attempts and is recorded in `recoveries`, including on success. Budget exhaustion is a `Timeout` failure, and the time a person held the session does not count against it, as discovery already does.
   * Test: unit with fake timers, backoff timing, a non idempotent step never retried, and a budget ending the run.
 * [ ] **S6-T03** Result assembly and the replay import graph test.
   * Accept: `ReplayResult` always carries `recoveries`, `interventions` and `drift`, including on success. `src/replay` imports no model client.

@@ -1,6 +1,7 @@
 import { access, mkdir, writeFile } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { z } from 'zod';
+import type { SessionControl } from '../control/controlPlane.js';
 import type { ControlToken } from '../control/controlToken.js';
 import { validateInputs } from '../core/capability/inputs.js';
 import { AppBinding, ParamSpec, type Capability } from '../core/capability/schema.js';
@@ -16,7 +17,10 @@ import { buildGoal, SYSTEM_PROMPT } from '../discovery/prompt.js';
 import { createRecorder } from '../discovery/recorder.js';
 import { toolsFor } from '../discovery/tools.js';
 import { buildTrace } from '../discovery/trace.js';
+import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput.js';
+import { createRunConsole } from '../escalation/runConsole.js';
 import { createFileCapabilityStore, type CapabilityWrite } from '../evidence/capabilityStore.js';
+import { interventionCaptures } from '../evidence/interventionCapture.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import type { Clock } from '../runtime/clock.js';
 import type { IdProvider } from '../runtime/ids.js';
@@ -55,6 +59,12 @@ export type DiscoveryRequest = z.output<typeof DiscoveryRequest>;
 export interface DiscoverLease {
   readonly surface: GuardedSurface;
   readonly control: ControlToken;
+  // The control plane over the same tokens the live session gates on, already started, so a
+  // person who takes the session is given a token the driver accepts and the run gets a fresh
+  // one back. See docs/ESCALATION.md section 2.
+  readonly session: SessionControl;
+  // How a person acts on this session while they hold it. Without it the console only watches.
+  readonly human?: HumanInputPort;
   // The same ledger the session's policy holds, so an approval the run collects is the one
   // authorize consumes.
   readonly grants: GrantLedger;
@@ -83,6 +93,8 @@ export interface DiscoverCommandDeps {
   readonly ids: IdProvider;
   readonly target: { readonly baseUrl: string };
   readonly environment: { readonly driver: string; readonly driverVersion: string };
+  // Where the run hosts its operator console, and how long it waits for somebody to claim.
+  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number };
 }
 
 type Loaded<T> = { readonly ok: true; readonly value: T } | { readonly ok: false; readonly problem: string };
@@ -177,6 +189,22 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
         root: maskTree(observation.root, { sensitive, inputs, redactor: deps.redactor }),
       });
     };
+    const humanActions: HumanActionRecord[] = [];
+    const runConsole = await createRunConsole({
+      control: leased.lease.session,
+      screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+      ...(leased.lease.human === undefined ? {} : { input: leased.lease.human }),
+      onHumanAction: (record) => humanActions.push(record),
+      redactor: deps.redactor,
+      known,
+      clock: deps.clock,
+      ids: deps.ids,
+      claimTimeoutMs: deps.console.claimTimeoutMs,
+      ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
+      port: deps.console.port,
+      // Stderr, because stdout carries one JSON summary and nothing else.
+      announce: (line) => deps.stderr(`A person is needed. ${line}\n`),
+    });
     try {
       result = await runDiscovery({
         surface,
@@ -198,6 +226,15 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
         },
         recorder,
         capture,
+        escalation: runConsole.escalation,
+        interventionCapture: interventionCaptures({
+          sink,
+          profile: profile.profile,
+          redactor: deps.redactor,
+          inputs,
+          observe: () => surface.observe(),
+          screenshot: (refs) => surface.screenshot(refs),
+        }),
       });
     } catch (error) {
       if (!(error instanceof CassetteMismatch)) throw error;
@@ -205,8 +242,11 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       deps.stderr(`${error.message}\n`);
       result = unreached('ModelCallFailed', 'The cassette does not match this run.');
     } finally {
+      await runConsole.close();
       await leased.lease.release();
     }
+    // What a person did while they held the session, which never becomes a step.
+    for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'trace', 'What a person did while they held the session', record);
   }
 
   // An extracted value is member data, so every later write hides it.

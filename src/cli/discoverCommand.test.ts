@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { allowlist, call, GOAL, happyPathTurns, profile } from '../../tests/fixtures/discovery/fakeRun.js';
 import { meridianScript } from '../../tests/fixtures/surface/meridianScreens.js';
+import { createSessionControl } from '../control/controlPlane.js';
 import { createControlTokens } from '../control/controlToken.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { createRedactor } from '../core/redaction/redactor.js';
@@ -91,7 +92,10 @@ describe('runDiscoverCommand', () => {
           runId,
           baseUrl: 'http://localhost:4010',
         });
-        return { ok: true, lease: { surface, control: tokens.issue('automation'), grants, release: async () => undefined } };
+        const session = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock, runId, tokens });
+        const control = session.apply('start').token;
+        if (control === null) throw new Error('A started session was issued no token.');
+        return { ok: true, lease: { surface, control, session, grants, release: async () => undefined } };
       },
       liveModel: () => {
         if (setup.liveModel === 'forbidden') throw new Error('A live model was built for a run that names a cassette.');
@@ -106,6 +110,8 @@ describe('runDiscoverCommand', () => {
       ids: createSequentialIds(),
       target: { baseUrl: 'http://localhost:4010' },
       environment: { driver: 'fake', driverVersion: '1.0.0' },
+      // Port 0, so every run in this suite binds a free port of its own.
+      console: { port: 0, claimTimeoutMs: 60_000 },
     });
     return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, model, patterns: loaded.allowlist.data.redactPatterns };
   }

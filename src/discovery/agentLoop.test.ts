@@ -8,12 +8,13 @@ import { createGrantLedger } from '../core/policy/authorize.js';
 import { AppProfile } from '../core/policy/profile.js';
 import { createRedactor } from '../core/redaction/redactor.js';
 import { ACTION_VERBS } from '../core/surfaceModel/types.js';
-import { createTestClock } from '../runtime/clock.js';
+import { createTestClock, type TestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface, type GuardedAction, type GuardedSurface } from '../surface/guardedSurface.js';
 import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent, type DiscoveryOptions } from './agentLoop.js';
 import { createFakeModelClient, type FakeTurn } from './fakeModelClient.js';
+import type { RaiseInput } from '../escalation/channel.js';
 import { createRecorder, type Recorder } from './recorder.js';
 
 const allowlist = Allowlist.parse({
@@ -53,7 +54,9 @@ function call(name: string, input: Record<string, unknown> = {}): FakeTurn {
   };
 }
 
-type EscalationFor = (tokens: SessionControlTokens) => NonNullable<DiscoveryOptions['escalation']>;
+// The live session the console would be attached to. A test drives the handover through it.
+type Session = { readonly tokens: SessionControlTokens; readonly clock: TestClock };
+type EscalationFor = (session: Session) => NonNullable<DiscoveryOptions['escalation']>;
 
 interface RunOptions {
   readonly turns: readonly FakeTurn[];
@@ -88,7 +91,7 @@ async function discover(options: RunOptions) {
   };
   const model = createFakeModelClient(options.turns);
   const events: DiscoveryEvent[] = [];
-  const escalation = typeof options.escalation === 'function' ? options.escalation(tokens) : options.escalation;
+  const escalation = typeof options.escalation === 'function' ? options.escalation({ tokens, clock }) : options.escalation;
   const result = await runDiscovery({
     surface,
     control: tokens.issue('automation'),
@@ -272,7 +275,7 @@ describe('runDiscovery', () => {
       turns: [call('escalate', { reason: 'The search form is not on the page.' })],
       escalation: {
         raise: async (input) => {
-          raised.push({ reason: input.reason, explanation: input.explanation, url: input.observation.frames.find((frame) => frame.framePath.length === 0)?.url });
+          raised.push({ reason: input.reason, explanation: input.explanation, url: input.url });
           return { kind: 'unclaimed', interventionId: 'int_000001' };
         },
       },
@@ -358,9 +361,10 @@ describe('runDiscovery', () => {
   // confirm, so the action reaches a person before it reaches the surface.
 
   // A resumed handover, as the escalation channel returns one once the person releases.
-  const released = (approved: boolean): EscalationFor => (tokens) => ({
-    raise: async () => ({ kind: 'resumed', interventionId: 'int_000001', approved, token: tokens.issue('automation') }),
-  });
+  const released = (approved: boolean): EscalationFor =>
+    ({ tokens }) => ({
+      raise: async () => ({ kind: 'resumed', interventionId: 'int_000001', approved, token: tokens.issue('automation') }),
+    });
 
   it('runs an undeclared click as a read, so a write the model never declared is refused by the network guard', async () => {
     const { performed } = await discover({ turns: [call('click', { ref: 'n6' }), call('done')] });
@@ -372,7 +376,7 @@ describe('runDiscovery', () => {
     const reasons: string[] = [];
     const { result, performed, events } = await discover({
       turns: [call('click', { ref: 'n6', submits: true }), call('done')],
-      escalation: (tokens) => ({
+      escalation: ({ tokens }) => ({
         raise: async (input) => {
           reasons.push(input.reason);
           return { kind: 'resumed', interventionId: 'int_000001', approved: true, token: tokens.issue('automation') };
@@ -417,7 +421,7 @@ describe('runDiscovery', () => {
     const asked: string[] = [];
     const { result } = await discover({
       turns: [...Array.from({ length: 6 }, () => call('escalate', { reason: 'Still stuck.' })), call('done')],
-      escalation: (tokens) => ({
+      escalation: ({ tokens }) => ({
         raise: async (input) => {
           asked.push(input.reason);
           return { kind: 'resumed', interventionId: 'int_000001', approved: true, token: tokens.issue('automation') };
@@ -438,6 +442,40 @@ describe('runDiscovery', () => {
     expect(events.filter((event) => event.t === 'handback')).toEqual([
       { t: 'handback', at: START, interventionId: 'int_000001', reason: 'PolicyConfirmation', approved: true },
     ]);
+  });
+
+  it('tells the person which session, which run and what the run has just done', async () => {
+    const seen: RaiseInput[] = [];
+    await discover({
+      turns: [call('click', { ref: 'n6' }), call('escalate', { reason: 'Stuck.' })],
+      recorder: createRecorder({ profile, redactor: createRedactor(allowlist.data), inputs: { memberId: '10001' } }),
+      escalation: {
+        raise: async (input) => {
+          seen.push(input);
+          return { kind: 'unclaimed', interventionId: 'int_000001' };
+        },
+      },
+    });
+
+    expect(seen[0]).toMatchObject({ sessionId: 'sess_000001', runId: 'run_000001', phase: 'discovery', goal: expect.stringContaining('{{inputs.memberId}}') });
+    expect(seen[0]?.recentActions.map((action) => action.kind)).toEqual(['click']);
+    expect(seen[0]?.recentActions[0]?.describedAs).not.toBeNull();
+  });
+
+  it('does not spend the run budget on the time a person held the session', async () => {
+    const { result } = await discover({
+      turns: [call('escalate', { reason: 'Stuck.' }), call('done')],
+      budgets: { maxDurationMs: 60_000 },
+      escalation: ({ tokens, clock }) => ({
+        raise: async () => {
+          // Ten minutes of somebody reading the screen and deciding.
+          clock.advance(600_000);
+          return { kind: 'resumed', interventionId: 'int_000001', approved: true, token: tokens.issue('automation') };
+        },
+      }),
+    });
+
+    expect(result.status).toBe('done');
   });
 
   it('ends escalated when nobody claims the session', async () => {

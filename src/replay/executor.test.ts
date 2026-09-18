@@ -192,7 +192,9 @@ describe('replay with a person on the other end', () => {
     });
 
     expect(raised).toHaveLength(3);
-    expect(failureOf(result)).toMatchObject({ class: 'PolicyDenied', atStepId: 'submitSearch' });
+    // Nothing denied this run. Three people looked at it and the step still cannot run, which
+    // is a precondition that does not hold and not a policy refusal.
+    expect(failureOf(result)).toMatchObject({ class: 'PreconditionFailed', atStepId: 'submitSearch' });
     expect(failureOf(result).observed).toContain('three');
   });
 

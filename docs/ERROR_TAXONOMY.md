@@ -88,7 +88,7 @@ type FailureClass =
   | 'LocatorNotFound'        // no strategy in the bundle resolved
   | 'LocatorAmbiguous'       // resolved to multiple nodes under a unique match policy
   | 'CheckpointFailed'       // the action ran but the state we expected did not appear
-  | 'PreconditionFailed'     // we were not in the state the step assumed
+  | 'PreconditionFailed'     // we were not in the state the step assumed, including after a release
   | 'Timeout'                // a bounded wait expired, or a step or duration budget ran out
   | 'SessionExpired'         // the app redirected to login mid run, and nothing re authenticates
   | 'PolicyDenied'           // the allowlist or risk rules refused the action
@@ -101,6 +101,8 @@ type FailureClass =
 ```
 
 `LocatorAmbiguous` being distinct from `LocatorNotFound` is worth the extra member. They have opposite fixes. Not found usually means drift. Ambiguous usually means the recording captured a locator that was unique on a one result page and is not unique on a multi result page, which is a recording quality bug.
+
+A run that a person handed back three times, and that still cannot carry on, ends as `PreconditionFailed` and never as `PolicyDenied`. Nothing refused it. The step has nothing to run against. Reading a refusal there would send whoever is on call to the allowlist, which is the wrong file.
 
 `Internal` exists so that our own defects are never disguised as surface problems. A classifier that cannot categorise something returns `Internal`, not a guess.
 

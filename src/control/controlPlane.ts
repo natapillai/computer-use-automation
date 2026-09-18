@@ -1,6 +1,6 @@
 import type { Clock } from '../runtime/clock.js';
 import type { IdProvider } from '../runtime/ids.js';
-import { createControlTokens, type ControlHolder, type ControlToken } from './controlToken.js';
+import { createControlTokens, type ControlHolder, type ControlToken, type SessionControlTokens } from './controlToken.js';
 
 // The control state machine of docs/ESCALATION.md section 2. Automation and a person share one
 // live session, so exactly one of them holds it at any moment. The reducer is pure, which is
@@ -63,6 +63,10 @@ export interface SessionControlOptions {
   readonly ids: IdProvider;
   readonly clock: Clock;
   readonly runId: string | null;
+  // The gate the live session already checks, when there is one. A control plane that rotated
+  // its own private tokens would hand a resumed run a token the surface driver refuses, so the
+  // handover would look correct and the first action after it would fail as ControlLost.
+  readonly tokens?: SessionControlTokens;
 }
 
 export function nextState(state: ControlState, event: ControlEvent): ControlState {
@@ -72,7 +76,7 @@ export function nextState(state: ControlState, event: ControlEvent): ControlStat
 }
 
 export function createSessionControl(options: SessionControlOptions): SessionControl {
-  const tokens = createControlTokens(options.sessionId, options.ids);
+  const tokens = options.tokens ?? createControlTokens(options.sessionId, options.ids);
   let state: ControlState = 'idle';
   let interventionId: string | null = null;
   let token: ControlToken | null = null;

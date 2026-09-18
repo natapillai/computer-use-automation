@@ -280,8 +280,11 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
         // than ending the run and making them start over. Bounded, because a handoff that
         // keeps coming back is a loop rather than an escalation.
         if (handoversOnStep >= MAX_HANDOVERS_PER_STEP) {
+          // Not PolicyDenied. Nothing refused this run. People looked at it three times and
+          // the step still has nothing to run against, which is a precondition that does not
+          // hold. Calling it a refusal would send whoever reads the result to the allowlist.
           throw fail({
-            class: 'PolicyDenied',
+            class: 'PreconditionFailed',
             expected: 'The release leaves the run somewhere it can carry on from.',
             observed: `Handed back three times on this step and it is still not somewhere the run can carry on from. ${resumption.detail}`,
             retryable: false,
