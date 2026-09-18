@@ -5,6 +5,7 @@ import { dirname, join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { allowlist, profile } from '../../tests/fixtures/discovery/fakeRun.js';
 import { meridianScript, type MeridianScriptOptions } from '../../tests/fixtures/surface/meridianScreens.js';
+import { createSessionControl } from '../control/controlPlane.js';
 import { createControlTokens } from '../control/controlToken.js';
 import { Capability } from '../core/capability/schema.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
@@ -88,19 +89,25 @@ describe('runReviewCommand', () => {
           script: meridianScript({ searchLeadsTo: 'noRecords', memberId: '00000', ...setup.script }),
           clock,
         });
+        const grants = createGrantLedger();
         const surface = createGuardedSurface({
           driver,
-          policy: { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants: createGrantLedger() },
+          policy: { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants },
           runId,
           baseUrl: 'http://localhost:4010',
         });
-        return { ok: true, lease: { surface, control: tokens.issue('automation'), release: async () => undefined } };
+        const session = createSessionControl({ sessionId: `sess_${leases}`, ids: createSequentialIds(), clock, runId, tokens });
+        const control = session.apply('start').token;
+        if (control === null) throw new Error('A started session was issued no token.');
+        return { ok: true, lease: { surface, control, session, grants, release: async () => undefined } };
       },
       redactor,
       clock,
       ids: createSequentialIds(),
       target: { baseUrl: 'http://localhost:4010' },
       environment: { driver: 'fake', driverVersion: '1.0.0' },
+      // Port 0, so every run in this suite binds a free port of its own.
+      console: { port: 0, claimTimeoutMs: 60_000 },
     });
     return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, patterns: loaded.allowlist.data.redactPatterns };
   }

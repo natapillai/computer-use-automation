@@ -1,8 +1,8 @@
 {
   "id": "member.openSubAccount",
   "name": "Open a member sub account",
-  "description": "Opens a new sub account of a given type for a member, with an opening deposit, and returns the suffix the system assigned.",
-  "goal": "open a {{inputs.accountType}} sub account for the member whose member ID is {{inputs.memberId}}, with an opening amount of {{inputs.openingAmount}}, and record the suffix the system assigns as the output suffix.",
+  "description": "Opens a new sub account of a given type for a member, with an opening deposit, and returns the suffix the system assigned. The form is reached by path because MERIDIAN Core links to it from nowhere, so the goal names it.",
+  "goal": "open a {{inputs.accountType}} sub account for the member whose member ID is {{inputs.memberId}}, with an opening amount of {{inputs.openingAmount}}. Nothing in this application links to the form, so navigate the content frame to /member/{{inputs.memberId}}/subaccount to reach it. Record the suffix the system assigns as the output suffix.",
   "app": { "appId": "meridian-core", "vendor": "meridian", "entryPath": "/servicing" },
   "allowWrites": true,
   "inputs": [

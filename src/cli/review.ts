@@ -1,5 +1,6 @@
 import { readFile } from 'node:fs/promises';
 import { chromium, type Browser } from 'playwright';
+import { createSessionControl } from '../control/controlPlane.js';
 import { createSessionBroker } from '../control/sessionBroker.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { createRedactor } from '../core/redaction/redactor.js';
@@ -17,6 +18,11 @@ import { REVIEW_EXIT, runReviewCommand } from './reviewCommand.js';
 //   echo '{"memberId":"00000"}' | npm run review -- --capability capabilities/<id>@1.0.0.json \
 //     --decision requests/<id>.<CODE>.review.json
 //   npm run review -- --capability capabilities/<id>@1.1.0.json --approve <reviewer>
+
+// While it runs it hosts the operator console on :4022. A probe that stops for a person prints
+// the URL of the intervention on stderr and waits there.
+const OPERATOR_PORT = 4022;
+const CLAIM_TIMEOUT_MS = 15 * 60 * 1_000;
 
 async function main(): Promise<number> {
   const target = parseTargetEnv(process.env);
@@ -59,15 +65,22 @@ async function main(): Promise<number> {
           ids: systemIds,
         });
         // A probe is a replay of a draft, so it is authorized as one.
-        const leased = await broker.lease({ runId, policy: { phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants: createGrantLedger() } });
+        const grants = createGrantLedger();
+        const leased = await broker.lease({ runId, policy: { phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants } });
         if (!leased.ok) return { ok: false, detail: leased.detail };
-        return { ok: true, lease: { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), release: () => leased.lease.release() } };
+        const session = createSessionControl({ sessionId: leased.lease.sessionId, ids: systemIds, clock: systemClock, runId, tokens: leased.lease.tokens });
+        const control = session.apply('start').token;
+        if (control === null) return { ok: false, detail: 'The session issued no token to start with.' };
+        return { ok: true, lease: { surface: leased.lease.surface, control, session, grants, human: leased.lease.human, release: () => leased.lease.release() } };
       },
       redactor,
       clock: systemClock,
       ids: systemIds,
       target: { baseUrl: targetBaseUrl },
       environment: { driver: 'web', driverVersion: '1.0.0' },
+      // A review of a capability that writes stops for a person exactly as a replay of it does,
+      // so it hosts the same console. Its own port, so a review and a replay can both be open.
+      console: { port: OPERATOR_PORT, claimTimeoutMs: CLAIM_TIMEOUT_MS },
     });
   } finally {
     await Promise.all(browsers.map((browser) => browser.close()));

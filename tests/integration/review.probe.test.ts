@@ -6,6 +6,7 @@ import { chromium, type Browser } from 'playwright';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { createTargetApp } from '../../apps/target/src/app.js';
 import { runReviewCommand } from '../../src/cli/reviewCommand.js';
+import { createSessionControl } from '../../src/control/controlPlane.js';
 import { createSessionBroker, type SessionBroker } from '../../src/control/sessionBroker.js';
 import { Capability } from '../../src/core/capability/schema.js';
 import { Allowlist } from '../../src/core/policy/allowlist.js';
@@ -75,9 +76,13 @@ describe('negative probe review against MERIDIAN Core', () => {
   });
 
   async function lease(runId: string) {
-    const leased = await broker.lease({ runId, policy: { phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants: createGrantLedger() } });
+    const grants = createGrantLedger();
+    const leased = await broker.lease({ runId, policy: { phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants } });
     if (!leased.ok) throw new Error(`The lease failed. ${leased.detail}`);
-    return { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), release: () => leased.lease.release() };
+    const session = createSessionControl({ sessionId: leased.lease.sessionId, ids: createSequentialIds(), clock: systemClock, runId, tokens: leased.lease.tokens });
+    const control = session.apply('start').token;
+    if (control === null) throw new Error('A started session was issued no token.');
+    return { surface: leased.lease.surface, control, session, grants, human: leased.lease.human, release: () => leased.lease.release() };
   }
 
   it(
@@ -99,6 +104,7 @@ describe('negative probe review against MERIDIAN Core', () => {
         ids: createSequentialIds(),
         target: { baseUrl: 'http://127.0.0.1' },
         environment: { driver: 'web', driverVersion: '1.0.0' },
+        console: { port: 0, claimTimeoutMs: 60_000 },
       });
 
       expect(code, err.join('')).toBe(0);

@@ -1,5 +1,6 @@
 import { dirname } from 'node:path';
 import { z } from 'zod';
+import type { SessionControl } from '../control/controlPlane.js';
 import type { ControlToken } from '../control/controlToken.js';
 import { capabilityDiff } from '../core/capability/diff.js';
 import { validateInputs } from '../core/capability/inputs.js';
@@ -14,8 +15,12 @@ import { matchStrategy } from '../core/surfaceModel/match.js';
 import type { Observation } from '../core/surfaceModel/types.js';
 import { declareOutcome, type OutcomeDeclaration } from '../discovery/outcomeProbe.js';
 import type { CapabilityStore } from '../evidence/capabilityStore.js';
+import type { GrantLedger } from '../core/policy/authorize.js';
+import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput.js';
+import { createRunConsole } from '../escalation/runConsole.js';
+import { interventionCaptures } from '../evidence/interventionCapture.js';
 import { createEvidenceSink } from '../evidence/sink.js';
-import { replay } from '../replay/executor.js';
+import { replay, type ReplayContext } from '../replay/executor.js';
 import type { Clock } from '../runtime/clock.js';
 import type { IdProvider } from '../runtime/ids.js';
 import type { ProfileLoad } from '../runtime/profile.js';
@@ -48,6 +53,11 @@ export type ReviewDecision = z.output<typeof ReviewDecision>;
 export interface ReviewLease {
   readonly surface: GuardedSurface;
   readonly control: ControlToken;
+  // The same three the other two commands take. A review probes a capability by replaying it,
+  // so a review of one that writes needs a person exactly as a replay of it does.
+  readonly session: SessionControl;
+  readonly grants: GrantLedger;
+  readonly human?: HumanInputPort;
   release(): Promise<void>;
 }
 
@@ -69,6 +79,15 @@ export interface ReviewCommandDeps {
   readonly ids: IdProvider;
   readonly target: { readonly baseUrl: string };
   readonly environment: { readonly driver: string; readonly driverVersion: string };
+  // Where the run hosts its operator console, and how long it waits for somebody to claim.
+  readonly console: { readonly port: number; readonly host?: string; readonly claimTimeoutMs: number };
+}
+
+// What a console hands a replay. Named, because three commands now pass the same three things.
+interface ReplayHandoff {
+  readonly escalation: ReplayContext['escalation'];
+  readonly grants: ReplayContext['grants'];
+  readonly capture: ReplayContext['capture'];
 }
 
 interface Refusal {
@@ -153,6 +172,45 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
   });
   await sink.log('info', 'review.started', { capability: { id: capability.id, version: capability.version }, code: decision.code, inputNames: Object.keys(inputs).sort() });
 
+  // A review probes a capability by replaying it, so a review of one that writes stops for a
+  // person at exactly the step a replay would. Each lease is its own browser session with its
+  // own tokens, so each gets its own console, opened and closed around the run it serves.
+  const humanActions: HumanActionRecord[] = [];
+  const withConsole = async <T>(lease: ReviewLease, run: (context: ReplayHandoff) => Promise<T>): Promise<T> => {
+    const { surface } = lease;
+    const opened = await createRunConsole({
+      control: lease.session,
+      screenshot: async () => surface.screenshot([...sensitiveFields(profile.profile, await surface.observe()).keys()]),
+      ...(lease.human === undefined ? {} : { input: lease.human }),
+      onHumanAction: (record) => humanActions.push(record),
+      redactor: deps.redactor,
+      known: [],
+      clock: deps.clock,
+      ids: deps.ids,
+      claimTimeoutMs: deps.console.claimTimeoutMs,
+      ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
+      port: deps.console.port,
+      // Stderr, because stdout carries one JSON summary and nothing else.
+      announce: (line) => deps.stderr(`A person is needed. ${line}\n`),
+    });
+    try {
+      return await run({
+        escalation: opened.escalation,
+        grants: lease.grants,
+        capture: interventionCaptures({
+          sink,
+          profile: profile.profile,
+          redactor: deps.redactor,
+          inputs: Object.fromEntries(Object.entries(inputs).map(([name, value]) => [name, String(value)])),
+          observe: () => surface.observe(),
+          screenshot: (refs) => surface.screenshot(refs),
+        }),
+      });
+    } finally {
+      await opened.close();
+    }
+  };
+
   const probeLease = await deps.lease({ runId, profile: profile.profile });
   if (!probeLease.ok) {
     deps.stderr(`${probeLease.detail}\n`);
@@ -165,7 +223,9 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
   let stop: Observation | null = null;
   try {
     const { surface, control } = probeLease.lease;
-    probeResult = await replay(capability, supplied, { surface, control, clock: deps.clock, runId, profile: profile.profile });
+    probeResult = await withConsole(probeLease.lease, (handoff) =>
+      replay(capability, supplied, { surface, control, clock: deps.clock, runId, profile: profile.profile, ...handoff }),
+    );
 
     if (probeResult.status !== 'failure') {
       refusal = { reason: 'ProbeDidNotStop', detail: `The probe ended as ${probeResult.status}, so there is no stopped screen to read an outcome from.` };
@@ -202,7 +262,16 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
       refusal = { reason: 'SurfaceUnavailable', detail: verifyLease.detail };
     } else {
       try {
-        verification = await replay(declared.capability, supplied, { surface: verifyLease.lease.surface, control: verifyLease.lease.control, clock: deps.clock, runId, profile: profile.profile });
+        verification = await withConsole(verifyLease.lease, (handoff) =>
+          replay(declared.capability, supplied, {
+            surface: verifyLease.lease.surface,
+            control: verifyLease.lease.control,
+            clock: deps.clock,
+            runId,
+            profile: profile.profile,
+            ...handoff,
+          }),
+        );
       } finally {
         await verifyLease.lease.release();
       }
