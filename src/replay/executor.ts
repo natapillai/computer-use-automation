@@ -21,6 +21,7 @@ import {
 } from '../core/outcome/result.js';
 import type { GrantLedger } from '../core/policy/authorize.js';
 import type { EscalationChannel } from '../escalation/channel.js';
+import { unclassifiedDialog } from '../escalation/unclassified.js';
 import { revalidate, type Resumption } from './resume.js';
 import { fingerprint } from '../core/surfaceModel/fingerprint.js';
 import type { ActionResult, Observation, ResolvedAction } from '../core/surfaceModel/types.js';
@@ -389,7 +390,8 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     // Observed before resolving, never between resolving and acting, so the ref check in
     // the driver still compares against the snapshot the ref came from.
     const before = fingerprint(await surface.observe());
-    await perform(await prepare(step), step.id, step.effect, step.idempotent);
+    const prepared = await prepare(step);
+    await perform(prepared, step.id, step.effect, step.idempotent);
 
     // Precedence is one total order, docs/ERROR_TAXONOMY.md section 6. Step rules, then
     // capability outcomes, then the app profile, then the postcondition. Within the step
@@ -418,10 +420,39 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     ];
 
     const timeoutMs = Math.min(step.postcondition.timeoutMs, step.timeoutMs);
-    const settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, () => surface.refusalsFor(step.id).length > 0);
+    const stopWhenRefused = (): boolean => surface.refusalsFor(step.id).length > 0;
+    let settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
     failIfRefused(step.id);
     if (settled.kind === 'stopped') {
       throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
+    }
+
+    // A dialog nobody declared is the case where the system does not know what to do next.
+    // Clicking it to find out is exactly what a back office automation must never do, so the
+    // run stops for a person instead. A dialog some rule claims never reaches here, because
+    // that rule wins the race.
+    if (settled.kind === 'expired' && settled.observation.dialogOpen && context.escalation !== undefined) {
+      const unclaimed = await unclassifiedDialog({
+        observation: settled.observation,
+        conditions: contenders.map((contender) => contender.condition),
+        match: (strategy, framePath) => surface.match(strategy, framePath),
+        outputResolvable,
+      });
+      if (unclaimed) {
+        const resumption = await handOver(
+          'UnclassifiedCondition',
+          'A dialog is open that nothing in this capability or the app profile claims, so the run stopped rather than clicking it.',
+          'Deal with the dialog, leave the session where this step can carry on, and hand it back.',
+        );
+        await resume(resumption, prepared, step.id, step.effect, step.idempotent);
+
+        // Whatever was done to the page, the step only counts when its own postcondition holds.
+        settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
+        failIfRefused(step.id);
+        if (settled.kind === 'stopped') {
+          throw fail({ class: 'Internal', expected: 'The wait ends on a condition, a timeout or a refusal.', observed: 'The wait stopped with no refusal recorded.', retryable: false });
+        }
+      }
     }
 
     if (settled.kind === 'expired') {

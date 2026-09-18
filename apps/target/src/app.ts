@@ -69,7 +69,21 @@ export function createTargetApp(options: TargetAppOptions): Express {
   const app = express();
   const sessions = new Set<string>();
   let members = loadSeed();
-  let faults: readonly string[] = [];
+  // Armed faults, scoped to a route and counted down, so a test arms exactly one surprise and
+  // the app goes back to behaving itself afterwards.
+  let faults: { readonly fault: string; readonly path: string; readonly method: string | null; remaining: number }[] = [];
+
+  // A fault is scoped to a route, and to a method when one is named, because the same path is
+  // served twice in this app and arming the wrong one spends the surprise before it matters.
+  const consumeFault = (fault: string, path: string, method: string): boolean => {
+    const armed = faults.find(
+      (candidate) => candidate.fault === fault && candidate.path === path && (candidate.method === null || candidate.method === method) && candidate.remaining > 0,
+    );
+    if (armed === undefined) return false;
+    armed.remaining -= 1;
+    faults = faults.filter((candidate) => candidate.remaining > 0);
+    return true;
+  };
 
   const fields = {
     memberId: generatedField(options.idSeed, 'memberId'),
@@ -84,6 +98,7 @@ export function createTargetApp(options: TargetAppOptions): Express {
   app.set('view engine', 'ejs');
   app.set('views', fileURLToPath(new URL('../views', import.meta.url)));
   app.use(express.urlencoded({ extended: false }));
+  app.use(express.json());
 
   // Test mode only. Every request served outside the control routes, so a test can prove
   // a request the network guard refused never reached the app.
@@ -126,6 +141,21 @@ export function createTargetApp(options: TargetAppOptions): Express {
     app.get('/__control__/state', (_req, res) => {
       res.json({ faults, sessions: sessions.size, requests });
     });
+    // Arms one fault on one route, for a number of responses. Nothing here is reachable by the
+    // automation, because the allowlist denies /__control__ outright.
+    app.post('/__control__/fault', (req, res) => {
+      const fault = formField(req.body, 'fault');
+      const path = formField(req.body, 'path');
+      const method = formField(req.body, 'method');
+      const count: unknown = typeof req.body === 'object' && req.body !== null ? Reflect.get(req.body, 'count') : undefined;
+      if (fault === '' || path === '') {
+        res.status(400).json({ error: 'A fault and a path are required.' });
+        return;
+      }
+      const armed = { fault, path, method: method === '' ? null : method.toUpperCase(), remaining: typeof count === 'number' && count > 0 ? count : 1 };
+      faults = [...faults, armed];
+      res.json({ armed });
+    });
   }
 
   app.use(['/servicing', '/member'], (req: Request, res: Response, next: NextFunction) => {
@@ -147,7 +177,7 @@ export function createTargetApp(options: TargetAppOptions): Express {
   });
 
   app.get('/servicing/search', (_req, res) => {
-    res.render('search', { fields, values: { memberId: '', surname: '' }, results: [], message: null });
+    res.render('search', { fields, values: { memberId: '', surname: '' }, results: [], message: null, dialog: consumeFault('surpriseDialog', '/servicing/search', 'GET') });
   });
 
   app.post('/servicing/search', (req, res) => {
@@ -155,14 +185,15 @@ export function createTargetApp(options: TargetAppOptions): Express {
       memberId: formField(req.body, fields.memberId.name).trim(),
       surname: formField(req.body, fields.surname.name).trim(),
     };
+    const dialog = consumeFault('surpriseDialog', '/servicing/search', 'POST');
     if (values.memberId === '' && values.surname === '') {
-      res.render('search', { fields, values, results: [], message: 'Enter a member ID or surname.' });
+      res.render('search', { fields, values, results: [], message: 'Enter a member ID or surname.', dialog });
       return;
     }
     const results = members.filter((member) =>
       values.memberId !== '' ? member.id === values.memberId : surnameOf(member).toLowerCase() === values.surname.toLowerCase(),
     );
-    res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null });
+    res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null, dialog });
   });
 
   app.get('/member/:id', (req, res) => {

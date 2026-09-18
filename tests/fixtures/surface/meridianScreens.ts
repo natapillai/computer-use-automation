@@ -7,7 +7,7 @@ import { box, uiNode } from './nodes.js';
 
 export interface MeridianScriptOptions {
   readonly memberLabel?: string;
-  readonly searchLeadsTo?: 'results' | 'noRecords' | 'wrongPage' | 'nowhere' | 'loginRedirect';
+  readonly searchLeadsTo?: 'results' | 'noRecords' | 'wrongPage' | 'nowhere' | 'loginRedirect' | 'dialog';
   readonly memberId?: string;
   readonly balance?: string;
   readonly duplicateSearchButton?: boolean;
@@ -74,6 +74,8 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
     { from: 'results', on: { kind: 'click', ref: 'r1' }, to: 'detail' },
   ];
   if (leadsTo !== 'nowhere') transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: leadsTo });
+  // Only a person clears the modal. Nothing in the automation has a reason to click it.
+  transitions.push({ from: 'dialog', on: { kind: 'click', ref: 'g3' }, to: 'results' });
   const ticking = options.clockTicks ?? false;
   if (ticking) {
     transitions.push({ from: 'search', on: { kind: 'click', ref: 'n2' }, to: 'searchTick' });
@@ -99,6 +101,24 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
         resultsStatus,
       ),
       noRecords: screen([...form, uiNode('m1', 'cell', 'No records found.', box(8, 131, 120, 20))], resultsPath, resultsStatus),
+      // A modal nothing in the capability or the app profile declares. The run must stop on it
+      // rather than click it to find out what it is.
+      dialog: {
+        ...screen(
+          [
+            ...form,
+            uiNode('g1', 'dialog', 'Session notice', box(300, 200, 400, 160), {
+              children: [
+                uiNode('g2', 'text', 'Your session will expire soon. Contact the service desk.', box(310, 240, 380, 20)),
+                uiNode('g3', 'cell', 'OK', box(620, 320, 60, 24), { clickableHint: true }),
+              ],
+            }),
+          ],
+          resultsPath,
+          resultsStatus,
+        ),
+        dialogOpen: true,
+      },
       wrongPage: screen([uiNode('h1', 'heading', 'Session Notice', box(8, 8, 837, 17))], '/servicing/search'),
       loginRedirect: screen(
         [

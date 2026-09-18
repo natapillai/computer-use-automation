@@ -4,8 +4,10 @@ import { ControlLostError, type ControlToken } from '../control/controlToken.js'
 import { resolveTemplate } from '../core/capability/resolveTemplate.js';
 import type { AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
+import { matchStrategy } from '../core/surfaceModel/match.js';
 import { progressHash } from '../core/surfaceModel/progressHash.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
+import { unclassifiedDialog } from '../escalation/unclassified.js';
 import type { Observation, ResolvedAction } from '../core/surfaceModel/types.js';
 import type { Clock } from '../runtime/clock.js';
 import type { GuardedOutcome, GuardedSurface } from '../surface/guardedSurface.js';
@@ -38,7 +40,7 @@ export type DiscoveryEvent =
   | { readonly t: 'decision'; readonly at: string; readonly tool: string; readonly input: unknown }
   | { readonly t: 'action'; readonly at: string; readonly tool: string; readonly ok: boolean; readonly detail: string }
   | { readonly t: 'authorization'; readonly at: string; readonly tool: string; readonly verdict: 'allow' | 'deny' | 'confirm'; readonly rule?: string }
-  | { readonly t: 'stuck'; readonly at: string; readonly detector: 'NoProgress' | 'ModelRequested'; readonly detail: string };
+  | { readonly t: 'stuck'; readonly at: string; readonly detector: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly detail: string };
 
 export interface DiscoveryOptions {
   readonly surface: GuardedSurface;
@@ -62,7 +64,7 @@ export interface DiscoveryOptions {
   // 3. Without it the loop still stops, because a run that does not know what to do next must
   // not keep acting, and the result still says why.
   readonly escalation?: {
-    raise(input: { readonly reason: 'NoProgress' | 'ModelRequested'; readonly explanation: string; readonly observation: Observation }): Promise<string>;
+    raise(input: { readonly reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly explanation: string; readonly observation: Observation }): Promise<string>;
   };
 }
 
@@ -76,7 +78,7 @@ interface DiscoveryCommon {
 
 export type DiscoveryResult =
   | (DiscoveryCommon & { readonly status: 'done' })
-  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: 'NoProgress' | 'ModelRequested'; readonly detail: string; readonly interventionId?: string })
+  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly detail: string; readonly interventionId?: string })
   | (DiscoveryCommon & {
       readonly status: 'failure';
       readonly reason: 'Timeout' | 'ModelCallFailed' | 'ModelStopped' | 'PolicyDenied' | 'ControlLost' | 'SurfaceUnavailable' | 'GoalInvalid';
@@ -120,7 +122,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const emit = (event: DiscoveryEvent): void => options.onEvent?.(event);
   const common = (): DiscoveryCommon => ({ modelCalls, actions, extracted, exchanges, finalObservation: latest });
   const fail = (reason: FailureReason, detail: string): Finish => new Finish({ ...common(), status: 'failure', reason, detail });
-  const escalate = async (reason: 'NoProgress' | 'ModelRequested', detail: string): Promise<Finish> => {
+  const escalate = async (reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition', detail: string): Promise<Finish> => {
     emit({ t: 'stuck', at: at(), detector: reason, detail });
     const interventionId = options.escalation === undefined || latest === null ? undefined : await options.escalation.raise({ reason, explanation: detail, observation: latest });
     return new Finish({ ...common(), status: 'escalated', reason, detail, ...(interventionId === undefined ? {} : { interventionId }) });
@@ -159,6 +161,21 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
   const emitAuthorization = (tool: string, outcome: GuardedOutcome): void => {
     if (outcome.kind === 'performed') emit({ t: 'authorization', at: at(), tool, verdict: 'allow' });
     else emit({ t: 'authorization', at: at(), tool, verdict: outcome.kind === 'denied' ? 'deny' : 'confirm', rule: outcome.decision.rule });
+  };
+
+  // A dialog the app profile does not claim stops the run here too. During discovery nothing
+  // else knows what it is, and letting the model click it to find out is the failure this
+  // whole detector exists to prevent. See docs/ESCALATION.md section 3.
+  const stopOnUnclaimedDialog = async (observation: Observation): Promise<void> => {
+    if (!observation.dialogOpen) return;
+    const unclaimed = await unclassifiedDialog({
+      observation,
+      conditions: options.profile.conditions.map((condition) => condition.when),
+      match: async (strategy, framePath) => matchStrategy(observation, strategy, framePath),
+    });
+    if (unclaimed) {
+      throw await escalate('UnclassifiedCondition', 'A dialog is open that the app profile does not claim, so the run stopped rather than clicking it.');
+    }
   };
 
   const withRecord = (executed: Executed, recorded: RecordedAction | undefined): Executed =>
@@ -248,6 +265,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
 
     let seen = await observe();
     await options.capture?.('initial', seen.observation);
+    await stopOnUnclaimedDialog(seen.observation);
     let unchanged = 0;
     const messages: Anthropic.MessageParam[] = [{ role: 'user', content: `${goal.text}\n\nObservation:\n${seen.text}` }];
 
@@ -294,6 +312,7 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (executed.terminal === 'escalated') throw await escalate('ModelRequested', executed.text);
 
       seen = await observe();
+      await stopOnUnclaimedDialog(seen.observation);
       if (executed.recordedIndex !== undefined) {
         options.recorder?.complete(executed.recordedIndex, { ok: !executed.isError, changed: seen.progress !== before });
       }

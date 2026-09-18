@@ -242,6 +242,14 @@ describe('runDiscovery', () => {
     expect(denied.events).toContainEqual(expect.objectContaining({ t: 'authorization', tool: 'navigate', verdict: 'deny', rule: 'deniedPath' }));
   });
 
+  it('stops for a person when a dialog appears that the app profile does not claim, without asking the model about it', async () => {
+    const { result, model } = await discover({ turns: [call('click', { ref: 'n6' }), call('done')], script: { searchLeadsTo: 'dialog' } });
+
+    expect(result).toMatchObject({ status: 'escalated', reason: 'UnclassifiedCondition' });
+    // One call made the click. Nothing asked the model what to do about the modal.
+    expect(model.requests).toHaveLength(1);
+  });
+
   it('raises a live intervention when the model asks for a person, and reports the id it raised', async () => {
     const raised: { reason: string; explanation: string; url: string | undefined }[] = [];
     const { result } = await discover({

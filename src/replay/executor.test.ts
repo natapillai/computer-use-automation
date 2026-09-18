@@ -196,6 +196,38 @@ describe('replay with a person on the other end', () => {
     expect(failureOf(result).observed).toContain('three');
   });
 
+  it('stops on a dialog no rule claims, never clicks it, and carries on once a person clears it', async () => {
+    const { result, raised, driver } = await run({
+      script: { searchLeadsTo: 'dialog' },
+      handovers: [
+        {
+          kind: 'resumed',
+          act: async (driver, tokens) => {
+            await driver.act({ kind: 'click', ref: 'g3' }, tokens.issue('human'));
+          },
+        },
+      ],
+    });
+
+    expect(raised.map((input) => input.reason)).toEqual(['UnclassifiedCondition']);
+    expect(result).toMatchObject({ status: 'success', interventions: [{ reason: 'UnclassifiedCondition', disposition: 'resumed' }] });
+    // The automation never touched the modal. Only the person did, and only the OK cell.
+    expect(driver.performed.filter((action) => action.kind === 'click' && action.ref === 'g1')).toEqual([]);
+  });
+
+  it('does not escalate a dialog a rule claims, because then the system knows what it is', async () => {
+    const fixture = readSavingsBalanceFixture();
+    const claimed: CapabilityInput = {
+      ...fixture,
+      outcomes: [...fixture.outcomes, { code: 'SESSION_NOTICE', description: 'The app asked the operator to contact the service desk.', terminal: true, provenance: 'manual', detect: { kind: 'dialogPresent' } }],
+    };
+
+    const { result, raised } = await run({ script: { searchLeadsTo: 'dialog' }, capability: claimed, handovers: [] });
+
+    expect(raised).toEqual([]);
+    expect(result).toMatchObject({ status: 'business_outcome', outcome: { code: 'SESSION_NOTICE' } });
+  });
+
   it('advances when the person left the page where the step was trying to get to', async () => {
     const { result } = await run({
       capability: needsApproval(),

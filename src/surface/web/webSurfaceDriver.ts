@@ -69,6 +69,14 @@ export function createWebSurfaceDriver(options: WebSurfaceOptions): SurfaceDrive
   // Per frame change counters as they stood when the last snapshot was taken.
   let baselines = new Map<Frame, Baseline>();
 
+  // Registered so Playwright stops dismissing dialogs by itself, which is its default. Neither
+  // accepting nor dismissing is the whole point. A dialog the automation did not expect goes to
+  // a person, and clicking it to find out what it says is what this system must never do.
+  let nativeDialog: string | null = null;
+  page.on('dialog', (dialog) => {
+    nativeDialog = dialog.type();
+  });
+
   page.on('response', (response) => {
     const request = response.request();
     if (!request.isNavigationRequest()) return;
@@ -80,6 +88,11 @@ export function createWebSurfaceDriver(options: WebSurfaceOptions): SurfaceDrive
   });
 
   const snapshot = async (): Promise<Observation> => {
+    // A native dialog blocks the page, so there is nothing to snapshot while one is open. The
+    // last observation is returned with the dialog flagged, which is what lets the run escalate
+    // instead of waiting out its budget against a page that cannot answer.
+    if (nativeDialog !== null && latest !== null) return { ...latest, dialogOpen: true };
+
     // Baselines come first, so any change that lands while the snapshot is taken is
     // counted against this observation and waitForChange returns at once.
     const next = new Map<Frame, Baseline>();
@@ -109,7 +122,7 @@ export function createWebSurfaceDriver(options: WebSurfaceOptions): SurfaceDrive
     return {
       root,
       frames: page.frames().map((frame) => ({ framePath: framePathOf(frame), url: frame.url(), lastStatus: statuses.get(frame) ?? null })),
-      dialogOpen: [...walkNodes(root)].some((node) => node.role === 'dialog' || node.role === 'alertdialog'),
+      dialogOpen: nativeDialog !== null || [...walkNodes(root)].some((node) => node.role === 'dialog' || node.role === 'alertdialog'),
     };
   };
 

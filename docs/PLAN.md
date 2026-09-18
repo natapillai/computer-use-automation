@@ -150,7 +150,7 @@ Ends at gate S4-T10. Goal, live discovery, reviewed artifact, and a replay that 
 
 Ends at gate S5-T07, where a human takes the live session, acts, hands back, and the run completes. It also carries the write flow, which is all of requirement 3.4.
 
-* [ ] **S5-T01** Control reducer, `InterventionRequest`, in memory store, and `UnclassifiedCondition`.
+* [x] **S5-T01** Control reducer, `InterventionRequest`, in memory store, and `UnclassifiedCondition`.
   * Accept: the seven state reducer around the S1-T07 token, rotating on every transition. An intervention carries the capability or goal, the step, a screenshot, the reason and a plain language explanation, redacted, with no resume token and no journal. Stuck detection is three detectors. `NoProgress` and `ModelRequested` from S4-T04 now raise live interventions, and `UnclassifiedCondition` fires in either phase on a dialog no rule claims. A policy `confirm` is not a stuck detector. It uses the same channel for a healthy run that needs approval. `ActionFailureStreak` and `RecoveryExhausted` are cut, because a step or duration budget already ends those runs as typed failures that belong to an engineer.
   * Test: unit, every legal and illegal transition, a token held across a transition rejected, the payload complete with no unredacted PII, `UnclassifiedCondition` firing on an unclaimed dialog and silent when a rule claims it, and a discovery `NoProgress` signal raised as an intervention.
 * [x] **S5-T02** Operator API and page, hosted by the run.
@@ -162,7 +162,7 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 * [x] **S5-T04** Resume revalidation and the one shot confirm grant.
   * Accept: on release the executor re observes and checks, in order, capability success, a declared outcome, the step postcondition, an approval grant, and the step precondition, and otherwise escalates again. A grant is bound to run, step and target and consumed once.
   * Test: unit, one per branch, including a human who finished the task reporting success without re acting, and a grant refused on reuse.
-* [ ] **S5-T05** Fault arming, `surpriseDialog`, and `UnexpectedDialog` escalation.
+* [x] **S5-T05** Fault arming, `surpriseDialog`, and `UnexpectedDialog` escalation.
   * Accept: `POST /__control__/fault` arms a route scoped fault with a count. `surpriseDialog` renders an HTML modal. A native dialog handler is registered that neither accepts nor dismisses. An unexpected dialog is escalated and never clicked.
   * Test: integration, no click dispatched, a screenshot captured, and an intervention raised.
 * [ ] **S5-T06** Sub account write flow, `flaky503`, and `member.openSubAccount`.
