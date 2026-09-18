@@ -49,9 +49,11 @@ export interface InterventionStore {
   get(id: string): InterventionRequest | null;
   list(): readonly InterventionRequest[];
   status(id: string): InterventionState | null;
-  settle(id: string, state: InterventionState): void;
+  // A release may carry an approval, which is a person approving one action rather than
+  // performing it, see docs/ESCALATION.md section 5.
+  settle(id: string, state: InterventionState, details?: { readonly approved?: boolean }): void;
   // How a blocked run learns that a person answered. Returns the way to stop listening.
-  subscribe(listener: (id: string, state: InterventionState) => void): () => void;
+  subscribe(listener: (id: string, state: InterventionState, details: { readonly approved: boolean }) => void): () => void;
 }
 
 export interface RaiseContext {
@@ -81,7 +83,7 @@ export interface RaiseContext {
 
 export function createInterventionStore(): InterventionStore {
   const items = new Map<string, { readonly request: InterventionRequest; readonly state: InterventionState }>();
-  const listeners = new Set<(id: string, state: InterventionState) => void>();
+  const listeners = new Set<(id: string, state: InterventionState, details: { readonly approved: boolean }) => void>();
 
   return {
     subscribe: (listener) => {
@@ -97,11 +99,11 @@ export function createInterventionStore(): InterventionStore {
     get: (id) => items.get(id)?.request ?? null,
     list: () => [...items.values()].filter((entry) => entry.state === 'open').map((entry) => entry.request),
     status: (id) => items.get(id)?.state ?? null,
-    settle: (id, state) => {
+    settle: (id, state, details) => {
       const entry = items.get(id);
       if (entry === undefined) throw new TypeError(`There is no intervention ${id} to settle.`);
       items.set(id, { request: entry.request, state });
-      for (const listener of [...listeners]) listener(id, state);
+      for (const listener of [...listeners]) listener(id, state, { approved: details?.approved === true });
     },
   };
 }

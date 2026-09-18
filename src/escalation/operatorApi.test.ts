@@ -144,6 +144,16 @@ describe('createOperatorApi', () => {
     expect(store.status('int_000001')).toBe('released');
   });
 
+  it('passes on the approval a person gave with the release', async () => {
+    const token = await claim();
+    const settled: { state: string; approved: boolean }[] = [];
+    store.subscribe((_id, state, details) => settled.push({ state, approved: details.approved }));
+
+    await api.inject({ method: 'POST', url: '/interventions/int_000001/release', headers: { 'x-control-token': token }, payload: { outcome: 'resumed', approval: true } });
+
+    expect(settled).toEqual([{ state: 'released', approved: true }]);
+  });
+
   it('refuses a release that does not hold the session, and leaves control where it was', async () => {
     await claim();
 

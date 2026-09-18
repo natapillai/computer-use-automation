@@ -153,13 +153,13 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 * [ ] **S5-T01** Control reducer, `InterventionRequest`, in memory store, and `UnclassifiedCondition`.
   * Accept: the seven state reducer around the S1-T07 token, rotating on every transition. An intervention carries the capability or goal, the step, a screenshot, the reason and a plain language explanation, redacted, with no resume token and no journal. Stuck detection is three detectors. `NoProgress` and `ModelRequested` from S4-T04 now raise live interventions, and `UnclassifiedCondition` fires in either phase on a dialog no rule claims. A policy `confirm` is not a stuck detector. It uses the same channel for a healthy run that needs approval. `ActionFailureStreak` and `RecoveryExhausted` are cut, because a step or duration budget already ends those runs as typed failures that belong to an engineer.
   * Test: unit, every legal and illegal transition, a token held across a transition rejected, the payload complete with no unredacted PII, `UnclassifiedCondition` firing on an unclaimed dialog and silent when a rule claims it, and a discovery `NoProgress` signal raised as an intervention.
-* [ ] **S5-T02** Operator API and page, hosted by the run.
+* [x] **S5-T02** Operator API and page, hosted by the run.
   * Accept: the run blocks in `pending_human` and prints the intervention URL. Endpoints to list, read, claim, release and abort, and a masked screenshot endpoint the page polls. A claim timeout ends the run as `escalated` with `unclaimed`. The page is bare HTML with a canvas and three buttons.
   * Test: integration, a claim transfers control, a release returns it, an unclaimed intervention times out, and screenshots are masked.
-* [ ] **S5-T03** CDP input forwarding with hit testing, and human action records.
+* [x] **S5-T03** CDP input forwarding with hit testing, and human action records.
   * Accept: `POST /sessions/:id/input` requires the current human token. Before dispatching a click it hit tests with `DOM.getNodeForLocation` and runs the recorder, so each human action carries a derived bundle. Typed values are never captured. Records go to evidence only.
   * Test: integration, a forwarded click changes state in the same session, a stale token is refused, and the record carries a resolvable bundle and no value.
-* [ ] **S5-T04** Resume revalidation and the one shot confirm grant.
+* [x] **S5-T04** Resume revalidation and the one shot confirm grant.
   * Accept: on release the executor re observes and checks, in order, capability success, a declared outcome, the step postcondition, an approval grant, and the step precondition, and otherwise escalates again. A grant is bound to run, step and target and consumed once.
   * Test: unit, one per branch, including a human who finished the task reporting success without re acting, and a grant refused on reuse.
 * [ ] **S5-T05** Fault arming, `surpriseDialog`, and `UnexpectedDialog` escalation.

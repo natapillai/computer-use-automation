@@ -66,14 +66,47 @@ describe('createEscalationChannel', () => {
   });
 
   it('returns resumed once a person hands the session back', async () => {
-    const { escalation, store } = channel(never);
+    const { escalation, store, control } = channel(never);
 
     const handover = raise(escalation);
     await Promise.resolve();
+    // The same order the API moves control in, claim then release, before the store settles.
+    control.apply('claim');
     store.settle('int_000001', 'claimed');
+    control.apply('release');
     store.settle('int_000001', 'released');
 
-    expect(await handover).toEqual({ kind: 'resumed', interventionId: 'int_000001' });
+    expect(await handover).toMatchObject({ kind: 'resumed', interventionId: 'int_000001', approved: false, token: { holder: 'automation' } });
+  });
+
+  it('carries an approval back, because approving one action is not the same as having done it', async () => {
+    const { escalation, store, control } = channel(never);
+
+    const handover = raise(escalation);
+    await Promise.resolve();
+    control.apply('claim');
+    store.settle('int_000001', 'claimed');
+    control.apply('release');
+    store.settle('int_000001', 'released', { approved: true });
+
+    expect(await handover).toMatchObject({ kind: 'resumed', interventionId: 'int_000001', approved: true, token: { holder: 'automation' } });
+  });
+
+  it('hands the run a token the person never held, because the old one died when they claimed', async () => {
+    const { escalation, store, control } = channel(never);
+
+    const handover = raise(escalation);
+    await Promise.resolve();
+    const held = control.apply('claim').token;
+    store.settle('int_000001', 'claimed');
+    control.apply('release');
+    store.settle('int_000001', 'released');
+    const resumed = await handover;
+
+    expect(control.snapshot()).toMatchObject({ state: 'automation', holder: 'automation' });
+    if (resumed.kind !== 'resumed') throw new Error('The handover did not resume.');
+    expect(resumed.token.value).not.toBe(held?.value);
+    expect(control.current()?.value).toBe(resumed.token.value);
   });
 
   it('returns aborted when a person ends the run', async () => {
@@ -100,6 +133,7 @@ describe('createEscalationChannel', () => {
 
     const handover = raise(escalation);
     await Promise.resolve();
+    control.apply('claim');
     store.settle('int_000001', 'claimed');
     close();
     await Promise.resolve();
@@ -107,7 +141,8 @@ describe('createEscalationChannel', () => {
     expect(store.status('int_000001')).toBe('claimed');
     expect(control.snapshot().state).not.toBe('aborted');
 
+    control.apply('release');
     store.settle('int_000001', 'released');
-    expect(await handover).toEqual({ kind: 'resumed', interventionId: 'int_000001' });
+    expect(await handover).toMatchObject({ kind: 'resumed', interventionId: 'int_000001', approved: false, token: { holder: 'automation' } });
   });
 });

@@ -1,4 +1,5 @@
 import type { SessionControl } from '../control/controlPlane.js';
+import type { ControlToken } from '../control/controlToken.js';
 import type { EscalationReason } from '../core/outcome/result.js';
 import type { KnownValue, Redactor } from '../core/redaction/redactor.js';
 import type { Clock } from '../runtime/clock.js';
@@ -10,7 +11,12 @@ import { raiseIntervention, type ActionSummary, type InterventionStore } from '.
 // for a claim and a release, see ADR 0016 and docs/ESCALATION.md section 5.
 
 export type Handover =
-  | { readonly kind: 'resumed'; readonly interventionId: string }
+  // approved is a person approving one action, which the run then performs itself with a one
+  // shot grant. It is not the same as a person having done something.
+  //
+  // The token is the new one. Control rotated when the person claimed the session, so whatever
+  // the run held before the handover is dead, and it has to act with this one or not at all.
+  | { readonly kind: 'resumed'; readonly interventionId: string; readonly approved: boolean; readonly token: ControlToken }
   | { readonly kind: 'aborted'; readonly interventionId: string }
   | { readonly kind: 'unclaimed'; readonly interventionId: string };
 
@@ -72,11 +78,15 @@ export function createEscalationChannel(options: EscalationChannelOptions): Esca
       options.announce(intervention.consoleUrl);
 
       return await new Promise<Handover>((settled) => {
-        const stop = options.store.subscribe((id, state) => {
+        const stop = options.store.subscribe((id, state, details) => {
           if (id !== intervention.id) return;
           if (state === 'released') {
             stop();
-            settled({ kind: 'resumed', interventionId: id });
+            // The API handed control back, which leaves the session in resuming. The run takes
+            // it from there with a token nobody else has seen.
+            const { token } = options.control.apply('resume');
+            if (token === null) throw new TypeError('A resumed session was issued no token.');
+            settled({ kind: 'resumed', interventionId: id, approved: details.approved, token });
           } else if (state === 'aborted') {
             stop();
             settled({ kind: 'aborted', interventionId: id });

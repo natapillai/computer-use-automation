@@ -1,23 +1,29 @@
 import { ControlLostError, type ControlToken } from '../control/controlToken.js';
 import { validateInputs } from '../core/capability/inputs.js';
 import { resolveTemplate, type TemplateValues } from '../core/capability/resolveTemplate.js';
-import type { Capability, Step } from '../core/capability/schema.js';
+import type { Capability, OutputSpec, Step } from '../core/capability/schema.js';
 import { templateBundle, templateCondition, type Templated } from '../core/capability/templateCondition.js';
 import type { DriftRecord } from '../core/locator/resolve.js';
 import type { AppProfile } from '../core/policy/profile.js';
 import {
   businessOutcomeResult,
+  escalatedResult,
   FAILURE_CLASSES,
   failureResult,
   successResult,
+  type EscalationReason,
   type FailureClass,
   type FailureDetail,
+  type InterventionRecord,
   type ReplayResult,
   type ResultBaseInput,
   type TypedValue,
 } from '../core/outcome/result.js';
+import type { GrantLedger } from '../core/policy/authorize.js';
+import type { EscalationChannel } from '../escalation/channel.js';
+import { revalidate, type Resumption } from './resume.js';
 import { fingerprint } from '../core/surfaceModel/fingerprint.js';
-import type { ActionResult, ResolvedAction } from '../core/surfaceModel/types.js';
+import type { ActionResult, Observation, ResolvedAction } from '../core/surfaceModel/types.js';
 import type { Clock } from '../runtime/clock.js';
 import type { GuardedSurface } from '../surface/guardedSurface.js';
 import { extractOutput } from './extract.js';
@@ -37,6 +43,14 @@ export interface ReplayContext {
   readonly profile: AppProfile;
   readonly env?: Readonly<Record<string, string>>;
   readonly allowedEnv?: readonly string[];
+  // Where the run stops for a person. Without it a step that needs approval fails, because
+  // nothing can approve it, see docs/ESCALATION.md section 5.
+  readonly escalation?: EscalationChannel;
+  // The same ledger the guarded surface authorizes against, so an approval a person gave can
+  // be spent on exactly one action.
+  readonly grants?: GrantLedger;
+  // Refs for the screenshot and snapshot an intervention carries, written by the caller.
+  readonly capture?: () => Promise<{ readonly screenshotRef: string; readonly snapshotRef: string }>;
 }
 
 type RuleClass = Step['onCondition'][number]['classify'];
@@ -58,6 +72,9 @@ interface PreparedAction {
 // The entry point is not a step, so it has no step id of its own to bind a grant to.
 const ENTRY_STEP_ID = 'entry';
 
+// A handoff that keeps coming back on the same step is a loop, not an escalation.
+const MAX_HANDOVERS_PER_STEP = 3;
+
 // Leaves the run from any depth with a finished result. It never escapes replay.
 class Stop {
   readonly result: ReplayResult;
@@ -68,7 +85,12 @@ class Stop {
 }
 
 export async function replay(capability: Capability, supplied: Readonly<Record<string, unknown>>, context: ReplayContext): Promise<ReplayResult> {
-  const { surface, control, clock, runId } = context;
+  const { surface, clock, runId } = context;
+  // Replaced on every resume. The token the run started with dies the moment a person claims
+  // the session, so acting with it afterwards is exactly what ADR 0008 forbids.
+  let control = context.control;
+  const interventions: InterventionRecord[] = [];
+  let handoversOnStep = 0;
   const allowedEnv = context.allowedEnv ?? [];
   const startedAt = clock.now().toISOString();
   const inputNames = Object.keys(supplied);
@@ -88,6 +110,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     stepsAttempted,
     stepsCompleted,
     drift,
+    interventions,
   });
 
   const fail = (detail: FailureInput): Stop =>
@@ -125,7 +148,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     return templated(resolution.ok ? { ok: true, value: resolution.text } : resolution, where);
   };
 
-  const perform = async (prepared: PreparedAction, stepId: string, effect: 'read' | 'write', idempotent: boolean): Promise<void> => {
+  const perform = async (prepared: PreparedAction, stepId: string, effect: 'read' | 'write', idempotent: boolean, afterApproval = false): Promise<void> => {
     const outcome = await surface.perform({ ...prepared, stepId, effect }, control);
     switch (outcome.kind) {
       case 'denied':
@@ -136,16 +159,141 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
           cause: `rule ${outcome.decision.rule}`,
           retryable: false,
         });
-      case 'confirm':
-        throw fail({
-          class: 'PolicyDenied',
-          expected: 'An action that may run without a person approving it.',
-          observed: 'This step writes to the system of record and no approval channel is attached to this run.',
-          cause: `rule ${outcome.decision.rule}`,
-          retryable: false,
-        });
+      case 'confirm': {
+        if (context.escalation === undefined) {
+          throw fail({
+            class: 'PolicyDenied',
+            expected: 'An action that may run without a person approving it.',
+            observed: 'This step writes to the system of record and no approval channel is attached to this run.',
+            cause: `rule ${outcome.decision.rule}`,
+            retryable: false,
+          });
+        }
+        if (afterApproval) {
+          throw fail({
+            class: 'PolicyDenied',
+            expected: 'The approved action runs once, spending the grant the person gave.',
+            observed: 'The step asked for approval again after one was already given.',
+            cause: `rule ${outcome.decision.rule}`,
+            retryable: false,
+          });
+        }
+        const resumption = await handOver(
+          'PolicyConfirmation',
+          `This step writes to the system of record, so it needs a person to approve it. ${outcome.decision.reason}`,
+          'Approve the action if it is the right thing to do, or do it yourself and hand the session back.',
+        );
+        await resume(resumption, prepared, stepId, effect, idempotent);
+        return;
+      }
       case 'performed':
         if (!outcome.result.ok) throw fail(actionFailure(outcome.result, idempotent));
+    }
+  };
+
+  // Everything an intervention needs, raised, waited on, and recorded whichever way it ends.
+  const handOver = async (reason: EscalationReason, explanation: string, suggestedAction: string): Promise<Resumption> => {
+    const channel = context.escalation;
+    if (channel === undefined) return { kind: 'escalate', detail: 'No approval channel is attached to this run.' };
+
+    handoversOnStep += 1;
+    const step = currentStep;
+    const startedAt = clock.now().toISOString();
+    const refs = (await context.capture?.()) ?? { screenshotRef: 'none', snapshotRef: 'none' };
+    const before = await surface.observe();
+    const handover = await channel.raise({
+      sessionId: surface.sessionId,
+      runId,
+      phase: 'replay',
+      reason,
+      explanation,
+      suggestedAction,
+      capability: { id: capability.id, version: capability.version },
+      ...(step === null ? {} : { atStep: { id: step.id, index: step.index, intent: step.intent } }),
+      url: before.frames[0]?.url ?? '',
+      framePath: step?.action.kind === 'navigate' ? step.action.framePath : (step?.target?.framePath ?? []),
+      screenshotRef: refs.screenshotRef,
+      snapshotRef: refs.snapshotRef,
+      recentActions: [],
+    });
+
+    interventions.push({
+      interventionId: handover.interventionId,
+      reason,
+      atStepId: step?.id ?? null,
+      disposition: handover.kind === 'resumed' ? 'resumed' : handover.kind,
+      startedAt,
+      endedAt: clock.now().toISOString(),
+    });
+
+    if (handover.kind !== 'resumed') {
+      throw new Stop(escalatedResult(base(), { id: handover.interventionId, reason, atStepId: step?.id ?? null, disposition: handover.kind }));
+    }
+    control = handover.token;
+    if (step === null) return { kind: 'escalate', detail: 'The run had no step to revalidate after the release.' };
+
+    // The page may be somewhere else entirely now, which is the whole point of the person
+    // having been there, so nothing resumes until a fresh observation says what is true.
+    const after = await surface.observe();
+    return revalidate({
+      capability,
+      step,
+      observation: after,
+      match: (strategy, framePath) => surface.match(strategy, framePath),
+      // Here an output is resolvable when the page can be read for it now, not when the run
+      // happens to have extracted it already. A person who finished the task left the answer on
+      // the screen, and asking the wrong question would miss exactly that.
+      outputResolvable: async (name) => {
+        const spec = capability.outputs.find((candidate) => candidate.name === name);
+        if (spec === undefined) return false;
+        const target = templated(templateBundle(spec.source.target, values(), allowedEnv), `the source of output ${name}`);
+        return (await extractOutput(spec, target, after, surface)).ok;
+      },
+      values: values(),
+      allowedEnv,
+      approved: handover.approved,
+    });
+  };
+
+  const resume = async (resumption: Resumption, prepared: PreparedAction, stepId: string, effect: 'read' | 'write', idempotent: boolean): Promise<void> => {
+    switch (resumption.kind) {
+      case 'success': {
+        // An operator asked to unblock a two step problem often just finishes the task.
+        await collectOutputs(await surface.observe(), capability.outputs);
+        throw new Stop(successResult(base(), outputs));
+      }
+      case 'outcome':
+        throw businessOutcome(resumption.code);
+      case 'satisfiedByHuman':
+        return;
+      case 'approved':
+        // One action, approved once. The ledger hands it out and the policy spends it.
+        context.grants?.issue({ runId, stepId, targetKey: prepared.targetKey });
+        await perform(prepared, stepId, effect, idempotent, true);
+        return;
+      case 'retry':
+        await perform(prepared, stepId, effect, idempotent);
+        return;
+      case 'escalate': {
+        // The person is already engaged, so telling them it is still not right is more use
+        // than ending the run and making them start over. Bounded, because a handoff that
+        // keeps coming back is a loop rather than an escalation.
+        if (handoversOnStep >= MAX_HANDOVERS_PER_STEP) {
+          throw fail({
+            class: 'PolicyDenied',
+            expected: 'The release leaves the run somewhere it can carry on from.',
+            observed: `Handed back three times on this step and it is still not somewhere the run can carry on from. ${resumption.detail}`,
+            retryable: false,
+          });
+        }
+        const again = await handOver(
+          'resumePreconditionFailed',
+          `The session came back, and the run still cannot carry on. ${resumption.detail}`,
+          'Put the session where this step can run, or end the run.',
+        );
+        await resume(again, prepared, stepId, effect, idempotent);
+        return;
+      }
     }
   };
 
@@ -206,6 +354,19 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     }
   };
 
+  const collectOutputs = async (observation: Observation, specs: readonly OutputSpec[]): Promise<void> => {
+    for (const spec of specs) {
+      const target = templated(templateBundle(spec.source.target, values(), allowedEnv), `the source of output ${spec.name}`);
+      const extraction = await extractOutput(spec, target, observation, surface);
+      if (extraction.ok) {
+        outputs[spec.name] = extraction.value;
+        outputText[spec.name] = extraction.text;
+      } else if (spec.required) {
+        throw fail({ class: 'OutputUnresolvable', expected: `${spec.name} can be read from ${target.describedAs}.`, observed: extraction.reason, retryable: false });
+      }
+    }
+  };
+
   const businessOutcome = (code: string): Stop => {
     const declared = capability.outcomes.find((outcome) => outcome.code === code);
     if (declared === undefined) {
@@ -215,6 +376,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
   };
 
   const runStep = async (step: Step): Promise<void> => {
+    handoversOnStep = 0;
     if (step.precondition !== undefined) {
       const condition = templated(templateCondition(step.precondition.condition, values(), allowedEnv), `the precondition of ${step.id}`);
       const ready = await race(surface, clock, [{ condition, entrant: 'precondition' }], step.precondition.timeoutMs, outputResolvable);
@@ -300,16 +462,10 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       });
     }
 
-    for (const spec of capability.outputs.filter((output) => output.source.stepId === step.id)) {
-      const target = templated(templateBundle(spec.source.target, values(), allowedEnv), `the source of output ${spec.name}`);
-      const extraction = await extractOutput(spec, target, settled.observation, surface);
-      if (extraction.ok) {
-        outputs[spec.name] = extraction.value;
-        outputText[spec.name] = extraction.text;
-      } else if (spec.required) {
-        throw fail({ class: 'OutputUnresolvable', expected: `${spec.name} can be read from ${target.describedAs}.`, observed: extraction.reason, retryable: false });
-      }
-    }
+    await collectOutputs(
+      settled.observation,
+      capability.outputs.filter((output) => output.source.stepId === step.id),
+    );
   };
 
   try {

@@ -106,12 +106,14 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
     return reply.send({ humanToken: token.value, sessionId: intervention.sessionId });
   });
 
-  app.post<WithId>('/interventions/:id/release', async (request, reply) => {
+  app.post<{ Params: { id: string }; Body: { outcome?: string; approval?: boolean } }>('/interventions/:id/release', async (request, reply) => {
     if (options.store.get(request.params.id) === null) return reply.code(404).send({ error: 'No such intervention.' });
     if (!holds(request, reply)) return reply;
 
     options.control.apply('release');
-    options.store.settle(request.params.id, 'released');
+    // An approval is one action approved, not performed. The run performs it with a one shot
+    // grant, see docs/ESCALATION.md section 5.
+    options.store.settle(request.params.id, 'released', { approved: request.body?.approval === true });
     return reply.send({ state: options.control.snapshot().state });
   });
 

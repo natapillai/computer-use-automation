@@ -3,7 +3,8 @@ import profileJson from '../../profiles/meridian-core.json' with { type: 'json' 
 import { readSavingsBalanceFixture } from '../../tests/fixtures/capabilities/readSavingsBalance.js';
 import { AppProfile } from '../core/policy/profile.js';
 import { meridianScript, type MeridianScriptOptions } from '../../tests/fixtures/surface/meridianScreens.js';
-import { createControlTokens } from '../control/controlToken.js';
+import { createControlTokens, type SessionControlTokens } from '../control/controlToken.js';
+import type { EscalationChannel, RaiseInput } from '../escalation/channel.js';
 import { Capability, type CapabilityInput } from '../core/capability/schema.js';
 import type { FailureDetail, ReplayResult } from '../core/outcome/result.js';
 import { Allowlist } from '../core/policy/allowlist.js';
@@ -50,10 +51,18 @@ function noRecordsBanner() {
   return rule.when;
 }
 
+// A scripted person on the other end of a handoff. act is what they did to the page while they
+// held it, performed with a human token, exactly as a real claim would.
+type HandoverScript =
+  | { readonly kind: 'resumed'; readonly approved?: boolean; readonly act?: (driver: SurfaceDriver, tokens: SessionControlTokens) => Promise<void> }
+  | { readonly kind: 'aborted' }
+  | { readonly kind: 'unclaimed' };
+
 interface RunOptions {
   readonly script?: MeridianScriptOptions;
   readonly memberId?: string;
   readonly capability?: CapabilityInput;
+  readonly handovers?: readonly HandoverScript[];
   // Stands in for the network guard, which the fake has no network to run.
   readonly afterAct?: (action: ResolvedAction, scope: StepScope) => void;
 }
@@ -71,22 +80,138 @@ async function run(options: RunOptions = {}) {
       return result;
     },
   };
+  const grants = createGrantLedger();
   const surface = createGuardedSurface({
     driver: acting,
     scope,
-    policy: { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants: createGrantLedger() },
+    policy: { allowlist, phase: 'replay', capabilityStatus: 'draft', allowUnattendedReplay: false, grants },
     runId: 'run_000001',
     baseUrl: 'http://localhost:4010',
   });
   const capability = Capability.parse(options.capability ?? readSavingsBalanceFixture());
-  const result = await replay(capability, { memberId: options.memberId ?? '10001' }, { surface, control: tokens.issue('automation'), clock, runId: 'run_000001', profile });
-  return { result, driver, elapsedMs: clock.now().getTime() - Date.parse(START) };
+
+  const raised: RaiseInput[] = [];
+  const escalation: EscalationChannel = {
+    raise: async (input) => {
+      raised.push(input);
+      const next = options.handovers?.[raised.length - 1];
+      if (next === undefined) throw new Error(`The run raised intervention ${raised.length} and the script has ${options.handovers?.length ?? 0}.`);
+      if (next.kind !== 'resumed') return { kind: next.kind, interventionId: `int_${raised.length}` };
+      await next.act?.(acting, tokens);
+      // Control rotated while the person held it, so the run is handed a token nobody else saw.
+      return { kind: 'resumed', interventionId: `int_${raised.length}`, approved: next.approved ?? false, token: tokens.issue('automation') };
+    },
+  };
+
+  const result = await replay(capability, { memberId: options.memberId ?? '10001' }, {
+    surface,
+    control: tokens.issue('automation'),
+    clock,
+    runId: 'run_000001',
+    profile,
+    ...(options.handovers === undefined ? {} : { escalation, grants }),
+  });
+  return { result, driver, raised, elapsedMs: clock.now().getTime() - Date.parse(START) };
+}
+
+// The same capability with its search step declared a write, which is what makes the policy ask
+// a person before it runs.
+function needsApproval(): CapabilityInput {
+  const fixture = readSavingsBalanceFixture();
+  return {
+    ...fixture,
+    policy: { ...fixture.policy, maxEffect: 'write' },
+    steps: fixture.steps.map((step) => (step.id === 'submitSearch' ? { ...step, effect: 'write' } : step)),
+  };
 }
 
 function failureOf(result: ReplayResult): FailureDetail {
   if (result.status !== 'failure') throw new Error(`Expected a failure but the run ended as ${result.status}.`);
   return result.failure;
 }
+
+describe('replay with a person on the other end', () => {
+  it('asks before a write, performs it once the person approves, and finishes the run', async () => {
+    const { result, raised, driver } = await run({ capability: needsApproval(), handovers: [{ kind: 'resumed', approved: true }] });
+
+    expect(raised.map((input) => input.reason)).toEqual(['PolicyConfirmation']);
+    expect(raised[0]).toMatchObject({ phase: 'replay', capability: { id: 'member.readSavingsBalance' }, atStep: { id: 'submitSearch' } });
+    expect(result).toMatchObject({ status: 'success', interventions: [{ reason: 'PolicyConfirmation', atStepId: 'submitSearch', disposition: 'resumed' }] });
+    // The approved action ran once, not twice.
+    expect(driver.performed.filter((action) => action.kind === 'click')).toHaveLength(2);
+  });
+
+  it('ends as escalated when nobody claims the session', async () => {
+    const { result } = await run({ capability: needsApproval(), handovers: [{ kind: 'unclaimed' }] });
+
+    expect(result).toMatchObject({
+      status: 'escalated',
+      intervention: { reason: 'PolicyConfirmation', atStepId: 'submitSearch', disposition: 'unclaimed' },
+      stepsCompleted: 2,
+    });
+  });
+
+  it('ends as escalated when the person ends the run', async () => {
+    const { result } = await run({ capability: needsApproval(), handovers: [{ kind: 'aborted' }] });
+
+    expect(result).toMatchObject({ status: 'escalated', intervention: { disposition: 'aborted' } });
+  });
+
+  it('reports success when the person finished the task instead of approving the action', async () => {
+    const { result } = await run({
+      capability: needsApproval(),
+      handovers: [
+        {
+          kind: 'resumed',
+          act: async (driver, tokens) => {
+            const human = tokens.issue('human');
+            await driver.act({ kind: 'click', ref: 'n6' }, human);
+            await driver.act({ kind: 'click', ref: 'r1' }, human);
+          },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({ status: 'success', interventions: [{ disposition: 'resumed' }] });
+    if (result.status !== 'success') return;
+    expect(result.outputs).toEqual({ savingsBalance: { type: 'money', amountMinor: 425075, currency: 'USD', raw: '$4,250.75' } });
+  });
+
+  it('hands the session straight back when the release left the run nowhere it can carry on from', async () => {
+    const { result, raised } = await run({ capability: needsApproval(), handovers: [{ kind: 'resumed' }, { kind: 'aborted' }] });
+
+    expect(raised.map((input) => input.reason)).toEqual(['PolicyConfirmation', 'resumePreconditionFailed']);
+    expect(result).toMatchObject({ status: 'escalated', intervention: { reason: 'resumePreconditionFailed', disposition: 'aborted' } });
+    expect(result.interventions).toHaveLength(2);
+  });
+
+  it('stops handing back after three tries on one step, because a loop is not an escalation', async () => {
+    const { result, raised } = await run({
+      capability: needsApproval(),
+      handovers: [{ kind: 'resumed' }, { kind: 'resumed' }, { kind: 'resumed' }, { kind: 'resumed' }],
+    });
+
+    expect(raised).toHaveLength(3);
+    expect(failureOf(result)).toMatchObject({ class: 'PolicyDenied', atStepId: 'submitSearch' });
+    expect(failureOf(result).observed).toContain('three');
+  });
+
+  it('advances when the person left the page where the step was trying to get to', async () => {
+    const { result } = await run({
+      capability: needsApproval(),
+      handovers: [
+        {
+          kind: 'resumed',
+          act: async (driver, tokens) => {
+            await driver.act({ kind: 'click', ref: 'n6' }, tokens.issue('human'));
+          },
+        },
+      ],
+    });
+
+    expect(result).toMatchObject({ status: 'success', stepsCompleted: 4 });
+  });
+});
 
 describe('replay', () => {
   it('returns the savings balance of member 10001 as 425075 minor units of USD', async () => {

@@ -145,8 +145,13 @@ describe('the operator API against a live session', () => {
         body: JSON.stringify({ outcome: 'resumed' }),
       });
       expect(released.status).toBe(200);
-      expect(await handover).toEqual({ kind: 'resumed', interventionId: 'int_000001' });
-      expect(control.snapshot()).toMatchObject({ state: 'resuming', holder: null });
+      // The run takes the session back with a token nobody else has seen, and the one the
+      // person held is dead.
+      const resumed = await handover;
+      expect(resumed).toMatchObject({ kind: 'resumed', interventionId: 'int_000001', approved: false, token: { holder: 'automation' } });
+      if (resumed.kind !== 'resumed') throw new Error('The handover did not resume.');
+      expect(resumed.token.value).not.toBe(humanToken);
+      expect(control.snapshot()).toMatchObject({ state: 'automation', holder: 'automation' });
     } finally {
       await api.close();
     }
