@@ -56,6 +56,16 @@ describe('Recorder', () => {
     expect(neighbourhood).not.toMatch(/4,250\.75|Test Member One|4111|10001/);
   });
 
+  it('records that the model declared a click a write, so the artifact can carry the effect', () => {
+    const recorder = createRecorder({ profile, redactor, inputs: { memberId: '10001' } });
+
+    const declared = recorder.record({ tool: 'click', observation: screen('search'), ref: 'n6', submits: true });
+    const plain = recorder.record({ tool: 'click', observation: screen('search'), ref: 'n6' });
+
+    expect(declared.submits).toBe(true);
+    expect(plain.submits).toBe(false);
+  });
+
   it('completes an action with whether it succeeded and changed the page', () => {
     const recorder = createRecorder({ profile, redactor, inputs: { memberId: '10001' } });
     recorder.record({ tool: 'click', observation: screen('search'), ref: 'n6' });

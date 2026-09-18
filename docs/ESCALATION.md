@@ -185,6 +185,8 @@ The mechanism is shared. The consequence differs.
 
 **Discovery.** After handback the model continues from the new state, with the human's actions summarised in its context so it does not repeat them. The generalizer does not turn human actions into steps, so a discovery run that a human had to complete does not produce an artifact. Its `DiscoveryResult` says so, and the evidence shows why.
 
+Approving one action is not completing the run. A handback raised as `PolicyConfirmation` is a person saying yes to a write the automation then performs itself with a one shot grant, so it leaves the page exactly as it was and the run still produces its artifact. Every other reason means somebody touched the session, and the generalizer refuses that run as `HumanCompleted`. The reason is on the `handback` event in the trace, so the rule is checked against evidence rather than against a flag the loop sets.
+
 **Replay.** The human is unblocking a production run. Their actions are recorded as evidence and never amend the artifact. A capability that keeps escalating at the same step needs re recording, and the evidence across those runs is what shows it.
 
 ## 9. Limits, stated honestly for REPORT.md

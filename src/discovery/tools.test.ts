@@ -25,6 +25,23 @@ describe('toolsFor', () => {
     expect(JSON.stringify(tools)).not.toMatch(/selector|xpath|css|coordinate|"value"|"text"/);
   });
 
+  it('offers no way to declare a write when the run may not write', () => {
+    expect(JSON.stringify(tools)).not.toContain('submits');
+  });
+
+  it('offers the submits flag on the acting tools when the run may write, and never requires it', () => {
+    const writing = toolsFor(['memberId'], { writes: true });
+    const click = writing.find((candidate) => candidate.name === 'click');
+    const press = writing.find((candidate) => candidate.name === 'press');
+
+    expect(Object.keys(click?.input_schema.properties ?? {})).toEqual(['ref', 'submits']);
+    expect(Object.keys(press?.input_schema.properties ?? {})).toEqual(['ref', 'key', 'submits']);
+    // Declaring a write is never required. A model that omits it gets refused by the network
+    // guard rather than quietly writing, which is what makes the flag safe to offer.
+    expect(click?.input_schema.required).toEqual(['ref']);
+    expect(JSON.stringify(writing.find((candidate) => candidate.name === 'fill'))).not.toContain('submits');
+  });
+
   it('keeps the tool names and input schemas the S2-T01 cassette recorded', async () => {
     const committed = Cassette.parse(JSON.parse(await readFile('tests/fixtures/cassettes/discovery.readSavingsBalance.json', 'utf8')));
     const [first] = committed.exchanges;

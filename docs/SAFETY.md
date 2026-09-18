@@ -103,6 +103,14 @@ Two independent properties, declared per step and cross checked against the app 
 
 The policy engine reads the effect a capability declares for its own steps, and the network guard enforces it against the profile, per ADR 0014 as amended. While a step runs, a request the profile does not list is refused, and a request the profile calls a write is refused under a step declared as a read. A capability whose declared effect contradicts the profile therefore fails as `PolicyDenied` before the write lands.
 
+### How a discovery step gets its effect
+
+A capability declares the effect of each of its steps, so replay knows. A discovery run has no capability yet, so something has to decide the effect of an action the model is about to take. Nothing in an accessibility tree says whether the cell behind a click submits a form, and inferring it from button text is the regex over button names this section already rejected.
+
+So the model declares it. A run whose request sets `allowWrites` is offered a `submits` flag on `click` and `press`, and setting it raises that step's effect to write. A read only request is never offered the flag at all, so its recorded tool set is unchanged.
+
+The flag widens nothing. Setting it sends the action to a person before it reaches the surface, which is the strictest path available. Omitting it leaves the step declared as a read, and the network guard then refuses the request the profile classifies as a write before it lands. Either way the submit does not happen without a person, so an undeclared write fails closed rather than slipping through. `tests/integration/discovery.write.test.ts` is the proof of the omitted case.
+
 The first version of this section had one enum and classified any POST as irreversible. The member search on the target app is a POST. That made the primary read capability require human confirmation on every discovery and every draft replay, and it made the transient retry case unreachable, because the schema forbids retrying an irreversible step. A search is a read that is not idempotent. One enum could not say that, and the regex over button names that sat beside it was the same defect in a different place.
 
 ### Why confirm rather than block

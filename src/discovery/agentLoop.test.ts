@@ -2,7 +2,7 @@ import type Anthropic from '@anthropic-ai/sdk';
 import { describe, expect, it } from 'vitest';
 import profileJson from '../../profiles/meridian-core.json' with { type: 'json' };
 import { meridianScript, type MeridianScriptOptions } from '../../tests/fixtures/surface/meridianScreens.js';
-import { createControlTokens } from '../control/controlToken.js';
+import { createControlTokens, type SessionControlTokens } from '../control/controlToken.js';
 import { Allowlist } from '../core/policy/allowlist.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { AppProfile } from '../core/policy/profile.js';
@@ -11,7 +11,7 @@ import { ACTION_VERBS } from '../core/surfaceModel/types.js';
 import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
-import { createGuardedSurface } from '../surface/guardedSurface.js';
+import { createGuardedSurface, type GuardedAction, type GuardedSurface } from '../surface/guardedSurface.js';
 import { runDiscovery, type DiscoveryBudgets, type DiscoveryEvent, type DiscoveryOptions } from './agentLoop.js';
 import { createFakeModelClient, type FakeTurn } from './fakeModelClient.js';
 import { createRecorder, type Recorder } from './recorder.js';
@@ -53,6 +53,8 @@ function call(name: string, input: Record<string, unknown> = {}): FakeTurn {
   };
 }
 
+type EscalationFor = (tokens: SessionControlTokens) => NonNullable<DiscoveryOptions['escalation']>;
+
 interface RunOptions {
   readonly turns: readonly FakeTurn[];
   readonly script?: MeridianScriptOptions;
@@ -60,21 +62,33 @@ interface RunOptions {
   readonly goal?: string;
   readonly recorder?: Recorder;
   readonly capture?: DiscoveryOptions['capture'];
-  readonly escalation?: DiscoveryOptions['escalation'];
+  readonly escalation?: DiscoveryOptions['escalation'] | EscalationFor;
 }
 
 async function discover(options: RunOptions) {
   const clock = createTestClock(START);
   const tokens = createControlTokens('sess_000001', createSequentialIds());
   const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script: meridianScript(options.script), clock });
-  const surface = createGuardedSurface({
+  const grants = createGrantLedger();
+  const guarded = createGuardedSurface({
     driver,
-    policy: { allowlist, phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants: createGrantLedger() },
+    policy: { allowlist, phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants },
     runId: 'run_000001',
     baseUrl: 'http://localhost:4010',
   });
+  // Every request the loop made of the surface, so a test can see the effect a step declared
+  // and not only what the surface did with it.
+  const performed: GuardedAction[] = [];
+  const surface: GuardedSurface = {
+    ...guarded,
+    perform: (request, control) => {
+      performed.push(request);
+      return guarded.perform(request, control);
+    },
+  };
   const model = createFakeModelClient(options.turns);
   const events: DiscoveryEvent[] = [];
+  const escalation = typeof options.escalation === 'function' ? options.escalation(tokens) : options.escalation;
   const result = await runDiscovery({
     surface,
     control: tokens.issue('automation'),
@@ -87,12 +101,14 @@ async function discover(options: RunOptions) {
     redactor: createRedactor(allowlist.data),
     budgets: { maxModelCalls: 20, maxActions: 40, maxDurationMs: 300_000, ...options.budgets },
     entryPath: '/servicing',
+    runId: 'run_000001',
+    grants,
     onEvent: (event) => events.push(event),
     ...(options.recorder === undefined ? {} : { recorder: options.recorder }),
     ...(options.capture === undefined ? {} : { capture: options.capture }),
-    ...(options.escalation === undefined ? {} : { escalation: options.escalation }),
+    ...(escalation === undefined ? {} : { escalation }),
   });
-  return { result, driver, model, events };
+  return { result, driver, model, events, performed };
 }
 
 // The last tool result the loop sent back, as text.
@@ -257,7 +273,7 @@ describe('runDiscovery', () => {
       escalation: {
         raise: async (input) => {
           raised.push({ reason: input.reason, explanation: input.explanation, url: input.observation.frames.find((frame) => frame.framePath.length === 0)?.url });
-          return 'int_000001';
+          return { kind: 'unclaimed', interventionId: 'int_000001' };
         },
       },
     });
@@ -273,7 +289,7 @@ describe('runDiscovery', () => {
       escalation: {
         raise: async (input) => {
           reasons.push(input.reason);
-          return 'int_000002';
+          return { kind: 'unclaimed', interventionId: 'int_000002' };
         },
       },
     });
@@ -336,5 +352,100 @@ describe('runDiscovery', () => {
     expect(result).toMatchObject({ status: 'failure', reason: 'GoalInvalid' });
     expect(model.requests).toHaveLength(0);
     expect(driver.performed).toHaveLength(0);
+  });
+  // The write path, S5-T06. A model declares a write with the submits flag. The flag widens
+  // nothing on its own. It raises the step's effect to write, which policy answers with
+  // confirm, so the action reaches a person before it reaches the surface.
+
+  // A resumed handover, as the escalation channel returns one once the person releases.
+  const released = (approved: boolean): EscalationFor => (tokens) => ({
+    raise: async () => ({ kind: 'resumed', interventionId: 'int_000001', approved, token: tokens.issue('automation') }),
+  });
+
+  it('runs an undeclared click as a read, so a write the model never declared is refused by the network guard', async () => {
+    const { performed } = await discover({ turns: [call('click', { ref: 'n6' }), call('done')] });
+
+    expect(performed.filter((request) => request.stepId !== 'entry').map((request) => request.effect)).toEqual(['read']);
+  });
+
+  it('stops for a person when the model declares a write, and performs it once with a grant after approval', async () => {
+    const reasons: string[] = [];
+    const { result, performed, events } = await discover({
+      turns: [call('click', { ref: 'n6', submits: true }), call('done')],
+      escalation: (tokens) => ({
+        raise: async (input) => {
+          reasons.push(input.reason);
+          return { kind: 'resumed', interventionId: 'int_000001', approved: true, token: tokens.issue('automation') };
+        },
+      }),
+    });
+
+    expect(reasons).toEqual(['PolicyConfirmation']);
+    expect(result.status).toBe('done');
+    // Confirmed once, then performed once. The grant is spent, so it can never run twice.
+    const writes = performed.filter((request) => request.effect === 'write');
+    expect(writes).toHaveLength(2);
+    expect(writes.every((request) => request.stepId === writes[0]?.stepId)).toBe(true);
+    expect(events.filter((event) => event.t === 'authorization').map((event) => event.verdict)).toEqual(['allow', 'confirm', 'allow']);
+  });
+
+  it('never performs the write when the person declines, and lets the run carry on', async () => {
+    const { result, performed, model } = await discover({
+      turns: [call('click', { ref: 'n6', submits: true }), call('done')],
+      escalation: released(false),
+    });
+
+    expect(result.status).toBe('done');
+    expect(performed.filter((request) => request.effect === 'write')).toHaveLength(1);
+    expect(lastToolResult(model.requests.at(-1)).text).toContain('declined');
+  });
+
+  it('carries on after a person hands the session back, telling the model what happened while it was paused', async () => {
+    const { result, model } = await discover({
+      turns: [call('escalate', { reason: 'The search form is not on the page.' }), call('done')],
+      escalation: released(true),
+    });
+
+    expect(result.status).toBe('done');
+    const handback = lastToolResult(model.requests.at(-1));
+    expect(handback.text).toContain('A person held the session');
+    expect(handback.text).toContain('Observation:');
+    expect(model.requests).toHaveLength(2);
+  });
+
+  it('ends escalated when a person is asked too many times, rather than handing back forever', async () => {
+    const asked: string[] = [];
+    const { result } = await discover({
+      turns: [...Array.from({ length: 6 }, () => call('escalate', { reason: 'Still stuck.' })), call('done')],
+      escalation: (tokens) => ({
+        raise: async (input) => {
+          asked.push(input.reason);
+          return { kind: 'resumed', interventionId: 'int_000001', approved: true, token: tokens.issue('automation') };
+        },
+      }),
+    });
+
+    expect(asked).toHaveLength(3);
+    expect(result).toMatchObject({ status: 'escalated', reason: 'ModelRequested' });
+  });
+
+  it('records each handback with why a person was asked and whether they approved', async () => {
+    const { events } = await discover({
+      turns: [call('click', { ref: 'n6', submits: true }), call('done')],
+      escalation: released(true),
+    });
+
+    expect(events.filter((event) => event.t === 'handback')).toEqual([
+      { t: 'handback', at: START, interventionId: 'int_000001', reason: 'PolicyConfirmation', approved: true },
+    ]);
+  });
+
+  it('ends escalated when nobody claims the session', async () => {
+    const { result } = await discover({
+      turns: [call('escalate', { reason: 'No way forward.' }), call('done')],
+      escalation: () => ({ raise: async () => ({ kind: 'unclaimed', interventionId: 'int_000009' }) }),
+    });
+
+    expect(result).toMatchObject({ status: 'escalated', reason: 'ModelRequested', interventionId: 'int_000009' });
   });
 });

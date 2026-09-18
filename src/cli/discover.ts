@@ -62,9 +62,10 @@ async function main(): Promise<number> {
           login: { path: '/auth/login', usernameField: 'username', passwordField: 'password', username: targetUsername, password: targetPassword },
           ids: systemIds,
         });
-        const leased = await broker.lease({ runId, policy: { phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants: createGrantLedger() } });
+        const grants = createGrantLedger();
+        const leased = await broker.lease({ runId, policy: { phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants } });
         if (!leased.ok) return { ok: false, detail: leased.detail };
-        return { ok: true, lease: { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), release: () => leased.lease.release() } };
+        return { ok: true, lease: { surface: leased.lease.surface, control: leased.lease.tokens.issue('automation'), grants, release: () => leased.lease.release() } };
       },
       liveModel: () => {
         const key = checkLiveModelKey(process.env);

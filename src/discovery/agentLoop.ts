@@ -1,13 +1,16 @@
 import type Anthropic from '@anthropic-ai/sdk';
 import { createHash } from 'node:crypto';
 import { ControlLostError, type ControlToken } from '../control/controlToken.js';
+import type { GrantLedger } from '../core/policy/authorize.js';
 import { resolveTemplate } from '../core/capability/resolveTemplate.js';
 import type { AppProfile } from '../core/policy/profile.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 import { matchStrategy } from '../core/surfaceModel/match.js';
 import { progressHash } from '../core/surfaceModel/progressHash.js';
 import { findNodeByRef } from '../core/surfaceModel/tree.js';
+import type { Handover } from '../escalation/channel.js';
 import { unclassifiedDialog } from '../escalation/unclassified.js';
+import type { EscalationReason } from '../core/outcome/result.js';
 import type { Observation, ResolvedAction } from '../core/surfaceModel/types.js';
 import type { Clock } from '../runtime/clock.js';
 import type { GuardedOutcome, GuardedSurface } from '../surface/guardedSurface.js';
@@ -21,6 +24,10 @@ import { toolsFor } from './tools.js';
 // record, until the model calls done, a budget is spent, or the run is stuck. Budget
 // exhaustion is a Timeout failure and never an escalation, because stuck means nobody knows
 // what to do next and out of budget means the run knew and ran out of room. See ESCALATION.
+
+// Why discovery stopped for a person. PolicyConfirmation is the write path, where nothing is
+// wrong and the run is simply not allowed to submit on its own.
+export type DiscoveryEscalation = Extract<EscalationReason, 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition' | 'PolicyConfirmation'>;
 
 export interface DiscoveryBudgets {
   readonly maxModelCalls: number;
@@ -40,7 +47,8 @@ export type DiscoveryEvent =
   | { readonly t: 'decision'; readonly at: string; readonly tool: string; readonly input: unknown }
   | { readonly t: 'action'; readonly at: string; readonly tool: string; readonly ok: boolean; readonly detail: string }
   | { readonly t: 'authorization'; readonly at: string; readonly tool: string; readonly verdict: 'allow' | 'deny' | 'confirm'; readonly rule?: string }
-  | { readonly t: 'stuck'; readonly at: string; readonly detector: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly detail: string };
+  | { readonly t: 'stuck'; readonly at: string; readonly detector: DiscoveryEscalation; readonly detail: string }
+  | { readonly t: 'handback'; readonly at: string; readonly interventionId: string; readonly reason: DiscoveryEscalation; readonly approved: boolean };
 
 export interface DiscoveryOptions {
   readonly surface: GuardedSurface;
@@ -54,6 +62,15 @@ export interface DiscoveryOptions {
   readonly redactor: Redactor;
   readonly budgets: DiscoveryBudgets;
   readonly entryPath: string;
+  // Named so a write this run performs can be bound to an approval, exactly as replay binds
+  // one. Without the ledger an approved write would re authorize, be told to confirm again,
+  // and ask the same person the same question forever.
+  readonly runId?: string;
+  readonly grants?: GrantLedger;
+  // Whether the request permits this run to change state. It decides only whether the model is
+  // offered the submits flag at all. A submit the model declares anyway is still treated as a
+  // write, because raising an action's effect is always the safe direction.
+  readonly allowWrites?: boolean;
   readonly onEvent?: (event: DiscoveryEvent) => void;
   readonly recorder?: Recorder;
   // Called with the first observation, and with a fresh observation taken as the run ends, so
@@ -64,7 +81,7 @@ export interface DiscoveryOptions {
   // 3. Without it the loop still stops, because a run that does not know what to do next must
   // not keep acting, and the result still says why.
   readonly escalation?: {
-    raise(input: { readonly reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly explanation: string; readonly observation: Observation }): Promise<string>;
+    raise(input: { readonly reason: DiscoveryEscalation; readonly explanation: string; readonly observation: Observation }): Promise<Handover>;
   };
 }
 
@@ -78,7 +95,7 @@ interface DiscoveryCommon {
 
 export type DiscoveryResult =
   | (DiscoveryCommon & { readonly status: 'done' })
-  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition'; readonly detail: string; readonly interventionId?: string })
+  | (DiscoveryCommon & { readonly status: 'escalated'; readonly reason: DiscoveryEscalation; readonly detail: string; readonly interventionId?: string })
   | (DiscoveryCommon & {
       readonly status: 'failure';
       readonly reason: 'Timeout' | 'ModelCallFailed' | 'ModelStopped' | 'PolicyDenied' | 'ControlLost' | 'SurfaceUnavailable' | 'GoalInvalid';
@@ -97,6 +114,7 @@ interface Executed {
 // Only these change the page by design, so only these count toward NoProgress.
 const ACTING_TOOLS: ReadonlySet<string> = new Set(['click', 'fill', 'select', 'press', 'navigate']);
 const NO_PROGRESS_LIMIT = 3;
+const MAX_HANDOVERS = 3;
 const MAX_TOKENS = 8_000;
 
 // Ends the loop from any depth with a finished result. It never escapes runDiscovery.
@@ -109,23 +127,43 @@ class Finish {
 }
 
 export async function runDiscovery(options: DiscoveryOptions): Promise<DiscoveryResult> {
-  const { surface, control, model, clock, budgets } = options;
+  const { surface, model, clock, budgets } = options;
   const started = clock.now().getTime();
-  const tools = toolsFor(Object.keys(options.inputs));
+  const tools = toolsFor(Object.keys(options.inputs), { writes: options.allowWrites === true });
   const extracted: Record<string, { ref: string; text: string }> = {};
   const exchanges: DiscoveryExchange[] = [];
   let modelCalls = 0;
   let actions = 0;
   let latest: Observation | null = null;
+  // Rotated every time a person hands the session back, because the token the run held before
+  // the handover died the moment they claimed it.
+  let control = options.control;
+  let handovers = 0;
+  // What happened while the run was paused, carried to the next thing the model is shown.
+  let pausedNote = '';
 
   const at = (): string => clock.now().toISOString();
   const emit = (event: DiscoveryEvent): void => options.onEvent?.(event);
   const common = (): DiscoveryCommon => ({ modelCalls, actions, extracted, exchanges, finalObservation: latest });
   const fail = (reason: FailureReason, detail: string): Finish => new Finish({ ...common(), status: 'failure', reason, detail });
-  const escalate = async (reason: 'NoProgress' | 'ModelRequested' | 'UnclassifiedCondition', detail: string): Promise<Finish> => {
+  const stopped = (reason: DiscoveryEscalation, detail: string, interventionId?: string): Finish =>
+    new Finish({ ...common(), status: 'escalated', reason, detail, ...(interventionId === undefined ? {} : { interventionId }) });
+
+  // Hands the live session to a person and waits for them to give it back, per docs/ESCALATION
+  // section 8. A run that gets the session back keeps going, because an escalation that always
+  // ends the run is a stop and not a handoff. It throws a finished result when nobody can take
+  // it, when they abort, or when the run has already asked a person MAX_HANDOVERS times, so a
+  // loop that cannot make progress on its own cannot ask forever either.
+  const handOver = async (reason: DiscoveryEscalation, detail: string): Promise<Extract<Handover, { kind: 'resumed' }>> => {
     emit({ t: 'stuck', at: at(), detector: reason, detail });
-    const interventionId = options.escalation === undefined || latest === null ? undefined : await options.escalation.raise({ reason, explanation: detail, observation: latest });
-    return new Finish({ ...common(), status: 'escalated', reason, detail, ...(interventionId === undefined ? {} : { interventionId }) });
+    if (options.escalation === undefined || latest === null) throw stopped(reason, detail);
+    if (handovers >= MAX_HANDOVERS) throw stopped(reason, detail);
+    handovers += 1;
+    const handover = await options.escalation.raise({ reason, explanation: detail, observation: latest });
+    if (handover.kind !== 'resumed') throw stopped(reason, detail, handover.interventionId);
+    control = handover.token;
+    emit({ t: 'handback', at: at(), interventionId: handover.interventionId, reason, approved: handover.approved });
+    return handover;
   };
 
   const observe = async (): Promise<{ text: string; hash: string; progress: string; observation: Observation }> => {
@@ -173,20 +211,42 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       conditions: options.profile.conditions.map((condition) => condition.when),
       match: async (strategy, framePath) => matchStrategy(observation, strategy, framePath),
     });
-    if (unclaimed) {
-      throw await escalate('UnclassifiedCondition', 'A dialog is open that the app profile does not claim, so the run stopped rather than clicking it.');
-    }
+    if (!unclaimed) return;
+    await handOver('UnclassifiedCondition', 'A dialog is open that the app profile does not claim, so the run stopped rather than clicking it.');
+    pausedNote += 'A person held the session while a dialog nobody had classified was open, and has handed it back. The observation below is the page as they left it. ';
   };
 
   const withRecord = (executed: Executed, recorded: RecordedAction | undefined): Executed =>
     recorded === undefined ? executed : { ...executed, recordedIndex: recorded.index };
 
-  const perform = async (action: ResolvedAction, framePath: readonly string[]): Promise<Executed> => {
+  // What an approval is bound to. The description the recorder derived from the real element,
+  // because that is what a person is shown, and the ref only when no bundle could be derived.
+  const writeFor = (submits: boolean, recorded: RecordedAction | undefined, ref: string): { readonly targetKey: string } | undefined =>
+    submits ? { targetKey: recorded?.bundle?.describedAs ?? ref } : undefined;
+
+  const perform = async (action: ResolvedAction, framePath: readonly string[], write?: { readonly targetKey: string }): Promise<Executed> => {
     const stepId = `action${actions}`;
-    const outcome = await surface.perform({ action, framePath, stepId, effect: 'read', targetKey: null }, control);
+    const effect = write === undefined ? 'read' : 'write';
+    const targetKey = write?.targetKey ?? null;
+    const ask = (): Promise<GuardedOutcome> => surface.perform({ action, framePath, stepId, effect, targetKey }, control);
+
+    let outcome = await ask();
     emitAuthorization(action.kind, outcome);
     if (outcome.kind === 'denied') return { text: `Policy denied this action. ${outcome.decision.reason}`, isError: true };
-    if (outcome.kind === 'confirm') return { text: `This action needs a person to approve it. ${outcome.decision.reason}`, isError: true };
+    if (outcome.kind === 'confirm') {
+      // A declared write is never refused outright. It goes to a person, and only their
+      // approval, spent once as a grant, lets it reach the surface. See docs/SAFETY.md.
+      if (write === undefined) return { text: `This action needs a person to approve it. ${outcome.decision.reason}`, isError: true };
+      const approval = await handOver('PolicyConfirmation', outcome.decision.reason);
+      if (!approval.approved) {
+        return { text: 'A person declined this action, so nothing was submitted and the page is unchanged. Do not try it again without a reason to think it will be approved.', isError: true };
+      }
+      options.grants?.issue({ runId: options.runId ?? '', stepId, targetKey });
+      pausedNote += 'A person approved this action while the run was paused. They changed nothing else, so the page is as it was. ';
+      outcome = await ask();
+      emitAuthorization(action.kind, outcome);
+      if (outcome.kind !== 'performed') return { text: 'The approval did not authorize this action, so nothing was submitted.', isError: true };
+    }
     if (!outcome.result.ok) return { text: `The action failed. ${outcome.result.detail}`, isError: true };
     if (action.kind !== 'fill') await settle();
     const refused = surface.refusalsFor(stepId);
@@ -222,8 +282,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     // page can change, with only the ref and names the recorder needs.
     switch (block.name) {
       case 'click': {
-        const recorded = options.recorder?.record({ tool: 'click', observation: current, ref });
-        return withRecord(await perform({ kind: 'click', ref }, node.framePath), recorded);
+        const submits = readBoolean(input, 'submits');
+        const recorded = options.recorder?.record({ tool: 'click', observation: current, ref, submits });
+        return withRecord(await perform({ kind: 'click', ref }, node.framePath, writeFor(submits, recorded, ref)), recorded);
       }
       case 'fill':
       case 'select': {
@@ -237,8 +298,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       case 'press': {
         const key = readString(input, 'key');
         if (key === null) return bad('press needs a key.');
-        const recorded = options.recorder?.record({ tool: 'press', observation: current, ref, key });
-        return withRecord(await perform({ kind: 'press', ref, key }, node.framePath), recorded);
+        const submits = readBoolean(input, 'submits');
+        const recorded = options.recorder?.record({ tool: 'press', observation: current, ref, key, submits });
+        return withRecord(await perform({ kind: 'press', ref, key }, node.framePath, writeFor(submits, recorded, ref)), recorded);
       }
       case 'extract': {
         const output = readString(input, 'output');
@@ -267,7 +329,9 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
     await options.capture?.('initial', seen.observation);
     await stopOnUnclaimedDialog(seen.observation);
     let unchanged = 0;
-    const messages: Anthropic.MessageParam[] = [{ role: 'user', content: `${goal.text}\n\nObservation:\n${seen.text}` }];
+    const opening = pausedNote;
+    pausedNote = '';
+    const messages: Anthropic.MessageParam[] = [{ role: 'user', content: `${goal.text}\n\n${opening}Observation:\n${seen.text}` }];
 
     for (;;) {
       if (clock.now().getTime() - started > budgets.maxDurationMs) throw fail('Timeout', `The run passed its duration budget of ${budgets.maxDurationMs}ms.`);
@@ -309,7 +373,10 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       const executed = await execute(first);
       emit({ t: 'action', at: at(), tool: first.name, ok: !executed.isError, detail: executed.text });
       if (executed.terminal === 'done') throw new Finish({ ...common(), status: 'done' });
-      if (executed.terminal === 'escalated') throw await escalate('ModelRequested', executed.text);
+      if (executed.terminal === 'escalated') {
+        await handOver('ModelRequested', executed.text);
+        pausedNote += 'A person held the session after you asked for help, and has handed it back. The observation below is the page as they left it. ';
+      }
 
       seen = await observe();
       await stopOnUnclaimedDialog(seen.observation);
@@ -319,14 +386,24 @@ export async function runDiscovery(options: DiscoveryOptions): Promise<Discovery
       if (acting) {
         unchanged = seen.progress === before ? unchanged + 1 : 0;
         if (unchanged >= NO_PROGRESS_LIMIT) {
-          throw await escalate('NoProgress', `The page did not change across ${NO_PROGRESS_LIMIT} consecutive actions.`);
+          await handOver('NoProgress', `The page did not change across ${NO_PROGRESS_LIMIT} consecutive actions.`);
+          // The count starts again, so a person who unstuck the page is not asked a second
+          // time for the same reason before the run has had a chance to use what they did.
+          unchanged = 0;
+          seen = await observe();
+          pausedNote += 'A person held the session because nothing you did was changing the page, and has handed it back. The observation below is the page as they left it. ';
         }
       }
 
+      // What happened while the run was paused reaches the model with the page it left behind,
+      // per docs/ESCALATION.md section 8. It prefixes the tool result rather than replacing it,
+      // because the model still needs to know how its own action went.
+      const note = pausedNote;
+      pausedNote = '';
       messages.push({
         role: 'user',
         content: [
-          { type: 'tool_result', tool_use_id: first.id, content: `${executed.text}\n\nObservation:\n${seen.text}`, is_error: executed.isError },
+          { type: 'tool_result', tool_use_id: first.id, content: `${note}${executed.text}\n\nObservation:\n${seen.text}`, is_error: executed.isError },
           ...rest.map((block) => ({ type: 'tool_result' as const, tool_use_id: block.id, content: 'Not run. Use one tool per turn.', is_error: true })),
         ],
       });
@@ -342,6 +419,11 @@ function readString(input: unknown, key: string): string | null {
   if (typeof input !== 'object' || input === null) return null;
   const value: unknown = Reflect.get(input, key);
   return typeof value === 'string' ? value : null;
+}
+
+function readBoolean(input: unknown, key: string): boolean {
+  if (typeof input !== 'object' || input === null) return false;
+  return Reflect.get(input, key) === true;
 }
 
 function readStrings(input: unknown, key: string): string[] | null {

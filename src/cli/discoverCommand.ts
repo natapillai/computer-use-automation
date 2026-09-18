@@ -4,6 +4,7 @@ import { z } from 'zod';
 import type { ControlToken } from '../control/controlToken.js';
 import { validateInputs } from '../core/capability/inputs.js';
 import { AppBinding, ParamSpec, type Capability } from '../core/capability/schema.js';
+import type { GrantLedger } from '../core/policy/authorize.js';
 import { sensitiveFields, type AppProfile } from '../core/policy/profile.js';
 import { maskTree } from '../core/redaction/maskTree.js';
 import type { KnownValue, Redactor } from '../core/redaction/redactor.js';
@@ -44,12 +45,19 @@ export const DiscoveryRequest = z.strictObject({
   goal: z.string().min(1),
   app: AppBinding,
   inputs: z.array(ParamSpec).min(1),
+  // Whether this request permits the run to change state. Absent means no, so a request
+  // written for a read can never grow a write by accident. It decides only what the model is
+  // offered. Every write still goes to a person before it reaches the surface.
+  allowWrites: z.boolean().optional(),
 });
 export type DiscoveryRequest = z.output<typeof DiscoveryRequest>;
 
 export interface DiscoverLease {
   readonly surface: GuardedSurface;
   readonly control: ControlToken;
+  // The same ledger the session's policy holds, so an approval the run collects is the one
+  // authorize consumes.
+  readonly grants: GrantLedger;
   release(): Promise<void>;
 }
 
@@ -182,6 +190,9 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
         redactor: deps.redactor,
         budgets: deps.budgets,
         entryPath: request.app.entryPath,
+        runId,
+        grants: leased.lease.grants,
+        allowWrites: request.allowWrites === true,
         onEvent: (event) => {
           events.push(event);
         },
@@ -249,7 +260,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
           system: SYSTEM_PROMPT,
           goal: goal.ok ? goal.text : request.goal,
           inputNames: Object.keys(inputs),
-          tools: toolsFor(Object.keys(inputs)),
+          tools: toolsFor(Object.keys(inputs), { writes: request.allowWrites === true }),
           exchanges: result.exchanges,
         },
         { known },
@@ -311,7 +322,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       actions: result.actions,
       recoveries: 0,
       drift: 0,
-      escalations: result.status === 'escalated' ? 1 : 0,
+      escalations: events.filter((event) => event.t === 'handback').length + (result.status === 'escalated' ? 1 : 0),
     },
     environment: { ...deps.environment, model: modelId, promptVersion: PROMPT_VERSION },
   });

@@ -63,6 +63,32 @@ describe('generalize', () => {
     expect(capability.successCondition.condition).toMatchObject({ kind: 'all', of: [{ kind: 'elementPresent' }, { kind: 'outputResolvable', outputName: 'savingsBalance' }] });
   });
 
+  it('carries a declared write into the step, which is never retried and never idempotent', async () => {
+    const trace = withActions(await happyTrace(), (actions) => actions.map((action) => (action.index === 1 ? { ...action, submits: true } : action)));
+
+    const capability = await generalized(trace);
+
+    expect(capability.steps.map((step) => [step.effect, step.idempotent, step.retry.attempts])).toEqual([
+      ['read', true, 2],
+      ['write', false, 0],
+      ['read', false, 0],
+    ]);
+  });
+
+  it('refuses a run a person had to finish, and accepts one they only approved', async () => {
+    const trace = await happyTrace();
+    const handback = (reason: 'ModelRequested' | 'PolicyConfirmation'): RunTrace => ({
+      ...trace,
+      events: [...trace.events, { t: 'handback', at: '2026-09-15T09:00:01.000Z', interventionId: 'int_000001', reason, approved: true }],
+    });
+
+    const completed = await generalize(handback('ModelRequested'), options);
+    const approved = await generalize(handback('PolicyConfirmation'), options);
+
+    expect(completed).toMatchObject({ ok: false, failure: 'HumanCompleted' });
+    expect(approved.ok).toBe(true);
+  });
+
   it('produces exactly the reviewed draft for the fixture trace', async () => {
     const expected: unknown = JSON.parse(readFileSync(new URL('../../tests/fixtures/discovery/expectedDraft.json', import.meta.url), 'utf8'));
 
@@ -121,7 +147,7 @@ describe('generalize', () => {
   describe('canonicalise', () => {
     it('stores a recorded navigate to a member path as a template', async () => {
       const trace = withActions(await happyTrace(), (actions) => {
-        const navigate: RecordedAction = { index: 0, tool: 'navigate', framePath: ['content'], bundle: null, dropped: [], path: '/member/10001', ok: true, changed: true };
+        const navigate: RecordedAction = { index: 0, tool: 'navigate', framePath: ['content'], bundle: null, dropped: [], submits: false, path: '/member/10001', ok: true, changed: true };
         return [...actions.slice(0, 2), navigate, ...actions.slice(2)].map((action, index) => ({ ...action, index }));
       });
 

@@ -42,7 +42,11 @@ export interface GeneralizeOptions {
 
 export type Generalization =
   | { readonly ok: true; readonly capability: Capability }
-  | { readonly ok: false; readonly failure: 'NoSteps' | 'NoPostcondition' | 'SuccessNotObserved' | 'SensitiveLiteral' | 'CapabilityInvalid'; readonly detail: string };
+  | {
+      readonly ok: false;
+      readonly failure: 'NoSteps' | 'NoPostcondition' | 'SuccessNotObserved' | 'SensitiveLiteral' | 'CapabilityInvalid' | 'HumanCompleted';
+      readonly detail: string;
+    };
 
 type StepInput = CapabilityInput['steps'][number];
 type OutputInput = CapabilityInput['outputs'][number];
@@ -59,6 +63,15 @@ const fail = (failure: Failure['failure'], detail: string): Failure => ({ ok: fa
 // the trace and nothing else, no surface, no model, no clock.
 export async function generalize(trace: RunTrace, options: GeneralizeOptions): Promise<Generalization> {
   const template = (text: string): string => templateInputs(text, options.inputValues);
+
+  // 0. Refuse a run a person had to finish, per docs/ESCALATION.md section 8. Nothing here
+  // turns what they did into a step, so the artifact would claim the automation can do
+  // something it has never done unaided. Approving one action is not finishing the run, and a
+  // write capability exists only because a person approved its submit.
+  const completedByHand = trace.events.find((event) => event.t === 'handback' && event.reason !== 'PolicyConfirmation');
+  if (completedByHand !== undefined) {
+    return fail('HumanCompleted', 'A person took the session over during this run, and their actions are not steps, so no artifact is produced.');
+  }
 
   // 1. Prune. A failed attempt or an action that changed nothing is not part of the flow. An
   // extract changes nothing by design and is kept, because it types an output.
@@ -109,7 +122,10 @@ export async function generalize(trace: RunTrace, options: GeneralizeOptions): P
     const postcondition = postconditionFor(action, actions, outputs);
     if (postcondition === null) return fail('NoPostcondition', `Nothing observed after the ${action.tool} at position ${position} can confirm it worked.`);
     postconditions.push(postcondition);
-    const idempotent = action.tool === 'fill' || action.tool === 'select' || action.tool === 'navigate';
+    // A write is one the model declared. Nothing about a click says whether the button behind
+    // it submits, so guessing here would either retry a post or refuse to retry anything.
+    const effect = action.submits ? 'write' : 'read';
+    const idempotent = !action.submits && (action.tool === 'fill' || action.tool === 'select' || action.tool === 'navigate');
     steps.push({
       id: stepIds.get(action) ?? '',
       index: position,
@@ -118,7 +134,7 @@ export async function generalize(trace: RunTrace, options: GeneralizeOptions): P
       ...(action.bundle === null ? {} : { target: action.bundle }),
       ...(action.value === undefined ? {} : { value: action.value }),
       postcondition,
-      effect: 'read',
+      effect,
       idempotent,
       retry: idempotent ? { attempts: 2, backoffMs: 500 } : { attempts: 0 },
       timeoutMs: 15_000,
@@ -144,7 +160,15 @@ export async function generalize(trace: RunTrace, options: GeneralizeOptions): P
     outcomes: [],
     steps,
     successCondition,
-    policy: { maxEffect: 'read', requiresApproval: true, allowUnattendedReplay: false, maxStepDurationMs: 20_000, maxTotalDurationMs: 120_000 },
+    // The ceiling is what the run actually did, so a read only capability can never grow a
+    // write later without the artifact itself changing and being reviewed again.
+    policy: {
+      maxEffect: steps.some((step) => step.effect === 'write') ? 'write' : 'read',
+      requiresApproval: true,
+      allowUnattendedReplay: false,
+      maxStepDurationMs: 20_000,
+      maxTotalDurationMs: 120_000,
+    },
     provenance: {
       recordedAt: options.recordedAt,
       discoveryRunId: trace.runId,

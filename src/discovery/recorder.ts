@@ -21,6 +21,9 @@ export interface ActionToRecord {
   readonly path?: string;
   readonly framePath?: readonly string[];
   readonly output?: string;
+  // Whether the model declared this action a write. Recorded rather than inferred, because
+  // nothing about a click tells you whether the button behind it submits.
+  readonly submits?: boolean;
 }
 
 export interface RecordedAction {
@@ -29,6 +32,7 @@ export interface RecordedAction {
   readonly framePath: readonly string[];
   readonly bundle: LocatorBundle | null;
   readonly dropped: readonly DroppedStrategy[];
+  readonly submits: boolean;
   readonly value?: string;
   readonly key?: string;
   readonly path?: string;
@@ -67,6 +71,7 @@ export function createRecorder(context: RecorderContext): Recorder {
           framePath: [...(action.framePath ?? [])],
           bundle: null,
           dropped: [],
+          submits: action.submits === true,
           ...(action.path === undefined ? {} : { path: action.path }),
         };
       } else {
@@ -84,6 +89,7 @@ export function createRecorder(context: RecorderContext): Recorder {
           framePath: [...(node?.framePath ?? [])],
           bundle: derived.ok ? derived.bundle : null,
           dropped: derived.dropped,
+          submits: action.submits === true,
           // The template, never the value that was typed.
           ...(action.inputName === undefined ? {} : { value: `{{inputs.${action.inputName}}}` }),
           ...(action.key === undefined ? {} : { key: action.key }),

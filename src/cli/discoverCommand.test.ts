@@ -8,7 +8,7 @@ import { createControlTokens } from '../control/controlToken.js';
 import { createGrantLedger } from '../core/policy/authorize.js';
 import { createRedactor } from '../core/redaction/redactor.js';
 import { Cassette } from '../discovery/cassetteModelClient.js';
-import { createFakeModelClient, type FakeTurn } from '../discovery/fakeModelClient.js';
+import { createFakeModelClient, type FakeModelClient, type FakeTurn } from '../discovery/fakeModelClient.js';
 import { canariesFromSeed, scanDirectories } from '../evidence/scanner.js';
 import { loadAllowlist } from '../runtime/allowlist.js';
 import { createTestClock } from '../runtime/clock.js';
@@ -37,6 +37,7 @@ interface Paths {
 }
 
 interface Setup {
+  readonly request?: Record<string, unknown>;
   readonly turns?: readonly FakeTurn[];
   readonly extraArgs?: readonly string[];
   readonly argv?: (paths: Paths) => readonly string[];
@@ -65,12 +66,13 @@ describe('runDiscoverCommand', () => {
     const loaded = await loadAllowlist('policy/allowlist.yaml');
     if (!loaded.ok) throw new Error(loaded.message);
     const paths: Paths = { request: join(root, 'request.json'), evidence: join(root, 'evidence'), capabilities: join(root, 'capabilities') };
-    await writeFile(paths.request, JSON.stringify(REQUEST));
+    await writeFile(paths.request, JSON.stringify(setup.request ?? REQUEST));
 
     const clock = createTestClock('2026-09-15T09:00:00.000Z');
     const out: string[] = [];
     const err: string[] = [];
     let leases = 0;
+    let model: FakeModelClient | undefined;
     const code = await runDiscoverCommand({
       argv: setup.argv?.(paths) ?? ['--request', paths.request, '--evidence', paths.evidence, '--capabilities', paths.capabilities, ...(setup.extraArgs ?? [])],
       readStdin: async () => setup.stdin ?? '{"memberId":"10001"}',
@@ -82,18 +84,20 @@ describe('runDiscoverCommand', () => {
         leases += 1;
         const tokens = createControlTokens('sess_000001', createSequentialIds());
         const driver = createFakeSurfaceDriver({ sessionId: 'sess_000001', control: tokens, script: meridianScript(), clock });
+        const grants = createGrantLedger();
         const surface = createGuardedSurface({
           driver,
-          policy: { allowlist, phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants: createGrantLedger() },
+          policy: { allowlist, phase: 'discovery', capabilityStatus: null, allowUnattendedReplay: false, grants },
           runId,
           baseUrl: 'http://localhost:4010',
         });
-        return { ok: true, lease: { surface, control: tokens.issue('automation'), release: async () => undefined } };
+        return { ok: true, lease: { surface, control: tokens.issue('automation'), grants, release: async () => undefined } };
       },
       liveModel: () => {
         if (setup.liveModel === 'forbidden') throw new Error('A live model was built for a run that names a cassette.');
         if (setup.liveModel === 'unavailable') return { ok: false, message: 'Invalid environment. ANTHROPIC_API_KEY is required for a live discovery run.' };
-        return { ok: true, client: createFakeModelClient(setup.turns ?? happyPathTurns()) };
+        model = createFakeModelClient(setup.turns ?? happyPathTurns());
+        return { ok: true, client: model };
       },
       modelId: setup.modelId === undefined ? 'claude-sonnet-5' : setup.modelId,
       redactor: createRedactor(loaded.allowlist.data),
@@ -103,8 +107,16 @@ describe('runDiscoverCommand', () => {
       target: { baseUrl: 'http://localhost:4010' },
       environment: { driver: 'fake', driverVersion: '1.0.0' },
     });
-    return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, patterns: loaded.allowlist.data.redactPatterns };
+    return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, model, patterns: loaded.allowlist.data.redactPatterns };
   }
+
+  it('offers the model a way to declare a write only when the request permits the run to write', async () => {
+    const readOnly = await run();
+    const writing = await run({ request: { ...REQUEST, allowWrites: true } });
+
+    expect(JSON.stringify(readOnly.model?.requests[0]?.params.tools)).not.toContain('submits');
+    expect(JSON.stringify(writing.model?.requests[0]?.params.tools)).toContain('submits');
+  });
 
   it('discovers, writes the draft capability and the evidence the brief asks for, and exits 0', async () => {
     const { code, stdout, stderr, paths } = await run();
@@ -160,6 +172,12 @@ describe('runDiscoverCommand', () => {
     const recorded = await run({ extraArgs: ['--cassette', cassettePath] });
     expect(recorded.code, recorded.stderr).toBe(0);
     expect(Cassette.parse(JSON.parse(await readFile(cassettePath, 'utf8'))).exchanges).toHaveLength(5);
+
+    // The recording carries the tool set the run was actually given. A cassette of a write run
+    // that recorded the read only tools would not match itself on replay.
+    const writeCassette = join(root, 'write-cassette.json');
+    await run({ request: { ...REQUEST, allowWrites: true }, extraArgs: ['--cassette', writeCassette] });
+    expect(JSON.stringify(Cassette.parse(JSON.parse(await readFile(writeCassette, 'utf8'))).tools)).toContain('submits');
 
     const again = await run({ extraArgs: ['--cassette', cassettePath] });
     expect([again.code, again.leases]).toEqual([2, 0]);
