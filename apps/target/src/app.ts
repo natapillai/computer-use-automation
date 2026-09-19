@@ -89,6 +89,20 @@ export function createTargetApp(options: TargetAppOptions): Express {
     return true;
   };
 
+  // Responses the hang fault is holding open. A fault that can only be ended by a timeout
+  // would make every suite that arms it wait, so reset releases them instead.
+  let held: Response[] = [];
+  const holdIfArmed = (path: string, method: string, res: Response): boolean => {
+    if (!consumeFault('hang', path, method)) return false;
+    held = [...held, res];
+    return true;
+  };
+
+  // The label a locator reads to find the member ID field. Renaming it is the drift fault,
+  // and the field behind it is untouched, so a bundle that does not depend on the label still
+  // resolves and a bundle that does has to fall back.
+  const labelForMemberId = (method: string): string => (consumeFault('relabel', '/servicing/search', method) ? 'Account Holder  ID:' : 'Member  ID:');
+
   const fields = {
     memberId: generatedField(options.idSeed, 'memberId'),
     surname: generatedField(options.idSeed, 'surname'),
@@ -156,6 +170,10 @@ export function createTargetApp(options: TargetAppOptions): Express {
       faults = [];
       requests.length = 0;
       submissions.length = 0;
+      // Anything the hang fault is holding is answered now, with the status a surface that
+      // gave up would send, so the caller gets a result rather than a dead socket.
+      for (const holding of held) if (!holding.headersSent) holding.status(503).render('unavailable');
+      held = [];
       res.json({ reset: true });
     });
     app.get('/__control__/state', (_req, res) => {
@@ -197,7 +215,14 @@ export function createTargetApp(options: TargetAppOptions): Express {
   });
 
   app.get('/servicing/search', (_req, res) => {
-    res.render('search', { fields, values: { memberId: '', surname: '' }, results: [], message: null, dialog: consumeFault('surpriseDialog', '/servicing/search', 'GET') });
+    res.render('search', {
+      fields,
+      values: { memberId: '', surname: '' },
+      results: [],
+      message: null,
+      dialog: consumeFault('surpriseDialog', '/servicing/search', 'GET'),
+      memberIdLabel: labelForMemberId('GET'),
+    });
   });
 
   app.post('/servicing/search', (req, res) => {
@@ -206,14 +231,18 @@ export function createTargetApp(options: TargetAppOptions): Express {
       surname: formField(req.body, fields.surname.name).trim(),
     };
     const dialog = consumeFault('surpriseDialog', '/servicing/search', 'POST');
+    const memberIdLabel = labelForMemberId('POST');
     if (values.memberId === '' && values.surname === '') {
-      res.render('search', { fields, values, results: [], message: 'Enter a member ID or surname.', dialog });
+      res.render('search', { fields, values, results: [], message: 'Enter a member ID or surname.', dialog, memberIdLabel });
       return;
     }
-    const results = members.filter((member) =>
+    const found = members.filter((member) =>
       values.memberId !== '' ? member.id === values.memberId : surnameOf(member).toLowerCase() === values.surname.toLowerCase(),
     );
-    res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null, dialog });
+    // Two rows showing the same member ID and linking to different records, which is what a
+    // locator that matches on the displayed text cannot tell apart.
+    const results = found.length > 0 && consumeFault('duplicateIds', '/servicing/search', 'POST') ? [...found, { ...(found[0] as Member), id: found[0]?.id ?? '' }] : found;
+    res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null, dialog, memberIdLabel });
   });
 
   app.get('/member/:id/subaccount', (req, res) => {
@@ -265,9 +294,19 @@ export function createTargetApp(options: TargetAppOptions): Express {
   });
 
   app.get('/member/:id', (req, res) => {
+    // Held before the record is looked up, because a surface that never answers never gets as
+    // far as deciding what it would have said.
+    if (holdIfArmed('/member/*', 'GET', res)) return;
+
     const member = members.find((candidate) => candidate.id === req.params.id);
     if (member === undefined) {
       res.status(404).render('notFound');
+      return;
+    }
+    // A restriction is an answer the institution gave, not a fault of ours, so it renders as an
+    // ordinary page with a message and no record on it.
+    if (consumeFault('denied', '/member/*', 'GET')) {
+      res.render('restricted', { memberId: member.id });
       return;
     }
     res.render('member', { member });

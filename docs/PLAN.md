@@ -178,9 +178,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 
 ## Slice 6. Error breadth
 
-* [ ] **S6-T01** Remaining faults, `denied`, `relabel`, `duplicateIds` and `hang`.
+* [x] **S6-T01** Remaining faults, `denied`, `relabel`, `duplicateIds` and `hang`.
   * Accept: route scoped and deterministic, armed with a count.
-  * Test: integration, one per fault asserting its documented behaviour.
+  * Test: integration, one per fault asserting its documented behaviour, `tests/integration/faults.test.ts`.
+  * Note: `hang` holds the response and `/__control__/reset` releases it as a 503, so no suite ever waits on a socket it armed itself.
 * [ ] **S6-T02** Retry on idempotent steps, `TransientLoad` recovery, and replay budgets.
   * Accept: bounded exponential backoff through `Clock.delay`, gated on `idempotent`. `TransientLoad` retries a 502 or 503 up to three attempts and is recorded in `recoveries`, including on success. Budget exhaustion is a `Timeout` failure, and the time a person held the session does not count against it, as discovery already does.
   * Test: unit with fake timers, backoff timing, a non idempotent step never retried, and a budget ending the run.
