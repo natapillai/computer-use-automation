@@ -182,9 +182,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: route scoped and deterministic, armed with a count.
   * Test: integration, one per fault asserting its documented behaviour, `tests/integration/faults.test.ts`.
   * Note: `hang` holds the response and `/__control__/reset` releases it as a 503, so no suite ever waits on a socket it armed itself.
-* [ ] **S6-T02** Retry on idempotent steps, `TransientLoad` recovery, and replay budgets.
+* [x] **S6-T02** Retry on idempotent steps, `TransientLoad` recovery, and replay budgets.
   * Accept: bounded exponential backoff through `Clock.delay`, gated on `idempotent`. `TransientLoad` retries a 502 or 503 up to three attempts and is recorded in `recoveries`, including on success. Budget exhaustion is a `Timeout` failure, and the time a person held the session does not count against it, as discovery already does.
-  * Test: unit with fake timers, backoff timing, a non idempotent step never retried, and a budget ending the run.
+  * Test: unit, `src/replay/executor.test.ts`, backoff timing on a test clock, a non idempotent step never retried, and a budget ending the run.
+  * Note: the committed capability declares its search not idempotent, because the app profile says the search POST is not, so both sides of the gate are tested by flipping that one declaration.
 * [ ] **S6-T03** Result assembly and the replay import graph test.
   * Accept: `ReplayResult` always carries `recoveries`, `interventions` and `drift`, including on success. `src/replay` imports no model client.
   * Test: unit, a run with retries reports them on a successful result, and the import graph walk finds no model client.

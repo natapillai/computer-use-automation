@@ -185,6 +185,68 @@ describe('replay with a person on the other end', () => {
     expect(result.interventions).toHaveLength(2);
   });
 
+  // S6-T02. A transient load is routine on this surface and recoverable, so a capability that
+  // was working correctly must not report as broken. The retry only ever applies to a step that
+  // declares itself idempotent, because repeating a submit risks posting it twice.
+
+  // The committed capability declares its search not idempotent, which is right, because the
+  // app profile says the search POST is not. Both sides of the gate need a case, so these two
+  // are the same capability with that one declaration flipped.
+  const searchDeclaredAs = (idempotent: boolean): CapabilityInput => {
+    const fixture = readSavingsBalanceFixture();
+    return {
+      ...fixture,
+      steps: fixture.steps.map((step) =>
+        step.id === 'submitSearch' ? { ...step, idempotent, retry: idempotent ? { attempts: 2, backoffMs: 500 } : { attempts: 0 } } : step,
+      ),
+    };
+  };
+
+  it('retries an idempotent step through a transient load, and reports the recovery on the run that then worked', async () => {
+    const { result, elapsedMs } = await run({ script: { flakyOnce: true }, capability: searchDeclaredAs(true) });
+
+    expect(result.status).toBe('success');
+    expect(result.recoveries).toEqual([{ condition: 'TransientLoad', atStepId: 'submitSearch', attempt: 1, resolved: true }]);
+    // One backoff, spent on the clock rather than on a timer nobody can see.
+    expect(elapsedMs).toBeGreaterThanOrEqual(500);
+  });
+
+  it('backs off further on each attempt, and stops after three', async () => {
+    const { result, elapsedMs } = await run({ script: { flakyOnce: true, searchLeadsTo: 'nowhere' }, capability: searchDeclaredAs(true) });
+
+    expect(failureOf(result)).toMatchObject({ class: 'SurfaceUnavailable', atStepId: 'submitSearch', retryable: true });
+    expect(result.recoveries.map((record) => [record.attempt, record.resolved])).toEqual([
+      [1, false],
+      [2, false],
+      [3, false],
+    ]);
+    // 500 then 1000, and the third attempt fails rather than waiting again.
+    expect(elapsedMs).toBeGreaterThanOrEqual(1_500);
+  });
+
+  it('never retries a step that is not idempotent, because repeating a submit risks posting it twice', async () => {
+    const { result, elapsedMs } = await run({ script: { flakyOnce: true }, capability: searchDeclaredAs(false) });
+
+    expect(failureOf(result)).toMatchObject({ class: 'SurfaceUnavailable', atStepId: 'submitSearch', retryable: true });
+    expect(result.recoveries).toEqual([]);
+    // Nothing was waited on, because nothing was going to be tried again.
+    expect(elapsedMs).toBe(0);
+  });
+
+  it('ends as Timeout when the run passes the duration the capability allows', async () => {
+    const fixture = searchDeclaredAs(true);
+    const tight: CapabilityInput = { ...fixture, policy: { ...fixture.policy, maxTotalDurationMs: 400 } };
+
+    const { result } = await run({ script: { flakyOnce: true }, capability: tight });
+
+    // The backoff spends more than the budget, and the next step is the one that notices.
+    expect(failureOf(result)).toMatchObject({ class: 'Timeout', retryable: true });
+    // The budget it broke and what it had actually spent, because a timeout that names neither
+    // sends whoever reads it to guess which of the two was wrong.
+    expect(failureOf(result).expected).toContain('400ms');
+    expect(failureOf(result).observed).toContain('500ms');
+  });
+
   it('stops handing back after three tries on one step, because a loop is not an escalation', async () => {
     const { result, raised } = await run({
       capability: needsApproval(),

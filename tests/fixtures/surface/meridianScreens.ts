@@ -18,6 +18,10 @@ export interface MeridianScriptOptions {
   // Puts a session clock on the search screen, and makes clicking the Member ID label move
   // between two screens that differ only in the clock's text.
   readonly clockTicks?: boolean;
+  // The first search lands on a screen that loaded with a 503, and searching again from there
+  // lands on the ordinary results. That is what a transient load looks like to a step that is
+  // allowed to repeat itself.
+  readonly flakyOnce?: boolean;
 }
 
 const ORIGIN = 'http://localhost:4010';
@@ -73,7 +77,15 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
     { from: 'search', on: { kind: 'navigate', path: '/servicing/search' }, to: 'search' },
     { from: 'results', on: { kind: 'click', ref: 'r1' }, to: 'detail' },
   ];
-  if (leadsTo !== 'nowhere') transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: leadsTo });
+  const flaky = options.flakyOnce ?? false;
+  if (flaky) {
+    transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: 'results503' });
+    // Searching again from the failed screen recovers, unless the script asks for a surface
+    // that never recovers, which is what bounds the retry rather than resolves it.
+    transitions.push({ from: 'results503', on: { kind: 'click', ref: 'n6' }, to: leadsTo === 'nowhere' ? 'results503' : leadsTo });
+  } else if (leadsTo !== 'nowhere') {
+    transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: leadsTo });
+  }
   // Only a person clears the modal. Nothing in the automation has a reason to click it.
   transitions.push({ from: 'dialog', on: { kind: 'click', ref: 'g3' }, to: 'results' });
   const ticking = options.clockTicks ?? false;
@@ -101,6 +113,9 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
         resultsStatus,
       ),
       noRecords: screen([...form, uiNode('m1', 'cell', 'No records found.', box(8, 131, 120, 20))], resultsPath, resultsStatus),
+      // The same page the search would have produced, except the frame loaded with a 503, which
+      // is the app profile's TransientLoad condition.
+      results503: screen([...form], resultsPath, 503),
       // A modal nothing in the capability or the app profile declares. The run must stop on it
       // rather than click it to find out what it is.
       dialog: {

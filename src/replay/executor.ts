@@ -16,6 +16,7 @@ import {
   type FailureDetail,
   type InterventionRecord,
   type ReplayResult,
+  type RecoveryRecord,
   type ResultBaseInput,
   type TypedValue,
 } from '../core/outcome/result.js';
@@ -76,6 +77,22 @@ const ENTRY_STEP_ID = 'entry';
 // A handoff that keeps coming back on the same step is a loop, not an escalation.
 const MAX_HANDOVERS_PER_STEP = 3;
 
+// A transient load is routine on this surface. Three attempts with a doubling backoff, and
+// only on a step that declares itself idempotent, because repeating a submit risks a double
+// post. The wait is spent on Clock.delay so no test has to wait for it.
+const MAX_RECOVERY_ATTEMPTS = 3;
+const RECOVERY_BACKOFF_MS = 500;
+
+// A condition the app profile calls recoverable, on a step that is allowed to run again. It
+// leaves the step rather than the run, which is why it is not a Stop.
+class Recoverable {
+  readonly code: string;
+
+  constructor(code: string) {
+    this.code = code;
+  }
+}
+
 // Leaves the run from any depth with a finished result. It never escapes replay.
 class Stop {
   readonly result: ReplayResult;
@@ -91,9 +108,15 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
   // the session, so acting with it afterwards is exactly what ADR 0008 forbids.
   let control = context.control;
   const interventions: InterventionRecord[] = [];
+  const recoveries: RecoveryRecord[] = [];
   let handoversOnStep = 0;
   const allowedEnv = context.allowedEnv ?? [];
   const startedAt = clock.now().toISOString();
+  const startedAtMs = clock.now().getTime();
+  // Time a person held the session. The duration budget bounds the automation, not somebody
+  // reading a screen and deciding, so a handover that outlasts the budget must not fail the run
+  // the moment it comes back. Discovery does the same.
+  let pausedMs = 0;
   const inputNames = Object.keys(supplied);
   const drift: DriftRecord[] = [];
   const outputs: Record<string, TypedValue> = {};
@@ -112,6 +135,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     stepsCompleted,
     drift,
     interventions,
+    recoveries,
   });
 
   const fail = (detail: FailureInput): Stop =>
@@ -200,6 +224,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     handoversOnStep += 1;
     const step = currentStep;
     const startedAt = clock.now().toISOString();
+    const pausedAt = clock.now().getTime();
     const refs = (await context.capture?.()) ?? { screenshotRef: 'none', snapshotRef: 'none' };
     const before = await surface.observe();
     const handover = await channel.raise({
@@ -218,6 +243,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       recentActions: [],
     });
 
+    pausedMs += clock.now().getTime() - pausedAt;
     interventions.push({
       interventionId: handover.interventionId,
       reason,
@@ -413,7 +439,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     return new Stop(businessOutcomeResult(base(), { code: declared.code, description: declared.description, terminal: declared.terminal }));
   };
 
-  const runStep = async (step: Step): Promise<void> => {
+  const attemptStep = async (step: Step): Promise<void> => {
     handoversOnStep = 0;
     if (step.precondition !== undefined) {
       const condition = templated(templateCondition(step.precondition.condition, values(), allowedEnv), `the precondition of ${step.id}`);
@@ -519,13 +545,16 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       // A recoverable condition on a step that cannot be repeated is not recoverable here. The
       // bounded retry lands at S6-T02 and will only ever apply to a step that declares itself
       // idempotent, because repeating a submit risks posting it twice.
-      if (entrant.classify === 'recoverable' && !step.idempotent) {
-        throw fail({
-          class: 'SurfaceUnavailable',
-          expected: step.postcondition.description,
-          observed: `The ${layer} condition ${entrant.code} holds, and this step is not idempotent, so nothing was retried.`,
-          retryable: true,
-        });
+      if (entrant.classify === 'recoverable') {
+        if (!step.idempotent) {
+          throw fail({
+            class: 'SurfaceUnavailable',
+            expected: step.postcondition.description,
+            observed: `The ${layer} condition ${entrant.code} holds, and this step is not idempotent, so nothing was retried.`,
+            retryable: true,
+          });
+        }
+        throw new Recoverable(entrant.code);
       }
 
       throw fail({
@@ -540,6 +569,44 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       settled.observation,
       capability.outputs.filter((output) => output.source.stepId === step.id),
     );
+  };
+
+  const runStep = async (step: Step): Promise<void> => {
+    // The budget bounds how long the automation runs, not how long a person takes to answer,
+    // so the time somebody held the session is taken off before the comparison.
+    const spent = clock.now().getTime() - startedAtMs - pausedMs;
+    if (spent > capability.policy.maxTotalDurationMs) {
+      throw fail({
+        class: 'Timeout',
+        expected: `The run finishes within the ${capability.policy.maxTotalDurationMs}ms this capability allows.`,
+        observed: `The run had spent ${spent}ms before ${step.id}, not counting any time a person held the session.`,
+        retryable: true,
+      });
+    }
+
+    const retried: number[] = [];
+    for (let attempt = 1; ; attempt += 1) {
+      try {
+        await attemptStep(step);
+        // Reported even though the run worked. A capability that only succeeds on the second
+        // try is a fact about the surface worth having in the result.
+        for (const number of retried) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: true });
+        return;
+      } catch (error) {
+        if (!(error instanceof Recoverable)) throw error;
+        if (attempt >= MAX_RECOVERY_ATTEMPTS) {
+          for (const number of [...retried, attempt]) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: false });
+          throw fail({
+            class: 'SurfaceUnavailable',
+            expected: step.postcondition.description,
+            observed: `The condition ${error.code} held on all ${MAX_RECOVERY_ATTEMPTS} attempts at this step.`,
+            retryable: true,
+          });
+        }
+        retried.push(attempt);
+        await clock.delay(RECOVERY_BACKOFF_MS * 2 ** (attempt - 1));
+      }
+    }
   };
 
   try {
