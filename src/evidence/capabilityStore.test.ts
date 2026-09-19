@@ -46,6 +46,20 @@ describe('FileCapabilityStore', () => {
   });
   afterEach(() => rm(directory, { recursive: true, force: true }));
 
+  it('writes the review sheet and the tool schema beside the artifact', async () => {
+    const written = await store.write(readSavingsBalanceFixture(), { inputValues });
+
+    expect(written.ok).toBe(true);
+    if (!written.ok) return;
+    // A sheet nobody can find is a function with a test. These sit next to the artifact, so
+    // a reviewer opening the directory has the thing they need in order to decide.
+    const sheet = await readFile(written.path.replace(/\.json$/, '.md'), 'utf8');
+    const tool: unknown = JSON.parse(await readFile(written.path.replace(/\.json$/, '.tool.json'), 'utf8'));
+    expect(sheet).toContain('Inputs');
+    expect(sheet).not.toContain('10001');
+    expect(Reflect.get(tool as object, 'name')).toBe('member_readSavingsBalance');
+  });
+
   it('writes <id>@<version>.json and a read and rewrite produces the same bytes', async () => {
     expect(await store.write(readSavingsBalanceFixture(), { inputValues })).toEqual({ ok: true, path: join(directory, FILE) });
     const bytes = await readFile(join(directory, FILE), 'utf8');

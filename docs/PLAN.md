@@ -204,9 +204,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: implements the interface, throws `NotImplementedError` per verb, and documents the verb to UI Automation mapping, including geometric relations over bounding rectangles.
   * Test: unit, `src/surface/desktop/desktopSurfaceDriver.test.ts`, the stub satisfies the interface type, every method rejects by name, and every verb in the vocabulary has a mapping.
   * Note: writing the mapping out was the point. The vocabulary needed nothing added for a desktop surface. The one thing that changes is where geometry comes from, a `BoundingRectangle` in screen coordinates rather than a layout box, so the anchor relative relations carry over unchanged.
-* [ ] **S7-T02** JSON Schema generation and the review sheet.
+* [x] **S7-T02** JSON Schema generation and the review sheet.
   * Accept: generated from the Zod schema, so a calling agent reads the same contract the executor enforces. A human readable sheet lists intents, inputs, outputs and declared outcomes.
-  * Test: unit, the tool schema names every required input with its type, and the sheet lists every declared outcome.
+  * Test: unit, `src/core/capability/publish.test.ts` covers the tool schema naming every input with its type and constraints and the sheet listing every outcome, `src/evidence/capabilityStore.test.ts` covers both being written beside the artifact.
+  * Note: both are written next to the artifact on every write, because a sheet nobody can find is a function with a test, and a sheet describing a version other than the one beside it is worse than none.
 
 ---
 

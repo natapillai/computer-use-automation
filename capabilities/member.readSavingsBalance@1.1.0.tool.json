@@ -1,0 +1,18 @@
+{
+  "name": "member_readSavingsBalance",
+  "description": "Looks up a member by ID and returns the current balance of their primary savings account. Returns savingsBalance.",
+  "input_schema": {
+    "type": "object",
+    "properties": {
+      "memberId": {
+        "type": "string",
+        "description": "Institution member number",
+        "pattern": "^[0-9]{5,10}$"
+      }
+    },
+    "required": [
+      "memberId"
+    ],
+    "additionalProperties": false
+  }
+}

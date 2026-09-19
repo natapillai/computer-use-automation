@@ -130,7 +130,12 @@ describe('runDiscoverCommand', () => {
 
     expect(code, stderr).toBe(0);
     expect(JSON.parse(stdout)).toMatchObject({ runId: 'run_000001', status: 'done', capability: { id: 'member.readSavingsBalance', version: '1.0.0' } });
-    expect(await filesUnder(paths.capabilities)).toEqual(['member.readSavingsBalance@1.0.0.json']);
+    // The artifact, the sheet a reviewer reads and the tool definition a calling agent uses.
+    expect(await filesUnder(paths.capabilities)).toEqual([
+      'member.readSavingsBalance@1.0.0.json',
+      'member.readSavingsBalance@1.0.0.md',
+      'member.readSavingsBalance@1.0.0.tool.json',
+    ]);
     expect(await filesUnder(paths.evidence)).toEqual([
       'discovery/run_000001/artifact.json',
       'discovery/run_000001/captures/final.a11y.json',
@@ -195,7 +200,11 @@ describe('runDiscoverCommand', () => {
       modelId: null,
     });
     expect(offline.code, offline.stderr).toBe(0);
-    expect(await filesUnder(join(root, 'offline-capabilities'))).toEqual(['member.readSavingsBalance@1.0.0.json']);
+    expect(await filesUnder(join(root, 'offline-capabilities'))).toEqual([
+      'member.readSavingsBalance@1.0.0.json',
+      'member.readSavingsBalance@1.0.0.md',
+      'member.readSavingsBalance@1.0.0.tool.json',
+    ]);
   });
 
   it('says what it is doing before it opens a browser or calls the model, so a slow run reads as a working one', async () => {

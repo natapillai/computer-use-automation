@@ -3,6 +3,7 @@ import { join } from 'node:path';
 import type { InputValue } from '../core/capability/inputs.js';
 import { parseCapability } from '../core/capability/load.js';
 import { findSensitiveLiterals } from '../core/capability/sensitiveLiterals.js';
+import { reviewSheet, toolFor } from '../core/capability/publish.js';
 import { Capability } from '../core/capability/schema.js';
 import type { Redactor } from '../core/redaction/redactor.js';
 
@@ -120,6 +121,12 @@ export function createFileCapabilityStore(options: FileCapabilityStoreOptions): 
           return { ok: false, failure: 'VersionExists', detail: `${capability.id}@${capability.version} already exists with different content. A change is a new version.` };
         }
       }
+      // Written beside the artifact, and rewritten whenever the artifact is, because a sheet
+      // that describes a version other than the one next to it is worse than no sheet. Neither
+      // is canonical, so neither is exclusive create.
+      await writeFile(path.replace(/\.json$/, '.md'), reviewSheet(capability), 'utf8');
+      await writeFile(path.replace(/\.json$/, '.tool.json'), `${JSON.stringify(toolFor(capability), null, 2)}
+`, 'utf8');
       return { ok: true, path };
     },
   };
