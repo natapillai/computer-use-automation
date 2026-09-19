@@ -102,8 +102,11 @@ describe('the injectable faults', { timeout: 30_000 }, () => {
 
     const results = await search('10001');
 
-    const rows = [...results.matchAll(/<a href="\/member\/[0-9]+">10001<\/a>/g)];
+    const rows = [...results.matchAll(/<a href="\/member\/([0-9]+)">10001<\/a>/g)];
     expect(rows).toHaveLength(2);
+    // The two rows show the same number and open different records, which is the hazard. Two
+    // rows for the same record would be harmless and would prove nothing.
+    expect(new Set(rows.map((row) => row[1])).size).toBe(2);
 
     // Armed once, so an ordinary search resolves to one row again.
     expect([...(await search('10001')).matchAll(/<a href="\/member\/[0-9]+">10001<\/a>/g)]).toHaveLength(1);

@@ -23,4 +23,15 @@ describe('fingerprint', () => {
   it('changes when a node appears', () => {
     expect(fingerprint(observationOf([]))).not.toBe(fingerprint(field('f3e13', 110)));
   });
+
+  it('ignores focus, because every click sets it and that is not the page changing', () => {
+    const blurred = observationOf([uiNode('f3e13', 'link', '10001', box(15, 158, 44, 19))]);
+    const focused = observationOf([uiNode('f3e13', 'link', '10001', box(15, 158, 44, 19), { state: { disabled: false, visible: true, focused: true } })]);
+
+    // The executor tells a step that did nothing from one that went somewhere wrong by
+    // comparing these. A click that focused a link and then hung did nothing, and reporting it
+    // as a page that changed into the wrong state sends a reader to the capability rather than
+    // to the surface that never answered.
+    expect(fingerprint(focused)).toBe(fingerprint(blurred));
+  });
 });

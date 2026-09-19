@@ -146,8 +146,10 @@ describe('the operator console page', { timeout: 60_000 }, () => {
 
     await page.keyboard.type('10001');
     await page.keyboard.press('Enter');
-    await page.waitForFunction('document.getElementById("status").textContent.includes("Sent")');
 
+    // The console sends one at a time and in order, so the assertion waits for the queue to
+    // drain rather than for a status line that appears after the first one.
+    await expect.poll(() => forwarded.filter((entry) => entry.kind === 'press').length).toBe(6);
     expect(forwarded.filter((entry) => entry.kind === 'press').map((entry) => entry.key)).toEqual(['1', '0', '0', '0', '1', 'Enter']);
     void handover;
   });

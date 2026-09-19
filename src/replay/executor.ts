@@ -83,16 +83,6 @@ const MAX_HANDOVERS_PER_STEP = 3;
 const MAX_RECOVERY_ATTEMPTS = 3;
 const RECOVERY_BACKOFF_MS = 500;
 
-// A condition the app profile calls recoverable, on a step that is allowed to run again. It
-// leaves the step rather than the run, which is why it is not a Stop.
-class Recoverable {
-  readonly code: string;
-
-  constructor(code: string) {
-    this.code = code;
-  }
-}
-
 // Leaves the run from any depth with a finished result. It never escapes replay.
 class Stop {
   readonly result: ReplayResult;
@@ -439,6 +429,25 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     return new Stop(businessOutcomeResult(base(), { code: declared.code, description: declared.description, terminal: declared.terminal }));
   };
 
+  // Asking for a response again. A frame is sent to the url it is already on, which goes
+  // through authorize like any other navigation, so a recovery cannot reach somewhere the
+  // allowlist would refuse.
+  const reloadFrame = async (framePath: readonly string[], stepId: string): Promise<void> => {
+    const observation = await surface.observe();
+    const frame = observation.frames.find((candidate) => candidate.framePath.join('/') === framePath.join('/'));
+    if (frame === undefined) return;
+    // The path rather than the whole url, because that is how every other navigation in a
+    // capability is expressed and it is what the allowlist reads.
+    let path: string;
+    try {
+      const parsed = new URL(frame.url);
+      path = `${parsed.pathname}${parsed.search}`;
+    } catch {
+      return;
+    }
+    await perform({ action: { kind: 'navigate', path, framePath }, framePath, targetKey: null }, stepId, 'read', true);
+  };
+
   const attemptStep = async (step: Step): Promise<void> => {
     handoversOnStep = 0;
     if (step.precondition !== undefined) {
@@ -530,37 +539,77 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     if (entrant.kind === 'outcome' || (entrant.kind === 'rule' && entrant.classify === 'business_outcome')) {
       throw businessOutcome(entrant.code);
     }
-    if (entrant.kind === 'rule' || entrant.kind === 'profile') {
-      const layer = entrant.kind === 'rule' ? 'step' : 'app profile';
-      // A failure named by a known class is that class. Anything else that fired has no
-      // handler yet, recovery at S6-T02 and escalation at S5, and fails as our own gap.
-      if (entrant.classify === 'failure' && isFailureClass(entrant.code)) {
+    // A transient load is a response that failed, so the recovery is to ask for that response
+    // again. Repeating the action would be wrong here. An action that navigates cannot be
+    // repeated from the page it landed on, because the thing it acted on is no longer there.
+    if ((entrant.kind === 'rule' || entrant.kind === 'profile') && entrant.classify === 'recoverable') {
+      if (!step.idempotent) {
         throw fail({
-          class: entrant.code,
+          class: 'SurfaceUnavailable',
           expected: step.postcondition.description,
-          observed: `The ${layer} condition ${entrant.code} holds.`,
-          retryable: entrant.code === 'SurfaceUnavailable' && step.idempotent,
+          observed: `The condition ${entrant.code} holds, and this step is not idempotent, so nothing was retried.`,
+          retryable: true,
         });
       }
-      // A recoverable condition on a step that cannot be repeated is not recoverable here. The
-      // bounded retry lands at S6-T02 and will only ever apply to a step that declares itself
-      // idempotent, because repeating a submit risks posting it twice.
-      if (entrant.classify === 'recoverable') {
-        if (!step.idempotent) {
+      const retried: number[] = [];
+      for (let attempt = 1; attempt <= MAX_RECOVERY_ATTEMPTS; attempt += 1) {
+        if (attempt === MAX_RECOVERY_ATTEMPTS) {
+          for (const number of [...retried, attempt]) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: false });
           throw fail({
             class: 'SurfaceUnavailable',
             expected: step.postcondition.description,
-            observed: `The ${layer} condition ${entrant.code} holds, and this step is not idempotent, so nothing was retried.`,
+            observed: `The condition ${entrant.code} held on all ${MAX_RECOVERY_ATTEMPTS} attempts at this step.`,
             retryable: true,
           });
         }
-        throw new Recoverable(entrant.code);
+        retried.push(attempt);
+        await clock.delay(RECOVERY_BACKOFF_MS * 2 ** (attempt - 1));
+        await reloadFrame(prepared.framePath, step.id);
+        settled = await race(surface, clock, contenders, timeoutMs, outputResolvable, stopWhenRefused);
+        failIfRefused(step.id);
+        const still = settled.kind === 'fired' && (settled.entrant.kind === 'rule' || settled.entrant.kind === 'profile') && settled.entrant.classify === 'recoverable';
+        if (still) continue;
+        // Reported even though the run worked. A capability that only succeeds once the
+        // surface is asked twice is a fact about the surface worth having in the result.
+        for (const number of retried) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: true });
+        break;
+      }
+      if (settled.kind !== 'fired') {
+        throw fail({ class: 'CheckpointFailed', expected: step.postcondition.description, observed: 'The step did not reach its postcondition after the surface recovered.', retryable: false });
+      }
+      if (settled.entrant.kind === 'outcome' || (settled.entrant.kind === 'rule' && settled.entrant.classify === 'business_outcome')) {
+        throw businessOutcome(settled.entrant.code);
+      }
+    }
+    const decided = settled.kind === 'fired' ? settled.entrant : entrant;
+    if (decided.kind === 'rule' || decided.kind === 'profile') {
+      const layer = decided.kind === 'rule' ? 'step' : 'app profile';
+      // A failure named by a known class is that class. Anything else that fired has no
+      // handler yet, recovery at S6-T02 and escalation at S5, and fails as our own gap.
+      if (decided.classify === 'failure' && isFailureClass(decided.code)) {
+        throw fail({
+          class: decided.code,
+          expected: step.postcondition.description,
+          observed: `The ${layer} condition ${decided.code} holds.`,
+          retryable: decided.code === 'SurfaceUnavailable' && step.idempotent,
+        });
+      }
+      // Reached only when the recovery above ran out of ways to help.
+      if (decided.classify === 'recoverable') {
+        // Reached only when the recovery above ran out of ways to help, because a recoverable
+        // condition that still holds after the retries is not recoverable on this run.
+        throw fail({
+          class: 'SurfaceUnavailable',
+          expected: step.postcondition.description,
+          observed: `The ${layer} condition ${decided.code} still holds.`,
+          retryable: true,
+        });
       }
 
       throw fail({
         class: 'Internal',
-        expected: `A handler for the ${entrant.classify} classification of ${entrant.code}.`,
-        observed: `The ${layer} condition ${entrant.code} fired and asks for ${entrant.classify}, which no handler in this executor covers.`,
+        expected: `A handler for the ${decided.classify} classification of ${decided.code}.`,
+        observed: `The ${layer} condition ${decided.code} fired and asks for ${decided.classify}, which no handler in this executor covers.`,
         retryable: false,
       });
     }
@@ -584,29 +633,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
       });
     }
 
-    const retried: number[] = [];
-    for (let attempt = 1; ; attempt += 1) {
-      try {
-        await attemptStep(step);
-        // Reported even though the run worked. A capability that only succeeds on the second
-        // try is a fact about the surface worth having in the result.
-        for (const number of retried) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: true });
-        return;
-      } catch (error) {
-        if (!(error instanceof Recoverable)) throw error;
-        if (attempt >= MAX_RECOVERY_ATTEMPTS) {
-          for (const number of [...retried, attempt]) recoveries.push({ condition: 'TransientLoad', atStepId: step.id, attempt: number, resolved: false });
-          throw fail({
-            class: 'SurfaceUnavailable',
-            expected: step.postcondition.description,
-            observed: `The condition ${error.code} held on all ${MAX_RECOVERY_ATTEMPTS} attempts at this step.`,
-            retryable: true,
-          });
-        }
-        retried.push(attempt);
-        await clock.delay(RECOVERY_BACKOFF_MS * 2 ** (attempt - 1));
-      }
-    }
+    await attemptStep(step);
   };
 
   try {

@@ -107,16 +107,24 @@ export const OPERATOR_PAGE = `<!doctype html>
     };
   }
 
-  async function forward(body, describe) {
-    if (token === null) { say('Claim the session before acting on it.'); return; }
-    const answer = await fetch('/sessions/' + intervention.sessionId + '/input', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json', 'x-control-token': token },
-      body: JSON.stringify(body),
+  // One at a time, in the order they were made. Typing fires a keydown per character and a
+  // person expects them to arrive as a word, so letting the requests race would put the
+  // characters into the live form in whatever order the network settled them.
+  let sending = Promise.resolve();
+
+  function forward(body, describe) {
+    if (token === null) { say('Claim the session before acting on it.'); return sending; }
+    sending = sending.then(async () => {
+      const answer = await fetch('/sessions/' + intervention.sessionId + '/input', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', 'x-control-token': token },
+        body: JSON.stringify(body),
+      });
+      if (!answer.ok) { say('The session refused that. ' + answer.status); return; }
+      say('Sent ' + describe + '. What you do is recorded, and what you type is not.');
+      await poll();
     });
-    if (!answer.ok) { say('The session refused that. ' + answer.status); return; }
-    say('Sent ' + describe + '. What you do is recorded, and what you type is not.');
-    await poll();
+    return sending;
   }
 
   canvas.addEventListener('click', (event) => forward({ kind: 'click', ...pointFrom(event) }, 'a click'));

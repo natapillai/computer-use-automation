@@ -211,7 +211,8 @@ Every row is an integration test against the local target app, collected in S6-T
 | Hard timeout | `hang` on member detail | `failure`, `Timeout`, naming the awaited condition | S6-T01 |
 | Unexpected dialog | `surpriseDialog` | `escalated`, dialog screenshotted, nothing clicked | S5-T05 |
 | Locator drift, recovered | `relabel` | `success`, with a drift record naming the strategy that won and the one that did not | S6-T01 |
-| Ambiguous locator | `duplicateIds` | `failure`, `LocatorAmbiguous` | S6-T01 |
+| Ambiguous locator, checkpoint | `duplicateIds` | `failure`, `CheckpointFailed`, observing that the page carries two of the row | S6-T04 |
+| Ambiguous locator, action | a second Search control on the page | `failure`, `LocatorAmbiguous` | S1-T09 |
 | Write, confirmation | `member.openSubAccount`, draft | a confirm intervention, then `success` after a one shot approval grant | S5-T06 |
 | Write, unattended | `member.openSubAccount`, approved with `allowUnattendedReplay` | `success` with no intervention | S5-T06 |
 | Write, no double post | `flaky503` on the submit route | `failure`, `SurfaceUnavailable`, `retryable`, and the app recorded exactly one submission | S5-T06 |

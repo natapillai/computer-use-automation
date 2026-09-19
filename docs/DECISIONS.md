@@ -302,6 +302,22 @@ The first run reported F5 as failed. The snapshot showed the node was present, a
 
 ---
 
+## ADR 0019. An ambiguous strategy ends the resolution rather than falling through
+
+**Status.** Accepted. Supersedes the fall through behaviour recorded in ADR 0013's resolution ladder.
+
+**Context.** A locator bundle is an ordered list of strategies under a match policy. The ladder tries each in turn and records drift when a lower ranked one wins. Until now a strategy that matched several nodes under a `unique` policy was treated the same as one that matched none, so the ladder carried on and a later strategy could resolve the element. `docs/ERROR_TAXONOMY.md` section 8 says the `duplicateIds` fault must produce `LocatorAmbiguous`, and it did not. It produced a success with a drift record, because the third strategy in the member link bundle resolved one of the two rows.
+
+**Decision.** Under a `unique` match policy, a strategy that matches more than one node ends the resolution as `LocatorAmbiguous`. The ladder no longer continues past it. Under an `nth` policy nothing changes, because that policy says several matches are expected and names which one to take.
+
+**Consequences.** The two failure classes now mean what the taxonomy says they mean. Not found is drift, and the fix is to re record. Ambiguous is a page carrying two things the recording cannot tell apart, and the fix is to record a locator that can. A capability that used to survive a duplicated row now stops, which is the point. On this target app the difference is a search result page showing two rows with the same member number and different records, where the old behaviour picked one by a rule the recording never verified. In a bank that is acting on a member nobody chose.
+
+**Rejected.** Keeping the fall through and relying on the drift record to make it visible. Drift is a signal that a page changed shape, and a reader treats it as a recovery rather than a warning. Using it to report a fifty fifty guess about which member record to open puts the most dangerous case in the same channel as the most routine one.
+
+**Rejected.** Letting the bundle choose, with a per bundle flag for whether ambiguity is fatal. That is a knob whose safe setting is always the same, and a capability author who set it the other way would be doing so to make a recording problem go away.
+
+---
+
 ## Template for new ADRs
 
 ```

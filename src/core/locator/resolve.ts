@@ -42,7 +42,15 @@ export async function resolveBundle(bundle: LocatorBundle, match: StrategyMatche
   for (const [strategyIndex, strategy] of bundle.strategies.entries()) {
     const refs = await match(strategy, bundle.framePath);
     const winner = pick(bundle, refs);
-    attempts.push({ strategyIndex, kind: strategy.kind, outcome: outcomeOf(bundle, refs, winner), matchCount: refs.length });
+    const outcome = outcomeOf(bundle, refs, winner);
+    attempts.push({ strategyIndex, kind: strategy.kind, outcome, matchCount: refs.length });
+
+    // ADR 0019. Several matches under a unique policy disproves the premise the bundle was
+    // recorded under, so the ladder stops rather than letting a later strategy pick one of
+    // them. A strategy that matched nothing is drift and the ladder carries on.
+    if (outcome === 'ambiguous') {
+      return { ok: false, failure: 'LocatorAmbiguous', describedAs: bundle.describedAs, attempts: [...attempts] };
+    }
 
     if (winner !== undefined) {
       const recorded = [...attempts];

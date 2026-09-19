@@ -239,9 +239,12 @@ export function createTargetApp(options: TargetAppOptions): Express {
     const found = members.filter((member) =>
       values.memberId !== '' ? member.id === values.memberId : surnameOf(member).toLowerCase() === values.surname.toLowerCase(),
     );
-    // Two rows showing the same member ID and linking to different records, which is what a
-    // locator that matches on the displayed text cannot tell apart.
-    const results = found.length > 0 && consumeFault('duplicateIds', '/servicing/search', 'POST') ? [...found, { ...(found[0] as Member), id: found[0]?.id ?? '' }] : found;
+    // Two rows showing the same member ID and linking to different records. A locator that
+    // matches on the displayed text cannot tell them apart, and picking one is picking a member
+    // record nobody chose, which is why ADR 0019 makes that fatal rather than recoverable.
+    const twin = members.find((candidate) => candidate.id !== found[0]?.id);
+    const results =
+      found.length > 0 && twin !== undefined && consumeFault('duplicateIds', '/servicing/search', 'POST') ? [...found, { ...twin, displayId: found[0]?.id ?? '' }] : found;
     res.render('search', { fields, values, results, message: results.length === 0 ? 'No records found.' : null, dialog, memberIdLabel });
   });
 
@@ -301,6 +304,13 @@ export function createTargetApp(options: TargetAppOptions): Express {
     const member = members.find((candidate) => candidate.id === req.params.id);
     if (member === undefined) {
       res.status(404).render('notFound');
+      return;
+    }
+    // A transient load on the read path. The member detail route is idempotent in the profile,
+    // so a capability whose author read the profile may declare this step repeatable and get
+    // the retry. See docs/ERROR_TAXONOMY.md section 8.
+    if (consumeFault('flaky503', '/member/*', 'GET')) {
+      res.status(503).render('unavailable');
       return;
     }
     // A restriction is an answer the institution gave, not a fault of ours, so it renders as an

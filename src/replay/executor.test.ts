@@ -399,7 +399,8 @@ describe('replay', () => {
     const failure = failureOf((await run({ script: { duplicateSearchButton: true } })).result);
 
     expect(failure).toMatchObject({ class: 'LocatorAmbiguous', atStepId: 'submitSearch' });
-    expect(failure.locatorAttempts?.map((attempt) => attempt.outcome)).toEqual(['ambiguous', 'ambiguous']);
+    // One attempt, per ADR 0019. The ladder stops on the first strategy that finds two.
+    expect(failure.locatorAttempts?.map((attempt) => attempt.outcome)).toEqual(['ambiguous']);
   });
 
   it('fails with PolicyDenied when the network guard refused a request during the step, even though the page moved on', async () => {

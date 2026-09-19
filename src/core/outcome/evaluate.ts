@@ -24,9 +24,14 @@ export async function evaluateCondition(condition: ConditionMatcher, context: Ev
   switch (condition.kind) {
     case 'elementPresent': {
       const resolution = await resolveBundle(condition.target, context.match);
-      return resolution.ok
-        ? held(`${condition.target.describedAs} is present.`)
-        : failed(`${condition.target.describedAs} did not resolve.`);
+      if (resolution.ok) return held(`${condition.target.describedAs} is present.`);
+      // Why it did not resolve decides what somebody does next. Several matches means the page
+      // carries two of the thing the checkpoint names, which is a different problem from none.
+      return failed(
+        resolution.failure === 'LocatorAmbiguous'
+          ? `${condition.target.describedAs} matched more than one element, so the page carries two of it.`
+          : `${condition.target.describedAs} did not resolve.`,
+      );
     }
 
     case 'textMatches': {

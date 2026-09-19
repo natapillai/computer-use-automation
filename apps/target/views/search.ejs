@@ -57,7 +57,7 @@ tr.hdr td { background: #d4d0c8; font-weight: bold; }
 <table class="grid" border="1" cellpadding="3" cellspacing="0">
   <tr class="hdr"><td>Member No</td><td>Name</td></tr>
 <% for (const member of results) { %>
-  <tr><td><a href="/member/<%= member.id %>"><%= member.id %></a></td><td><%= member.name %></td></tr>
+  <tr><td><a href="/member/<%= member.id %>"><%= member.displayId === undefined ? member.id : member.displayId %></a></td><td><%= member.name %></td></tr>
 <% } %>
 </table>
 <% } %>

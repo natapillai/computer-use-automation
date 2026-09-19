@@ -190,9 +190,11 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: `ReplayResult` always carries `recoveries`, `interventions` and `drift`, including on success. `src/replay` imports no model client.
   * Test: unit, `src/core/outcome/result.test.ts` covers all four result shapes carrying the three arrays, `src/replay/executor.test.ts` covers a successful run reporting its retries, and `src/replay/imports.test.ts` walks the graph transitively.
   * Note: the import walk was mutation checked by adding a model import three levels deep, in `src/core/outcome/result.ts`, and it failed.
-* [ ] **S6-T04** The result matrix.
+* [x] **S6-T04** The result matrix, the nine rows that do not need the write capability.
   * Accept: one integration test per row of `docs/ERROR_TAXONOMY.md` section 8. `relabel` carries drift and is reported as a success with a drift record.
-  * Test: integration, each row asserts its exact status and code.
+  * Test: integration, `tests/integration/resultMatrix.test.ts`, each row asserts its exact status and code.
+  * Note: building it found three defects. ADR 0019, where an ambiguous strategy was rescued by a lower ranked one. The recovery retried the action rather than the failed load, which cannot work for a step that navigates. And focus was in the fingerprint, so every click looked like the page had changed and a hang read as `CheckpointFailed` rather than `Timeout`.
+  * [ ] The four write rows, which need `member.openSubAccount` from the live run. Not skipped in the file, because a skipped test reads as a passing one.
 
 ---
 

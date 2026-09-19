@@ -42,28 +42,31 @@ describe('resolveBundle', () => {
     });
   });
 
-  it('skips a strategy that is ambiguous under a unique policy and records the lower ranked win as drift', async () => {
+  it('stops on an ambiguous strategy under a unique policy rather than letting a later one guess', async () => {
     const resolution = await resolveBundle(
       memberIdBundle(),
       scripted({ 'role-name': ['n4', 'n9'], 'anchor-relative': ['n4'] }),
     );
 
+    // ADR 0019. Two nodes match the description the recording was made against, so the page
+    // holds two things it cannot tell apart. A later strategy resolving one of them is a guess,
+    // and on this surface the guess is which member record to open.
+    expect(resolution.ok).toBe(false);
+    if (resolution.ok) return;
+    expect(resolution.failure).toBe('LocatorAmbiguous');
+    expect(resolution.attempts).toEqual([{ strategyIndex: 0, kind: 'role-name', outcome: 'ambiguous', matchCount: 2 }]);
+  });
+
+  it('still falls through when a strategy simply does not match, which is drift', async () => {
+    const resolution = await resolveBundle(memberIdBundle(), scripted({ 'role-name': [], 'anchor-relative': ['n4'] }));
+
     expect(resolution.ok).toBe(true);
     if (!resolution.ok) return;
     expect(resolution.ref).toBe('n4');
-    expect(resolution.drift).toEqual({
-      describedAs: 'Member ID input',
-      preferredKind: 'role-name',
-      winningKind: 'anchor-relative',
-      winningIndex: 1,
-      attempts: [
-        { strategyIndex: 0, kind: 'role-name', outcome: 'ambiguous', matchCount: 2 },
-        { strategyIndex: 1, kind: 'anchor-relative', outcome: 'matched', matchCount: 1 },
-      ],
-    });
+    expect(resolution.drift).toMatchObject({ preferredKind: 'role-name', winningKind: 'anchor-relative', winningIndex: 1 });
   });
 
-  it('fails as LocatorAmbiguous when every strategy matches more than one node', async () => {
+  it('fails as LocatorAmbiguous on the first strategy that matches more than one node', async () => {
     const resolution = await resolveBundle(
       memberIdBundle(),
       scripted({ 'role-name': ['n4', 'n9'], 'anchor-relative': ['n4', 'n9'], structural: ['n4', 'n9'] }),
@@ -72,7 +75,9 @@ describe('resolveBundle', () => {
     expect(resolution.ok).toBe(false);
     if (resolution.ok) return;
     expect(resolution.failure).toBe('LocatorAmbiguous');
-    expect(resolution.attempts.map((attempt) => attempt.outcome)).toEqual(['ambiguous', 'ambiguous', 'ambiguous']);
+    // One attempt, not three. The later strategies are not tried, because the page has already
+    // shown it carries two of the thing the bundle describes.
+    expect(resolution.attempts.map((attempt) => attempt.outcome)).toEqual(['ambiguous']);
   });
 
   it('fails as LocatorNotFound listing every attempted strategy when nothing matches', async () => {

@@ -80,9 +80,11 @@ export function meridianScript(options: MeridianScriptOptions = {}): FakeScript 
   const flaky = options.flakyOnce ?? false;
   if (flaky) {
     transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: 'results503' });
-    // Searching again from the failed screen recovers, unless the script asks for a surface
-    // that never recovers, which is what bounds the retry rather than resolves it.
-    transitions.push({ from: 'results503', on: { kind: 'click', ref: 'n6' }, to: leadsTo === 'nowhere' ? 'results503' : leadsTo });
+    // Asking for the page again is what recovers it, which is what a transient load means and
+    // what the executor does. A surface the script says never recovers stays where it is, which
+    // is what bounds the retry rather than resolving it.
+    const recovered = leadsTo === 'nowhere' ? 'results503' : leadsTo;
+    transitions.push({ from: 'results503', on: { kind: 'navigate', path: resultsPath }, to: recovered });
   } else if (leadsTo !== 'nowhere') {
     transitions.push({ from: 'search', on: { kind: 'click', ref: 'n6' }, to: leadsTo });
   }
