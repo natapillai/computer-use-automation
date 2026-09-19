@@ -200,9 +200,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 
 ## Slice 7. Seams
 
-* [ ] **S7-T01** `DesktopSurfaceDriver` stub.
+* [x] **S7-T01** `DesktopSurfaceDriver` stub.
   * Accept: implements the interface, throws `NotImplementedError` per verb, and documents the verb to UI Automation mapping, including geometric relations over bounding rectangles.
-  * Test: unit, the class satisfies the interface type and every verb throws a named error.
+  * Test: unit, `src/surface/desktop/desktopSurfaceDriver.test.ts`, the stub satisfies the interface type, every method rejects by name, and every verb in the vocabulary has a mapping.
+  * Note: writing the mapping out was the point. The vocabulary needed nothing added for a desktop surface. The one thing that changes is where geometry comes from, a `BoundingRectangle` in screen coordinates rather than a layout box, so the anchor relative relations carry over unchanged.
 * [ ] **S7-T02** JSON Schema generation and the review sheet.
   * Accept: generated from the Zod schema, so a calling agent reads the same contract the executor enforces. A human readable sheet lists intents, inputs, outputs and declared outcomes.
   * Test: unit, the tool schema names every required input with its type, and the sheet lists every declared outcome.
