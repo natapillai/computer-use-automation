@@ -217,7 +217,7 @@ Never spent building. Runs wherever building stopped.
 
 * [ ] **S8-T01** `README.md`.
   * Accept: setup, config with every key in `.env.example` and the value to use, including the current default model, the exact demo sequence of discover, review and replay, how to run offline from the cassette, that the target app runs on `http://localhost:4010` with no hosts file changes, and a statement that `apps/target` is a fixture and the Express and Fastify split is deliberate.
-* [ ] **S8-T02** `REPORT.md`.
+* [~] **S8-T02** `REPORT.md`. First draft written. It is 2088 words, which is at the top of the one to three page range, and it needs the live approved write run before section 3 and section 7 are final.
   * Accept: one to three pages, first person, the brief's seven headings in their exact wording including the ampersands and the hyphen. Section 3 tells the stale ref finding from S1-T08, where an old ref named the card number cell after navigation, as the evidence for derived and verified locators over model authored selectors, and the S1-T10 wait that passed the gate while broken and was caught by its test. Section 7 starts from the draft under Cuts for REPORT section 7 below, and stays near half a page. The full list in `PROGRESS.md` is source material, not the section.
 * [ ] **S8-T03** Pre submission checks.
   * Accept: a walk of `docs/REQUIREMENTS.md` row by row. One grep for task IDs this plan does not define, with `retired` exempt. One grep for raw `setTimeout`, `setInterval` and `setImmediate` in `src/core`, `src/replay`, `src/discovery` and `src/control`. A pass for dead code, skipped tests, TODO comments and secrets. `evidence/README.md` naming the one file worth opening in each directory.
