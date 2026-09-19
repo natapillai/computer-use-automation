@@ -186,9 +186,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: bounded exponential backoff through `Clock.delay`, gated on `idempotent`. `TransientLoad` retries a 502 or 503 up to three attempts and is recorded in `recoveries`, including on success. Budget exhaustion is a `Timeout` failure, and the time a person held the session does not count against it, as discovery already does.
   * Test: unit, `src/replay/executor.test.ts`, backoff timing on a test clock, a non idempotent step never retried, and a budget ending the run.
   * Note: the committed capability declares its search not idempotent, because the app profile says the search POST is not, so both sides of the gate are tested by flipping that one declaration.
-* [ ] **S6-T03** Result assembly and the replay import graph test.
+* [x] **S6-T03** Result assembly and the replay import graph test.
   * Accept: `ReplayResult` always carries `recoveries`, `interventions` and `drift`, including on success. `src/replay` imports no model client.
-  * Test: unit, a run with retries reports them on a successful result, and the import graph walk finds no model client.
+  * Test: unit, `src/core/outcome/result.test.ts` covers all four result shapes carrying the three arrays, `src/replay/executor.test.ts` covers a successful run reporting its retries, and `src/replay/imports.test.ts` walks the graph transitively.
+  * Note: the import walk was mutation checked by adding a model import three levels deep, in `src/core/outcome/result.ts`, and it failed.
 * [ ] **S6-T04** The result matrix.
   * Accept: one integration test per row of `docs/ERROR_TAXONOMY.md` section 8. `relabel` carries drift and is reported as a success with a drift record.
   * Test: integration, each row asserts its exact status and code.

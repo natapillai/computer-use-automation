@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FAILURE_CLASSES, failureResult, successResult } from './result.js';
+import { businessOutcomeResult, escalatedResult, FAILURE_CLASSES, failureResult, successResult } from './result.js';
 
 const base = {
   runId: 'run_000001',
@@ -50,6 +50,24 @@ describe('result constructors', () => {
       interventions: [],
       drift: [],
     });
+  });
+
+  it('carry all three on every shape a result can take, not only on success', () => {
+    const shapes = [
+      successResult(base, {}),
+      businessOutcomeResult(base, { code: 'MEMBER_NOT_FOUND', description: 'No member exists with the supplied ID.', terminal: true }),
+      failureResult(base, { ...failure, class: 'CheckpointFailed' }),
+      escalatedResult(base, { id: 'int_000001', reason: 'NoProgress', atStepId: null, disposition: 'unclaimed' }),
+    ];
+
+    // A caller that has to ask which shape it got before it knows whether a field is there is
+    // a caller that will forget. Every result answers all three questions.
+    for (const shape of shapes) {
+      expect(Array.isArray(shape.recoveries), shape.status).toBe(true);
+      expect(Array.isArray(shape.interventions), shape.status).toBe(true);
+      expect(Array.isArray(shape.drift), shape.status).toBe(true);
+    }
+    expect(shapes.map((shape) => shape.status)).toEqual(['success', 'business_outcome', 'failure', 'escalated']);
   });
 
   it('report input names in a stable order', () => {
