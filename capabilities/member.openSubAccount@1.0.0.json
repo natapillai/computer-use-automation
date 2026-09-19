@@ -1,0 +1,591 @@
+{
+  "schemaVersion": "1.0.0",
+  "id": "member.openSubAccount",
+  "version": "1.0.0",
+  "name": "Open a member sub account",
+  "description": "Opens a new sub account of a given type for a member, with an opening deposit, and returns the suffix the system assigned. The form is reached by path because MERIDIAN Core links to it from nowhere, so the goal names it.",
+  "app": {
+    "appId": "meridian-core",
+    "vendor": "meridian",
+    "entryPath": "/servicing"
+  },
+  "surface": {
+    "kind": "legacy-web",
+    "minDriverVersion": "1.0.0",
+    "capabilitiesRequired": [
+      "frames"
+    ]
+  },
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "description": "Institution member number",
+      "sensitivity": "pii",
+      "constraints": {
+        "pattern": "^[0-9]{5,10}$"
+      }
+    },
+    {
+      "name": "accountType",
+      "type": "enum",
+      "enumValues": [
+        "Savings",
+        "Holiday Club",
+        "Christmas Club"
+      ],
+      "required": true,
+      "description": "The kind of sub account to open",
+      "sensitivity": "internal"
+    },
+    {
+      "name": "openingAmount",
+      "type": "string",
+      "required": true,
+      "description": "The opening deposit, at least $25.00",
+      "sensitivity": "pii",
+      "constraints": {
+        "pattern": "^[0-9]+\\.[0-9]{2}$"
+      }
+    }
+  ],
+  "outputs": [
+    {
+      "name": "suffix",
+      "type": "string",
+      "description": "The value read from cell H01",
+      "sensitivity": "internal",
+      "required": true,
+      "source": {
+        "stepId": "clickCellOpenAccount",
+        "target": {
+          "framePath": [
+            "content"
+          ],
+          "strategies": [
+            {
+              "kind": "role-name",
+              "role": "cell",
+              "name": "H01",
+              "exact": true,
+              "confidence": 0.9
+            },
+            {
+              "kind": "anchor-relative",
+              "anchor": {
+                "kind": "text",
+                "text": "Suffix:",
+                "exact": true,
+                "confidence": 0.75
+              },
+              "relation": "rightOf",
+              "role": "cell",
+              "confidence": 0.75
+            },
+            {
+              "kind": "text",
+              "text": "H01",
+              "exact": true,
+              "confidence": 0.7
+            }
+          ],
+          "matchPolicy": "unique",
+          "describedAs": "cell H01"
+        },
+        "attribute": "text"
+      }
+    }
+  ],
+  "outcomes": [],
+  "steps": [
+    {
+      "id": "navigateMemberMemberIdSubaccount",
+      "index": 0,
+      "intent": "Open /member/the memberId input/subaccount in the content frame",
+      "action": {
+        "kind": "navigate",
+        "path": "/member/{{inputs.memberId}}/subaccount",
+        "framePath": [
+          "content"
+        ]
+      },
+      "postcondition": {
+        "description": "combobox Account Type: is present",
+        "condition": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "label",
+                "text": "Account Type:",
+                "confidence": 0.85
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Account Type:",
+                  "exact": true,
+                  "confidence": 0.8
+                },
+                "relation": "sameRow",
+                "role": "combobox",
+                "confidence": 0.8
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Account Type:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "combobox",
+                "confidence": 0.75
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "role-name",
+                  "role": "heading",
+                  "name": "Open Sub Account",
+                  "exact": true,
+                  "confidence": 0.6
+                },
+                "relation": "firstBelow",
+                "role": "combobox",
+                "confidence": 0.6
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "combobox Account Type:"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": true,
+      "sensitive": false,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    },
+    {
+      "id": "selectComboboxAccountType",
+      "index": 1,
+      "intent": "Choose the accountType input in combobox Account Type:",
+      "action": {
+        "kind": "select"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "label",
+            "text": "Account Type:",
+            "confidence": 0.85
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Account Type:",
+              "exact": true,
+              "confidence": 0.8
+            },
+            "relation": "sameRow",
+            "role": "combobox",
+            "confidence": 0.8
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Account Type:",
+              "exact": true,
+              "confidence": 0.75
+            },
+            "relation": "rightOf",
+            "role": "combobox",
+            "confidence": 0.75
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "role-name",
+              "role": "heading",
+              "name": "Open Sub Account",
+              "exact": true,
+              "confidence": 0.6
+            },
+            "relation": "firstBelow",
+            "role": "combobox",
+            "confidence": 0.6
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "combobox Account Type:"
+      },
+      "value": "{{inputs.accountType}}",
+      "postcondition": {
+        "description": "combobox Account Type: holds the accountType input",
+        "condition": {
+          "kind": "textMatches",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "label",
+                "text": "Account Type:",
+                "confidence": 0.85
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Account Type:",
+                  "exact": true,
+                  "confidence": 0.8
+                },
+                "relation": "sameRow",
+                "role": "combobox",
+                "confidence": 0.8
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Account Type:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "combobox",
+                "confidence": 0.75
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "role-name",
+                  "role": "heading",
+                  "name": "Open Sub Account",
+                  "exact": true,
+                  "confidence": 0.6
+                },
+                "relation": "firstBelow",
+                "role": "combobox",
+                "confidence": 0.6
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "combobox Account Type:"
+          },
+          "pattern": "^{{inputs.accountType}}$"
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": true,
+      "sensitive": false,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    },
+    {
+      "id": "fillTextboxOpeningAmount",
+      "index": 2,
+      "intent": "Enter the openingAmount input into textbox Opening Amount:",
+      "action": {
+        "kind": "fill"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "label",
+            "text": "Opening Amount:",
+            "confidence": 0.85
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Opening Amount:",
+              "exact": true,
+              "confidence": 0.8
+            },
+            "relation": "sameRow",
+            "role": "textbox",
+            "confidence": 0.8
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "text",
+              "text": "Opening Amount:",
+              "exact": true,
+              "confidence": 0.75
+            },
+            "relation": "rightOf",
+            "role": "textbox",
+            "confidence": 0.75
+          },
+          {
+            "kind": "anchor-relative",
+            "anchor": {
+              "kind": "role-name",
+              "role": "heading",
+              "name": "Open Sub Account",
+              "exact": true,
+              "confidence": 0.6
+            },
+            "relation": "firstBelow",
+            "role": "textbox",
+            "confidence": 0.6
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "textbox Opening Amount:"
+      },
+      "value": "{{inputs.openingAmount}}",
+      "postcondition": {
+        "description": "textbox Opening Amount: holds the openingAmount input",
+        "condition": {
+          "kind": "textMatches",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "label",
+                "text": "Opening Amount:",
+                "confidence": 0.85
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Opening Amount:",
+                  "exact": true,
+                  "confidence": 0.8
+                },
+                "relation": "sameRow",
+                "role": "textbox",
+                "confidence": 0.8
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Opening Amount:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "textbox",
+                "confidence": 0.75
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "role-name",
+                  "role": "heading",
+                  "name": "Open Sub Account",
+                  "exact": true,
+                  "confidence": 0.6
+                },
+                "relation": "firstBelow",
+                "role": "textbox",
+                "confidence": 0.6
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "textbox Opening Amount:"
+          },
+          "pattern": "^{{inputs.openingAmount}}$"
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "read",
+      "idempotent": true,
+      "sensitive": false,
+      "retry": {
+        "attempts": 2,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    },
+    {
+      "id": "clickCellOpenAccount",
+      "index": 3,
+      "intent": "Click cell Open Account",
+      "action": {
+        "kind": "click"
+      },
+      "target": {
+        "framePath": [
+          "content"
+        ],
+        "strategies": [
+          {
+            "kind": "role-name",
+            "role": "cell",
+            "name": "Open Account",
+            "exact": true,
+            "confidence": 0.9
+          },
+          {
+            "kind": "text",
+            "text": "Open Account",
+            "exact": true,
+            "confidence": 0.7
+          }
+        ],
+        "matchPolicy": "unique",
+        "describedAs": "cell Open Account"
+      },
+      "postcondition": {
+        "description": "cell H01 is present",
+        "condition": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "role-name",
+                "role": "cell",
+                "name": "H01",
+                "exact": true,
+                "confidence": 0.9
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Suffix:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "cell",
+                "confidence": 0.75
+              },
+              {
+                "kind": "text",
+                "text": "H01",
+                "exact": true,
+                "confidence": 0.7
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell H01"
+          }
+        },
+        "timeoutMs": 10000
+      },
+      "effect": "write",
+      "idempotent": false,
+      "sensitive": false,
+      "retry": {
+        "attempts": 0,
+        "backoffMs": 500
+      },
+      "timeoutMs": 15000,
+      "onCondition": [],
+      "provenance": "model"
+    }
+  ],
+  "successCondition": {
+    "description": "The run ends with suffix readable",
+    "condition": {
+      "kind": "all",
+      "of": [
+        {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "role-name",
+                "role": "cell",
+                "name": "H01",
+                "exact": true,
+                "confidence": 0.9
+              },
+              {
+                "kind": "anchor-relative",
+                "anchor": {
+                  "kind": "text",
+                  "text": "Suffix:",
+                  "exact": true,
+                  "confidence": 0.75
+                },
+                "relation": "rightOf",
+                "role": "cell",
+                "confidence": 0.75
+              },
+              {
+                "kind": "text",
+                "text": "H01",
+                "exact": true,
+                "confidence": 0.7
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell H01"
+          }
+        },
+        {
+          "kind": "outputResolvable",
+          "outputName": "suffix"
+        }
+      ]
+    },
+    "timeoutMs": 10000
+  },
+  "policy": {
+    "maxEffect": "write",
+    "requiresApproval": true,
+    "allowUnattendedReplay": false,
+    "maxStepDurationMs": 20000,
+    "maxTotalDurationMs": 120000
+  },
+  "provenance": {
+    "recordedAt": "2026-09-19T06:42:58.657Z",
+    "discoveryRunId": "run_e5b46f88-d93c-4efc-8137-6abc2372e48f",
+    "model": "claude-sonnet-5",
+    "promptVersion": "1.0.0",
+    "recorderVersion": "1.0.0",
+    "generalizerVersion": "1.0.0",
+    "redactionApplied": true
+  },
+  "lifecycle": {
+    "status": "draft"
+  }
+}

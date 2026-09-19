@@ -168,11 +168,11 @@ describe('discovering the write flow through the command', { timeout: 120_000 },
     expect(code, stderr).toBe(0);
     expect(submissions).toEqual([{ memberId: '10001', accountType: 'Holiday Club', suffix: 'H01', balance: '$250.00' }]);
 
-    const summary = JSON.parse(stdout) as { capability: { id: string; version: string; path: string } | null };
+    const summary = JSON.parse(stdout) as { capability: { id: string; version: string } | null };
     expect(summary.capability).toMatchObject({ id: 'member.openSubAccount', version: '1.0.0' });
     if (summary.capability === null) return;
 
-    const capability = Capability.parse(JSON.parse(await readFile(summary.capability.path, 'utf8')));
+    const capability = Capability.parse(JSON.parse(await readFile(join(root, 'capabilities', `${summary.capability.id}@${summary.capability.version}.json`), 'utf8')));
     expect(capability.policy.maxEffect).toBe('write');
     expect(capability.steps.map((step) => [step.action.kind, step.effect, step.idempotent])).toEqual([
       ['navigate', 'read', true],

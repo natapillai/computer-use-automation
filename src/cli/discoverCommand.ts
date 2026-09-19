@@ -223,6 +223,9 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       onScreenshotServed: (bytes) => {
         lastShown = bytes;
       },
+      // Shown only to whoever holds the session, and written nowhere. An operator asked to
+      // authorise a write has to be able to say which record it is for.
+      subject: () => inputs,
       redactor: deps.redactor,
       known,
       clock: deps.clock,
@@ -370,11 +373,14 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
     ...(result.status === 'done' ? {} : { reason: result.reason, detail: redact(result.detail) }),
     modelCalls: result.modelCalls,
     actions: result.actions,
-    capability: capability === null || written === null || !written.ok ? null : { id: capability.id, version: capability.version, path: written.path },
+    // The id and the version, not where the file landed. A caller who wants the file knows the
+    // capabilities directory they passed, and a reader pasting this into a ticket should not be
+    // pasting the machine it ran on.
+    capability: capability === null || written === null || !written.ok ? null : { id: capability.id, version: capability.version },
     ...(refusal === null ? {} : { generalization: { failure: refusal.failure, detail: redact(refusal.detail) } }),
     ...(storeRefusal === null ? {} : { store: { failure: storeRefusal.failure, detail: redact(storeRefusal.detail) } }),
     cassette: recorded ? (recordTo ?? null) : null,
-    evidence: sink.directory,
+    evidence: sink.reference,
   };
 
   // The persisted copy names the capability by id and version and the evidence by its place in
@@ -384,7 +390,6 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
     ...summary,
     capability: capability === null ? null : { id: capability.id, version: capability.version },
     cassette: recorded,
-    evidence: `discovery/${runId}`,
   };
 
   const exit = capability !== null ? DISCOVER_EXIT.produced : result.status === 'escalated' ? DISCOVER_EXIT.escalated : DISCOVER_EXIT.failure;

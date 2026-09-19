@@ -1,6 +1,7 @@
 import { appendFile, mkdir, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, relative, resolve } from 'node:path';
 import type { KnownValue, RedactionContext, Redactor } from '../core/redaction/redactor.js';
+import { asReference } from '../cli/paths.js';
 import type { Clock } from '../runtime/clock.js';
 
 // The one place run evidence is written, see docs/EVIDENCE.md. Every text byte passes
@@ -44,6 +45,9 @@ export interface RunManifest extends ManifestSummary {
 export interface EvidenceSink {
   readonly runId: string;
   readonly directory: string;
+  // Where the run is, said in a way that can be pasted into a ticket. directory is the real
+  // path on disk and belongs in file operations. This belongs in anything a person reads.
+  readonly reference: string;
   // Values learned during the run, such as an extracted balance, join provenance redaction
   // for every later write.
   addKnown(context: RedactionContext): void;
@@ -65,6 +69,7 @@ export interface EvidenceSinkOptions {
 export async function createEvidenceSink(options: EvidenceSinkOptions): Promise<EvidenceSink> {
   const { redactor, clock, runId, phase } = options;
   const directory = resolve(options.root, phase, runId);
+  const reference = asReference(options.root, phase, runId);
   await mkdir(directory, { recursive: true });
 
   const startedAt = clock.now().toISOString();
@@ -98,6 +103,7 @@ export async function createEvidenceSink(options: EvidenceSinkOptions): Promise<
   return {
     runId,
     directory,
+    reference,
     addKnown: (extra) => {
       known.push(...extra.known);
     },

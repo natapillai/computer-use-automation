@@ -17,6 +17,7 @@ import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
 import { runDiscoverCommand } from './discoverCommand.js';
+import { looksLikeMachinePath } from './paths.js';
 
 // The discover command on the scripted app with a scripted model. The redactor is built from
 // the committed allowlist and everything written is scanned for the seeded canaries, so this
@@ -117,6 +118,19 @@ describe('runDiscoverCommand', () => {
     return { code, stdout: out.join(''), stderr: err.join(''), leases, paths, model, patterns: loaded.allowlist.data.redactPatterns };
   }
 
+  it('prints no machine path, because what it prints gets pasted into a ticket', async () => {
+    const { stdout, stderr, paths } = await run();
+
+    // The evidence root here is an absolute temporary directory, which is the case that found
+    // this defect twice. What comes out names the run and not the machine.
+    expect(looksLikeMachinePath(paths.evidence)).toBe(true);
+    for (const line of [...stdout.split('\n'), ...stderr.split('\n')]) {
+      expect(looksLikeMachinePath(line.trim()), line).toBe(false);
+      expect(line).not.toContain(paths.evidence);
+    }
+    expect(JSON.parse(stdout)).toMatchObject({ evidence: 'evidence/discovery/run_000001' });
+  });
+
   it('offers the model a way to declare a write only when the request permits the run to write', async () => {
     const readOnly = await run();
     const writing = await run({ request: { ...REQUEST, allowWrites: true } });
@@ -158,7 +172,7 @@ describe('runDiscoverCommand', () => {
     expect(scan.hits).toEqual([]);
   });
 
-  it('persists a summary with no local path and no capability file name for a pattern to mistake, and prints the full path', async () => {
+  it('persists a summary with no local path and no capability file name for a pattern to mistake', async () => {
     const { stdout, paths } = await run();
     const directory = join(paths.evidence, 'discovery', 'run_000001');
     const persisted = [await readFile(join(directory, 'log.jsonl'), 'utf8'), await readFile(join(directory, 'manifest.json'), 'utf8')].join('\n');
@@ -166,8 +180,11 @@ describe('runDiscoverCommand', () => {
     expect(persisted).not.toContain(root);
     expect(persisted).not.toContain(JSON.stringify(root).slice(1, -1));
     expect(persisted).not.toContain('[redacted:');
-    expect(persisted).toContain('"evidence":"discovery/run_000001"');
-    expect(JSON.parse(stdout)).toMatchObject({ capability: { path: join(paths.capabilities, 'member.readSavingsBalance@1.0.0.json') } });
+    expect(persisted).toContain('"evidence":"evidence/discovery/run_000001"');
+    // The id and the version. Where the file landed is the caller's own capabilities
+    // directory, and printing the absolute path of it is how a username reached a ticket.
+    expect(JSON.parse(stdout)).toMatchObject({ capability: { id: 'member.readSavingsBalance', version: '1.0.0' } });
+    expect(stdout).not.toContain(paths.capabilities);
   });
 
   it('keeps observation hashes, decisions, authorization verdicts, actions and derivations in the trace', async () => {

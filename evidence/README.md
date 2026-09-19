@@ -25,3 +25,13 @@ I claimed the session on the console, read the screen, and released it without a
 `captures/decision-01.png` is the picture the console had in front of me when I decided, taken from the bytes it served rather than from a screenshot taken afterwards. `captures/intervention-01.png` is the screen at the moment the run stopped. The member number and the member name are masked in both.
 
 The opening amount and the account type are readable in those images, and that is deliberate. The masking comes from the app profile's field map, which covers member data, and a person cannot meaningfully approve a change they are not allowed to see. Both are values the caller supplied rather than anything read out of the system of record, and both appear only as `{{inputs.openingAmount}}` and `{{inputs.accountType}}` everywhere text is written.
+
+### The approved write, run_e5b46f88
+
+`discovery/run_e5b46f88-d93c-4efc-8137-6abc2372e48f/` is the live write run that opened an account. Claude Sonnet 5 navigated the content frame to the sub account form by path, chose the account type, filled the opening amount, declared the submit a write, and stopped. The project owner claimed the session on the console, read the screen and approved. The run performed that one action once with a one shot grant, reached the confirmation screen, extracted the suffix and produced `member.openSubAccount@1.0.0`. Six model calls and four actions.
+
+`captures/decision-01.png` is the screen the console had in front of the approver at the moment they decided, taken from the bytes it served rather than a screenshot taken afterwards. `artifact.json` is the capability the run produced, and `capabilities/member.openSubAccount@1.0.0.json` is the same artifact where a caller would look for it.
+
+`discovery/run_dd3f4ee4-dfeb-4b72-a6ba-cfa3731de01e/` is an earlier attempt on the same goal, ended at the console rather than approved, and kept because it carries two interventions rather than one.
+
+That run found the defect worth reading about. The approver could not establish which member the change was for. The screen masks the member number and the name, the trace records the navigate as `/member/{{inputs.memberId}}/subaccount`, and the console panel showed the goal with its placeholders unresolved. The only place the value existed was the command they had typed, so the approval rested on reasoning rather than observation. One redaction rule was serving two audiences. A claimed operator holding a live session now sees the resolved inputs in the console, and nothing written down does. It is in `REPORT.md` section 6.

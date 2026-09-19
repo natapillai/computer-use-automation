@@ -1,0 +1,96 @@
+{
+  "runId": "run_e5b46f88-d93c-4efc-8137-6abc2372e48f",
+  "phase": "discovery",
+  "startedAt": "2026-09-19T06:30:24.403Z",
+  "endedAt": "2026-09-19T06:42:58.711Z",
+  "capability": {
+    "id": "member.openSubAccount",
+    "version": "1.0.0"
+  },
+  "goal": "open a {{inputs.accountType}} sub account for the member whose member ID is {{inputs.memberId}}, with an opening amount of {{inputs.openingAmount}}. Nothing in this application links to the form, so navigate the content frame to /member/{{inputs.memberId}}/subaccount to reach it. Record the suffix the system assigns as the output suffix.",
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "done",
+    "summary": "Produced member.openSubAccount version 1.0.0 as a draft."
+  },
+  "counts": {
+    "steps": 4,
+    "modelCalls": 6,
+    "actions": 4,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 1
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "trace.jsonl",
+      "kind": "trace",
+      "description": "Every observation, decision, authorization, action and derivation of the run"
+    },
+    {
+      "path": "captures/step-00-initial.png",
+      "kind": "screenshot",
+      "description": "The initial screen with member data masked"
+    },
+    {
+      "path": "captures/step-00-initial.a11y.json",
+      "kind": "snapshot",
+      "description": "The initial accessibility tree with member data masked"
+    },
+    {
+      "path": "transcript.jsonl",
+      "kind": "transcript",
+      "description": "The model exchange, redacted"
+    },
+    {
+      "path": "captures/intervention-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was shown at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/intervention-01.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/decision-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was looking at when they answered handoff 1"
+    },
+    {
+      "path": "captures/final.png",
+      "kind": "screenshot",
+      "description": "The final screen with member data masked"
+    },
+    {
+      "path": "captures/final.a11y.json",
+      "kind": "snapshot",
+      "description": "The final accessibility tree with member data masked"
+    },
+    {
+      "path": "artifact.json",
+      "kind": "artifact",
+      "description": "The capability this run produced, a draft at version 1.0.0"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": "claude-sonnet-5",
+    "promptVersion": "1.0.0"
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {
+      "known": 17
+    }
+  }
+}

@@ -66,6 +66,7 @@ describe('createOperatorApi', () => {
       },
       onHumanAction: (record) => recorded.push(record),
       onScreenshotServed: (bytes) => served.push(bytes),
+      subject: () => ({ memberId: '10001', accountType: 'Holiday Club' }),
     });
 
     raiseIntervention({
@@ -151,6 +152,29 @@ describe('createOperatorApi', () => {
     // is the picture that was in front of them, and a second capture is a different picture.
     expect(served).toHaveLength(1);
     expect(Array.from(served[0] ?? [])).toEqual(Array.from(shown.rawPayload));
+  });
+
+  it('gives the subject of the change only to whoever holds the session', async () => {
+    const refused = await api.inject({ method: 'GET', url: '/sessions/sess_000001/subject' });
+    const stale = await api.inject({ method: 'GET', url: '/sessions/sess_000001/subject', headers: { 'x-control-token': 'not-the-token' } });
+
+    expect(refused.statusCode).toBe(403);
+    expect(stale.statusCode).toBe(403);
+
+    const claimed = await claim();
+    const held = await api.inject({ method: 'GET', url: '/sessions/sess_000001/subject', headers: { 'x-control-token': claimed } });
+
+    expect(held.statusCode).toBe(200);
+    expect(JSON.parse(held.body)).toEqual({ inputs: { memberId: '10001', accountType: 'Holiday Club' } });
+  });
+
+  it('keeps the subject out of the intervention, which is stored and read by machines', async () => {
+    const shown = await api.inject({ method: 'GET', url: '/interventions/int_000001' });
+
+    // One redaction rule was serving two audiences. A claimed operator holding a live session
+    // gets the values. Everything that is written down does not.
+    expect(shown.body).not.toContain('10001');
+    expect(shown.body).not.toContain('Holiday Club');
   });
 
   it('serves the console to a browser and the intervention to a machine at the same link', async () => {

@@ -45,6 +45,10 @@ export const OPERATOR_PAGE = `<!doctype html>
   <button id="release" disabled>Release</button>
   <button id="abort" disabled>Abort</button>
   <fieldset>
+    <legend>What this change is for</legend>
+    <dl id="subject"><dd>Claim the session to see which record this affects.</dd></dl>
+  </fieldset>
+  <fieldset>
     <legend>Send a frame somewhere</legend>
     <label>Frame <input id="frame" value="content"></label>
     <label>Path <input id="path" placeholder="/member/00000/subaccount"></label>
@@ -153,6 +157,18 @@ export const OPERATOR_PAGE = `<!doctype html>
     await poll();
   });
 
+  // The resolved inputs of the run. Fetched only once the session is held, because looking at
+  // a screen is not authorising a change and only the second one needs to know who it is for.
+  async function showSubject() {
+    const answer = await fetch('/sessions/' + intervention.sessionId + '/subject', { headers: { 'x-control-token': token } });
+    if (!answer.ok) return;
+    const body = await answer.json();
+    const entries = Object.entries(body.inputs ?? {});
+    document.getElementById('subject').innerHTML = entries.length === 0
+      ? '<dd>This run was given no inputs.</dd>'
+      : entries.map(([name, value]) => '<dt>' + name + '</dt><dd>' + String(value) + '</dd>').join('');
+  }
+
   document.getElementById('claim').addEventListener('click', async () => {
     const claimed = await fetch('/interventions/' + intervention.id + '/claim', { method: 'POST' });
     if (!claimed.ok) { say('That intervention is already claimed.'); return; }
@@ -163,7 +179,10 @@ export const OPERATOR_PAGE = `<!doctype html>
     document.getElementById('abort').disabled = false;
     document.getElementById('go').disabled = false;
     canvas.focus();
+    // Said before the subject is fetched, so this cannot land on top of a message from an
+    // action the person has already taken while it was in flight.
     say('You hold the session. Click the picture, type into it, or send a frame somewhere. The automation cannot act until you release it.');
+    await showSubject();
   });
 
   async function release(approval) {

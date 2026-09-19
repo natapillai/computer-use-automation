@@ -97,6 +97,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
       port: 0,
       announce: () => undefined,
       claimWindow: () => new Promise<void>(() => undefined),
+      subject: () => ({ memberId: '10001', accountType: 'Holiday Club' }),
     });
     run = opened;
 
@@ -120,6 +121,25 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     await page.waitForFunction('document.getElementById("canvas").width === 400');
     return { control, handover };
   }
+
+  it('shows a claimed operator which record the change is for, which is what approving means', async () => {
+    const { handover } = await stopFor('PolicyConfirmation');
+
+    // Before claiming, the panel says nothing about the subject. Looking is not authorising.
+    expect(await page.locator('#subject').innerText()).not.toContain('10001');
+
+    await page.click('#claim');
+    await page.locator('#subject:has-text("10001")').waitFor();
+
+    // A sufficiency check rather than a masking one. The screen masks the member number and
+    // the trace holds a template, so before this the only place the value existed was the
+    // command the operator typed. Approving a write without being able to say who it is for
+    // is not approval.
+    const shown = await page.locator('#subject').innerText();
+    expect(shown).toContain('memberId');
+    expect(shown).toContain('10001');
+    void handover;
+  });
 
   it('turns a click on the picture into a click on the live session, in page space', async () => {
     const { handover } = await stopFor('UnclassifiedCondition');

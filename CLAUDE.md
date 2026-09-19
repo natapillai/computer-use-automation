@@ -34,7 +34,7 @@ These are not preferences. Violating any of them is a defect.
 7. **Deterministic tests.** No network in unit or integration tests. No real model calls in the test suite. No `sleep` based waits anywhere, in tests or in production code.
 8. **Decisions get recorded, in proportion.** A new ADR only when a decision supersedes an existing ADR or changes an answer in `REPORT.md`. Anything smaller is recorded in the commit body.
 9. **Never read or print credential files.** Not `.npmrc`, `.env`, cloud credentials or key files, not even to check one setting. Use targeted commands such as `npm config get strict-ssl` that return a single value.
-10. **A verification runs bare.** Any command whose exit code decides something runs on its own, with its exit code checked directly. Never pipe it into `head`, `tail`, `grep` or anything else that replaces the exit code, and never suppress its stderr. A check whose failure mode is silence is worse than no check, so a check that cannot fail loudly does not ship.
+10. **A verification runs bare, and so does a diagnostic.** Any command whose exit code decides something runs on its own, with its exit code checked directly. Never pipe it into `head`, `tail`, `grep` or anything else that replaces the exit code, and never suppress its stderr. A check whose failure mode is silence is worse than no check, so a check that cannot fail loudly does not ship. The same applies to any run you are reading the output of to find something out. Write the whole output to a file and read the file. Piping a failing run into `tail` cost the cause of two test failures that have never been explained, twice, which is why this sentence exists.
 
 ## 3. Stack
 

@@ -147,6 +147,7 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
         onScreenshotServed: (bytes) => {
           lastShown = bytes;
         },
+        subject: () => Object.fromEntries(Object.entries(validated.values).map(([name, value]) => [name, String(value)])),
         redactor: deps.redactor,
         known: [],
         clock: deps.clock,
@@ -196,7 +197,9 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
     environment: { ...deps.environment, model: null, promptVersion: null },
   });
 
-  const runDirectory = await fileByOutcome(sink.directory, result.status);
+  await fileByOutcome(sink.directory, result.status);
+  // Where the run is, not where this machine keeps it. A caller pastes what a command prints.
+  const runDirectory = `${sink.reference.split('/')[0] ?? 'evidence'}/replay/${FOLDER[result.status]}/${sink.runId}`;
   deps.stdout(`${JSON.stringify({ ...result, evidence: { runDirectory } }, null, 2)}\n`);
   return exitFor(result);
 }

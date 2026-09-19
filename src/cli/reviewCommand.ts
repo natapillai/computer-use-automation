@@ -120,7 +120,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
       deps.stderr(`${approved.detail}\n`);
       return REVIEW_EXIT.failure;
     }
-    deps.stdout(`${JSON.stringify({ status: 'approved', capability: { id: capability.id, version: capability.version }, approvedBy: approver, approvedAt, path: approved.path }, null, 2)}\n`);
+    deps.stdout(`${JSON.stringify({ status: 'approved', capability: { id: capability.id, version: capability.version }, approvedBy: approver, approvedAt }, null, 2)}\n`);
     return REVIEW_EXIT.declared;
   }
 
@@ -184,6 +184,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
       screenshot: maskedScreenshot(surface, profile.profile),
       ...(lease.human === undefined ? {} : { input: lease.human }),
       onHumanAction: (record) => humanActions.push(record),
+      subject: () => Object.fromEntries(Object.entries(inputs).map(([name, value]) => [name, String(value)])),
       redactor: deps.redactor,
       known: [],
       clock: deps.clock,
@@ -321,7 +322,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
           path,
           probe: probeSummary,
           verification: verificationSummary,
-          evidence: sink.directory,
+          evidence: sink.reference,
         }
       : {
           status: 'refused',
@@ -329,7 +330,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
           detail: deps.redactor.text(refusal?.detail ?? 'The review wrote nothing.', { known: [] }),
           probe: probeSummary,
           verification: verificationSummary,
-          evidence: sink.directory,
+          evidence: sink.reference,
         };
 
   await sink.log(refusal === null ? 'info' : 'error', 'review.finished', { ...summary, evidence: `review/${runId}`, ...(refusal === null ? { path: undefined } : {}) });

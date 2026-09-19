@@ -21,6 +21,12 @@ export interface OperatorApiOptions {
   // The bytes that went to a person, so the run can file the picture they were looking at when
   // they answered. A screenshot taken afterwards is a different picture and proves less.
   readonly onScreenshotServed?: (bytes: Uint8Array) => void;
+  // The resolved inputs of the run, for whoever is holding the session and nobody else. An
+  // operator asked to authorise a write has to be able to say which record it is for, and the
+  // screen masks the member number, the trace holds a template and the intervention is
+  // redacted for storage. One redaction rule was serving two audiences, and a claimed operator
+  // in front of a live session is not a log file.
+  readonly subject?: () => Readonly<Record<string, string>>;
   readonly host?: string;
   readonly port?: number;
 }
@@ -122,6 +128,14 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
 
     options.onHumanAction?.(sent.record);
     return reply.send(sent.record);
+  });
+
+  // Never written anywhere. It is not on the intervention, not in the trace, not in a prompt
+  // and not in the decision capture, which photographs the live page rather than this console.
+  app.get<WithId>('/sessions/:id/subject', async (request, reply) => {
+    if (request.params.id !== options.control.snapshot().sessionId || options.subject === undefined) return reply.code(404).send({ error: 'No such session.' });
+    if (!holds(request, reply)) return reply;
+    return reply.send({ inputs: options.subject() });
   });
 
   app.post<WithId>('/interventions/:id/claim', async (request, reply) => {

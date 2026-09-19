@@ -24,6 +24,8 @@ export interface RunConsoleOptions {
   readonly onHumanAction?: (record: HumanActionRecord) => void;
   // The bytes the console last put in front of a person, so a run can file what they saw.
   readonly onScreenshotServed?: (bytes: Uint8Array) => void;
+  // The resolved inputs, shown only to whoever holds the session. See operatorApi.
+  readonly subject?: () => Readonly<Record<string, string>>;
   readonly redactor: Redactor;
   readonly known: readonly KnownValue[];
   readonly clock: Clock;
@@ -54,6 +56,7 @@ export async function createRunConsole(options: RunConsoleOptions): Promise<RunC
     ...(options.input === undefined ? {} : { input: options.input }),
     ...(options.onHumanAction === undefined ? {} : { onHumanAction: options.onHumanAction }),
     ...(options.onScreenshotServed === undefined ? {} : { onScreenshotServed: options.onScreenshotServed }),
+    ...(options.subject === undefined ? {} : { subject: options.subject }),
     ...(options.host === undefined ? {} : { host: options.host }),
     port: options.port,
   });

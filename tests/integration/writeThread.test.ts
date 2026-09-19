@@ -226,6 +226,12 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
     // stamped a log line.
     const decisions = (await readdir(join(directory, 'captures'))).filter((name) => name.startsWith('decision-')).sort();
     expect(decisions).toEqual(['decision-01.png', 'decision-02.png']);
+
+    // The subject a claimed operator was shown reaches nothing that is written down. The
+    // console tells them which record the change is for, and the record of it does not.
+    for (const file of ['trace.jsonl', 'transcript.jsonl', 'humanActions.jsonl', 'log.jsonl']) {
+      expect(await readFile(join(directory, file), 'utf8'), file).not.toContain('"10001"');
+    }
     const bytes = await readFile(join(directory, 'captures', 'decision-02.png'));
     expect(Array.from(bytes.subarray(0, 4))).toEqual([137, 80, 78, 71]);
   });
@@ -298,11 +304,11 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
     await working;
 
     expect(code, err.join('')).toBe(0);
-    const summary = JSON.parse(out.join('')) as { capability: { id: string; version: string; path: string } | null };
+    const summary = JSON.parse(out.join('')) as { capability: { id: string; version: string } | null };
     expect(summary.capability).toMatchObject({ id: 'member.openSubAccount', version: '1.0.0' });
     if (summary.capability === null) return;
 
-    const capability = Capability.parse(JSON.parse(await readFile(summary.capability.path, 'utf8')));
+    const capability = Capability.parse(JSON.parse(await readFile(join(capabilities, `${summary.capability.id}@${summary.capability.version}.json`), 'utf8')));
     expect(capability.policy.maxEffect).toBe('write');
     expect(capability.steps.map((step) => [step.action.kind, step.effect, step.idempotent])).toEqual([
       ['navigate', 'read', true],

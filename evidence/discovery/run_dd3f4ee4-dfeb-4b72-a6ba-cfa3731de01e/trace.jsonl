@@ -1,0 +1,23 @@
+{"t":"authorization","at":"2026-09-19T06:25:25.415Z","tool":"navigate","verdict":"allow"}
+{"t":"observation","at":"2026-09-19T06:25:25.560Z","observationHash":"c53245d2a23f70af","progressHash":"d6ccf27fab0f2df2"}
+{"t":"decision","at":"2026-09-19T06:25:27.441Z","tool":"navigate","input":{"path":"/member/{{inputs.memberId}}/subaccount","framePath":["content"]}}
+{"t":"authorization","at":"2026-09-19T06:25:27.465Z","tool":"navigate","verdict":"allow"}
+{"t":"action","at":"2026-09-19T06:25:27.971Z","tool":"navigate","ok":true,"detail":"Done."}
+{"t":"observation","at":"2026-09-19T06:25:28.012Z","observationHash":"4b4930901fa1aaca","progressHash":"ab1d025009718173"}
+{"t":"decision","at":"2026-09-19T06:25:29.211Z","tool":"select","input":{"ref":"f3e17","input":"accountType"}}
+{"t":"authorization","at":"2026-09-19T06:25:29.260Z","tool":"select","verdict":"allow"}
+{"t":"action","at":"2026-09-19T06:25:32.268Z","tool":"select","ok":true,"detail":"Done."}
+{"t":"observation","at":"2026-09-19T06:25:32.305Z","observationHash":"66756c30357aa583","progressHash":"9e9029d7d1542159"}
+{"t":"decision","at":"2026-09-19T06:25:34.004Z","tool":"fill","input":{"ref":"f3e21","input":"openingAmount"}}
+{"t":"authorization","at":"2026-09-19T06:25:34.051Z","tool":"fill","verdict":"allow"}
+{"t":"action","at":"2026-09-19T06:25:34.051Z","tool":"fill","ok":true,"detail":"Done."}
+{"t":"observation","at":"2026-09-19T06:25:34.092Z","observationHash":"032fa971567caf50","progressHash":"95f4d2ef73964df8"}
+{"t":"decision","at":"2026-09-19T06:25:35.453Z","tool":"click","input":{"ref":"f3e28","submits":true}}
+{"t":"authorization","at":"2026-09-19T06:25:35.454Z","tool":"click","verdict":"confirm","rule":"effect"}
+{"t":"stuck","at":"2026-09-19T06:25:35.455Z","detector":"PolicyConfirmation","detail":"This step writes to the system of record and needs a person to approve it."}
+{"t":"handback","at":"2026-09-19T06:29:43.296Z","interventionId":"int_3d91cb19-a719-4560-ac16-61ff952e8619","reason":"PolicyConfirmation","approved":false}
+{"t":"action","at":"2026-09-19T06:29:43.296Z","tool":"click","ok":false,"detail":"A person declined this action, so nothing was submitted and the page is unchanged. Do not try it again without a reason to think it will be approved."}
+{"t":"observation","at":"2026-09-19T06:29:43.347Z","observationHash":"032fa971567caf50","progressHash":"95f4d2ef73964df8"}
+{"t":"decision","at":"2026-09-19T06:29:45.657Z","tool":"escalate","input":{"reason":"The \"Open Account\" submission was declined by the approving person, so the sub account could not be opened. No suffix was assigned. Please advise on how to proceed."}}
+{"t":"action","at":"2026-09-19T06:29:45.657Z","tool":"escalate","ok":true,"detail":"The \"Open Account\" submission was declined by the approving person, so the sub account could not be opened. No suffix was assigned. Please advise on how to proceed."}
+{"t":"stuck","at":"2026-09-19T06:29:45.657Z","detector":"ModelRequested","detail":"The \"Open Account\" submission was declined by the approving person, so the sub account could not be opened. No suffix was assigned. Please advise on how to proceed."}
