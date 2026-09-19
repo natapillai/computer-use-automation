@@ -22,6 +22,8 @@ export interface RunConsoleOptions {
   // How a person acts on the live session. Without it the console can only watch.
   readonly input?: HumanInputPort;
   readonly onHumanAction?: (record: HumanActionRecord) => void;
+  // The bytes the console last put in front of a person, so a run can file what they saw.
+  readonly onScreenshotServed?: (bytes: Uint8Array) => void;
   readonly redactor: Redactor;
   readonly known: readonly KnownValue[];
   readonly clock: Clock;
@@ -51,6 +53,7 @@ export async function createRunConsole(options: RunConsoleOptions): Promise<RunC
     screenshot: () => options.screenshot(),
     ...(options.input === undefined ? {} : { input: options.input }),
     ...(options.onHumanAction === undefined ? {} : { onHumanAction: options.onHumanAction }),
+    ...(options.onScreenshotServed === undefined ? {} : { onScreenshotServed: options.onScreenshotServed }),
     ...(options.host === undefined ? {} : { host: options.host }),
     port: options.port,
   });

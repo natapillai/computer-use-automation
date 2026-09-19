@@ -198,6 +198,32 @@ describe('runDiscoverCommand', () => {
     expect(await filesUnder(join(root, 'offline-capabilities'))).toEqual(['member.readSavingsBalance@1.0.0.json']);
   });
 
+  it('says what it is doing before it opens a browser or calls the model, so a slow run reads as a working one', async () => {
+    const { stderr, model } = await run();
+
+    const lines = stderr.split('\n').filter((line) => line.trim() !== '');
+    // The run id and where the evidence is going, before anything slow has happened.
+    expect(lines[0]).toContain('run_000001');
+    expect(lines[0]).toContain('member.readSavingsBalance');
+    expect(stderr).toContain('discovery/run_000001');
+    // The session is up and the console is listening, which is the other thing a person
+    // watching a silent terminal needs to know.
+    expect(stderr).toContain('console');
+    // One line per decision, so a live run can be followed without opening the trace.
+    expect(stderr).toMatch(/\bfill\b/);
+    expect(model?.requests.length).toBeGreaterThan(0);
+  });
+
+  it('asks the model the goal the request file carries, word for word', async () => {
+    const { model } = await run();
+
+    const first = model?.requests[0]?.params.messages[0];
+    const text = typeof first?.content === 'string' ? first.content : JSON.stringify(first?.content);
+    // The fix for the first live write run was to name the form in the goal. That is worth
+    // nothing unless the goal reaches the model unchanged, which is what this asserts.
+    expect(text).toContain(REQUEST.goal);
+  });
+
   it('exits 3 and writes no capability when the model asks for a person', async () => {
     const { code, stdout, paths } = await run({ turns: [call('escalate', { reason: 'The search form is not on the page.' })] });
 

@@ -242,11 +242,22 @@ The draft for S8-T02, about half a page. It groups the fourteen entries under De
 >
 > * **Cross tenant reuse and drift management are designed, not built.** Overlays that rebind locators and outputs but never the contract are specified in `docs/ARTIFACT_SCHEMA.md` and ADR 0015, and replay records locator degradation, but there is no second tenant, no overlay merge and no per tenant drift signal.
 > * **Recovery and fault coverage are narrow.** Transient 502 and 503 responses are retried on idempotent steps and reported even on success, but interstitials, stale elements and session expiry are not recovered, and the target app injects six faults.
+> * **One test suite has an unexplained failure.** The end to end suite failed once in forty seven minutes where it normally takes forty five seconds, and I could not reproduce it in twenty six later runs. I bounded both unbounded waits in its harness so the same shape of failure would now be loud rather than long, and I am recording it unexplained rather than closed.
 > * **The operator handoff is real but thin.** Control moves on the live session with hit tested and recorded input, while the operator page polls screenshots, human actions stay in evidence rather than becoming draft steps, and stuck detection covers no progress, unclassified dialogs and the model asking for help.
 > * **Capability tooling stops at the contract.** The JSON Schema is generated, but no catalog serves it, nothing classifies version changes, and the generalizer adds no stability wait beyond the postcondition race.
 > * **Guardrails around the code are manual.** There is no CI, coverage gate, lint rule or action rate limit, there is no visual locator fallback, and the desktop driver is a documented stub.
 >
 > The one thing I would build next is a second tenant of the target app, because its differences would force the overlay merge, the interstitial handler and drift management into existence together.
+
+---
+
+## Notes for REPORT section 3
+
+Collected as they happen, so S8-T02 assembles rather than remembers. Section 3 is what I got wrong and what it cost.
+
+* **Three cases of a test passing while the real path was broken.** Each was found by driving the layer a person actually touches, and each had a green suite over it. The stale ref, where a search field's ref named a card number cell on the next page and the unit tests could not see it because the fake driver reissued refs honestly. The select defect, where a native list reports its chosen option as a child rather than as text, so the tree said every list was empty, the generalizer pruned the step that made the choice, and the capability would have submitted an empty form. The console, where the input endpoint, the hit test and the record it produces were all real and all tested, and the page never called any of them, because every test posted to the endpoint directly. The fourth is mine to admit rather than to claim: my own rehearsal script wrote the navigate step the model was supposed to choose, so the test supplied the answer to the thing under test. That is the console defect one layer up, and it is the reason I now ask of every test which layer it drives.
+* **The balance cell has no locator of its own.** It is an unnamed td whose only stable relationship is being to the right of the cell that reads Savings. Every strategy that names an element directly failed on it, which is what made the anchor relative strategy earn its place in the bundle rather than being designed in.
+* **The write capability navigates to the form by path rather than following a link.** Nothing in MERIDIAN Core links to the sub account form. Adding a link would have changed an observation the committed cassette asserts, and it would have hidden the case where a person is the only way forward. So the goal names the path, which is legitimate because a discovery request is a task written by somebody who knows the application, and the discovery is in how to drive the form.
 
 ---
 

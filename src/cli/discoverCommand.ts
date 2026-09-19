@@ -160,6 +160,13 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
   sink.addKnown({ known });
   await sink.log('info', 'discovery.started', { goal: request.goal, inputNames: Object.keys(inputs).sort(), model: modelId, source: replayFrom === undefined ? 'live' : 'cassette' });
 
+  // A live run opens a browser, signs in and then waits on a model, which is a long time to
+  // show nothing. Silence and a hang look identical from a terminal, so the run says what it is
+  // doing as it does it. All of it goes to stderr, because stdout carries one JSON summary.
+  const note = (line: string): void => deps.stderr(`${line}\n`);
+  note(`discover ${runId} ${request.id}`);
+  note(`evidence discovery/${runId}`);
+
   const events: DiscoveryEvent[] = [];
   const recorder = createRecorder({ profile: profile.profile, redactor: deps.redactor, inputs });
   const TRACE = 'Every observation, decision, authorization, action and derivation of the run';
@@ -206,11 +213,16 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       });
     };
     const humanActions: HumanActionRecord[] = [];
+    let decisions = 0;
+    let lastShown: Uint8Array | null = null;
     const runConsole = await createRunConsole({
       control: leased.lease.session,
       screenshot: maskedScreenshot(surface, profile.profile),
       ...(leased.lease.human === undefined ? {} : { input: leased.lease.human }),
       onHumanAction: (record) => humanActions.push(record),
+      onScreenshotServed: (bytes) => {
+        lastShown = bytes;
+      },
       redactor: deps.redactor,
       known,
       clock: deps.clock,
@@ -220,8 +232,22 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       ...(deps.console.host === undefined ? {} : { host: deps.console.host }),
       port: deps.console.port,
       // Stderr, because stdout carries one JSON summary and nothing else.
-      announce: (line) => deps.stderr(`A person is needed. ${line}\n`),
+      announce: (line) => note(`A person is needed. ${line}`),
     });
+    // What a person was looking at when they answered. The console serves a new frame every
+    // second, so the last one it served before the answer is the one they decided on. Taking a
+    // fresh screenshot here would be a different picture of a page that has already moved on.
+    let decided = 0;
+    runConsole.store.subscribe((_id, state) => {
+      if (state !== 'released' && state !== 'aborted') return;
+      const shown = lastShown;
+      if (shown === null) return;
+      decided += 1;
+      const name = `captures/decision-${String(decided).padStart(2, '0')}.png`;
+      writing = writing.then(() => sink.writeScreenshot(name, `The screen a person was looking at when they answered handoff ${decided}`, shown));
+    });
+    note(`console ${runConsole.baseUrl}`);
+    note(`session up, driving ${request.app.appId} from ${request.app.entryPath}`);
     try {
       result = await runDiscovery({
         surface,
@@ -241,6 +267,11 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
         onEvent: (event) => {
           events.push(event);
           stream('trace.jsonl', 'trace', TRACE, event);
+          // One line per decision and its outcome. Tool names, never values, which is the same
+          // rule the trace follows.
+          if (event.t === 'decision') note(`  [${++decisions}] ${event.tool}`);
+          if (event.t === 'action' && !event.ok) note(`  [${decisions}] ${event.tool} did not work`);
+          if (event.t === 'stuck') note(`  stopped, ${event.detector}`);
         },
         onExchange: (exchange) => stream('transcript.jsonl', 'transcript', 'The model exchange, redacted', exchange),
         recorder,

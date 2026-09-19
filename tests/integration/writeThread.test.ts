@@ -215,10 +215,19 @@ describe('the write thread with a person at the console', { timeout: 180_000 }, 
     // What they did is on the record, and the path they typed is redacted like everything else.
     const runDirectory = join(result.evidence, 'discovery');
     const runs = await readdir(runDirectory);
-    const actions = await readFile(join(runDirectory, runs[0] ?? '', 'humanActions.jsonl'), 'utf8');
+    const directory = join(runDirectory, runs[0] ?? '');
+    const actions = await readFile(join(directory, 'humanActions.jsonl'), 'utf8');
     expect(actions).toContain('"kind":"navigate"');
     expect(actions).toContain('{{inputs.memberId}}');
     expect(actions).not.toContain('/member/10001/');
+
+    // One image per answer, and it is the one the console had put in front of the person, not a
+    // fresh capture taken afterwards. It is what says somebody looked rather than rubber
+    // stamped a log line.
+    const decisions = (await readdir(join(directory, 'captures'))).filter((name) => name.startsWith('decision-')).sort();
+    expect(decisions).toEqual(['decision-01.png', 'decision-02.png']);
+    const bytes = await readFile(join(directory, 'captures', 'decision-02.png'));
+    expect(Array.from(bytes.subarray(0, 4))).toEqual([137, 80, 78, 71]);
   });
 
   it('opens nothing when the person refuses the write', async () => {

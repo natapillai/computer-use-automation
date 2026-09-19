@@ -18,6 +18,9 @@ export interface OperatorApiOptions {
   // input, which is a console that can only watch.
   readonly input?: HumanInputPort;
   readonly onHumanAction?: (record: HumanActionRecord) => void;
+  // The bytes that went to a person, so the run can file the picture they were looking at when
+  // they answered. A screenshot taken afterwards is a different picture and proves less.
+  readonly onScreenshotServed?: (bytes: Uint8Array) => void;
   readonly host?: string;
   readonly port?: number;
 }
@@ -77,7 +80,9 @@ export async function createOperatorApi(options: OperatorApiOptions): Promise<Op
 
   app.get<WithId>('/sessions/:id/screenshot', async (request, reply) => {
     if (request.params.id !== options.control.snapshot().sessionId) return reply.code(404).send({ error: 'No such session.' });
-    return reply.type('image/png').send(Buffer.from(await options.screenshot(request.params.id)));
+    const bytes = await options.screenshot(request.params.id);
+    options.onScreenshotServed?.(bytes);
+    return reply.type('image/png').send(Buffer.from(bytes));
   });
 
   // The forwarding path. It never goes through act(), so the holder check here is the only

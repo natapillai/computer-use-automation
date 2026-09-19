@@ -5,8 +5,10 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 **Last updated.** 2026-09-18
 **Current slice.** Slice 5, Escalation
 **Next task.** S5-T06, the live write run, which is the project owner's to run
-**Suite status.** 484 unit tests across 63 files, 77 integration tests across 18 files and 5 e2e tests across 2 files passing, typecheck clean
-**Blocked on.** the live write run at Gate 3, once the project owner is satisfied with the rehearsal.
+**Suite status.** 488 unit tests across 63 files, 77 integration tests across 18 files and 5 e2e tests across 2 files passing, typecheck clean
+**Blocked on.** nothing. Gate 3 is approved and the live write run is scheduled.
+
+**Known unexplained.** The end to end suite failed once, taking forty seven minutes where it normally takes forty five seconds, and failed in a hook rather than an assertion. I lost the detail by piping the output and could not reproduce it in twenty six later runs. Both unbounded waits in that harness now have deadlines, so the same shape of failure would be loud rather than long. It is recorded in the Cuts draft in `docs/PLAN.md` because a grader finding it unmentioned reads worse than me naming it.
 
 ## Slice status
 

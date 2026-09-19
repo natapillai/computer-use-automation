@@ -28,11 +28,13 @@ describe('createOperatorApi', () => {
   let screenshots = 0;
   let forwarded: { kind: string; x?: number; y?: number; key?: string; path?: string; framePath?: string }[] = [];
   let recorded: HumanActionRecord[] = [];
+  let served: Uint8Array[] = [];
 
   beforeEach(async () => {
     screenshots = 0;
     forwarded = [];
     recorded = [];
+    served = [];
     store = createInterventionStore();
     control = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: createTestClock('2026-09-17T09:00:00.000Z'), runId: 'run_000001' });
     control.apply('start');
@@ -63,6 +65,7 @@ describe('createOperatorApi', () => {
         },
       },
       onHumanAction: (record) => recorded.push(record),
+      onScreenshotServed: (bytes) => served.push(bytes),
     });
 
     raiseIntervention({
@@ -138,6 +141,16 @@ describe('createOperatorApi', () => {
 
     expect(refused.statusCode).toBe(403);
     expect(forwarded.filter((entry) => entry.kind === 'navigate')).toEqual([]);
+  });
+
+  it('reports the image it served, so the run can keep the one a person was looking at', async () => {
+    const shown = await api.inject({ method: 'GET', url: '/sessions/sess_000001/screenshot' });
+
+    expect(shown.statusCode).toBe(200);
+    // The exact bytes, not a fresh screenshot taken later. What proves somebody saw an action
+    // is the picture that was in front of them, and a second capture is a different picture.
+    expect(served).toHaveLength(1);
+    expect(Array.from(served[0] ?? [])).toEqual(Array.from(shown.rawPayload));
   });
 
   it('serves the console to a browser and the intervention to a machine at the same link', async () => {

@@ -16,10 +16,15 @@ export function readPipedStdin(): Promise<string | null> {
 }
 
 // One JSON object keyed by input name, or null. The text is never repeated in a message.
+//
+// A leading byte order mark is stripped first. PowerShell writes one in front of anything it
+// pipes into a native command, and Windows editors write one into a saved file, so both routes
+// a caller is told to use can deliver it. Refusing there would report a correct payload as
+// malformed, which is a worse answer than the one character it costs to ignore.
 export function parseInputObject(text: string): Record<string, unknown> | null {
   let parsed: unknown;
   try {
-    parsed = JSON.parse(text);
+    parsed = JSON.parse(text.replace(/^﻿/, ''));
   } catch {
     return null;
   }

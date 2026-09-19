@@ -138,11 +138,15 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
       const { surface, session, grants, human } = leased.lease;
       const inputs = Object.fromEntries(Object.entries(validated.values).map(([name, value]) => [name, String(value)]));
       const humanActions: HumanActionRecord[] = [];
+      let lastShown: Uint8Array | null = null;
       const console_ = await createRunConsole({
         control: session,
         screenshot: maskedScreenshot(surface, profile.profile),
         ...(human === undefined ? {} : { input: human }),
         onHumanAction: (record) => humanActions.push(record),
+        onScreenshotServed: (bytes) => {
+          lastShown = bytes;
+        },
         redactor: deps.redactor,
         known: [],
         clock: deps.clock,
