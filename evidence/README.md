@@ -15,3 +15,13 @@ The project owner claimed the session on the console, looked at the masked scree
 Both runs were ended at the console rather than allowed to finish, so neither carries a trace, a transcript or a manifest. Those are written when the loop returns, and a process that is killed never gets there. That is a real limit of the evidence sink and it is recorded in `REPORT.md` rather than tidied away here.
 
 What the run found is recorded honestly. The console could show a person the session and could not let them touch it, because the page never called the input endpoint that sits under it. The goal named no route to a form nothing links to. Both are fixed after this run, and the evidence of them failing is the reason the fixes exist.
+
+### The declined write, run_666b7c9f
+
+`discovery/run_666b7c9f-ad89-4650-9fe4-16fcf36b8432/` is the live write run with the approval refused. Claude Sonnet 5 read the goal, navigated the content frame to the sub account form by path, chose the account type, filled the opening amount, and declared the submit a write by setting the flag the request permits. Policy answered confirm, the run stopped, and the console URL went to stderr.
+
+I claimed the session on the console, read the screen, and released it without approving. The run was told the action was declined. It did not try the submit again. It asked for guidance instead, which raised a second intervention that nobody claimed, and the run ended as escalated with no capability written and no account opened. The final capture shows the session still on the form rather than on a confirmation screen, which is what says the submit never happened.
+
+`captures/decision-01.png` is the picture the console had in front of me when I decided, taken from the bytes it served rather than from a screenshot taken afterwards. `captures/intervention-01.png` is the screen at the moment the run stopped. The member number and the member name are masked in both.
+
+The opening amount and the account type are readable in those images, and that is deliberate. The masking comes from the app profile's field map, which covers member data, and a person cannot meaningfully approve a change they are not allowed to see. Both are values the caller supplied rather than anything read out of the system of record, and both appear only as `{{inputs.openingAmount}}` and `{{inputs.accountType}}` everywhere text is written.
