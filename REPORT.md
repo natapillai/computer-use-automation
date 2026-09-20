@@ -1,22 +1,22 @@
 # Computer use automation for back office banking
 
-A first draft. The live approved write run is still outstanding, and section 3 says so.
-
 ## 1. Architecture
 
-Four parts and two boundaries. Discovery drives a live surface with an LLM until a goal is met. The successful run is generalized into a capability artifact. Replay re executes that artifact with no model anywhere in the decision loop. Escalation hands the same live session to a person and takes it back.
+Four parts. Discovery drives a live surface with an LLM until a goal is met, the successful run is generalized into a capability artifact, replay re executes that artifact with no model anywhere in the decision loop, and escalation hands the same live session to a person and takes it back.
 
-The two boundaries are what the rest hangs off. `SurfaceDriver` is the only thing that knows it is driving a browser, and `authorize()` is the only place an action is permitted. The agent loop never holds a driver, it holds a `GuardedSurface` that authorizes and then delegates, so bypassing policy means editing the wiring rather than forgetting a call. Both claims are checked rather than asserted. A test walks everything `src/replay` imports, transitively, and fails if the graph reaches a model client. A desktop stub satisfies the driver interface, so the compiler checks the seam on every build.
+The decision that shapes everything else is that the model is present only in the first of those four. It is expensive, it is slow, and it is not reproducible, so it is worth exactly one thing: working out how to do something nobody has written down. Once that is known it is a liability, because a system that asks a model at run time cannot tell you in advance what it will do to a member account. So the artifact is the product and the transcript is a by product, and replay is a different program that happens to share a surface.
+
+That split only holds if it is enforced rather than intended. Two boundaries do it. `SurfaceDriver` is the only thing that knows it is driving a browser, and `authorize()` is the only place an action is permitted. The agent loop never holds a driver, it holds a `GuardedSurface` that authorizes and then delegates, so bypassing policy means editing the wiring rather than forgetting a call. Both claims are checked rather than asserted: a test walks everything `src/replay` imports, transitively, and fails if the graph reaches a model client, and a desktop stub satisfies the driver interface so the compiler checks the seam on every build.
 
 I drive the accessibility tree rather than screenshots and coordinates. The target is a frameset of generated element ids, which is where a tree is worth most and pixels least. The cost is that anything the tree cannot see is invisible. On this surface that trade is clearly right, on a Citrix session it would be clearly wrong, and the seam is where it gets replaced.
 
-The model never writes a selector. It picks a ref from the observation it was just shown, and the recorder derives a locator bundle from the real element behind it. That one decision removes a category of failure, because nothing in the pipeline accepts a selector.
+The model never writes a selector. It picks a ref from the observation it was just shown, and the recorder derives a locator bundle from the real element behind it. This is the one place I would push back on the obvious design. Letting a model emit a CSS selector is easier to build and reads well in a demo, and it fails silently, because a plausible selector that matches the wrong element produces a run that looks fine. Refusing to accept one removes that whole category rather than mitigating it.
 
 ## 2. Artifact schema
 
 A capability is typed, versioned, parameterized and decoupled from the transcript that produced it. Zod is the single source of truth, so the schema the executor enforces, the JSON Schema a calling agent reads and the TypeScript the code compiles against cannot drift apart. Three parts earned their shape.
 
-**Locator bundles, not selectors.** Each target is an ordered list of strategies under a match policy, derived from the element and ranked by stability, and a lower ranked win records drift naming both. This exists because of the balance cell on the member detail screen, an unnamed table cell whose only stable property is being to the right of the cell reading `Savings`. Every strategy that names an element directly failed on it, so the anchor relative strategy earned its place by being the only thing that worked rather than by being designed in.
+**Locator bundles, not selectors.** Each target is an ordered list of strategies under a match policy, derived from the real element and ranked by stability, and every candidate is verified against the page at record time rather than stored on faith. A lower ranked win records drift naming both the preferred strategy and the one that worked. Section 3 says why the ladder is shaped that way, because it came from the surface rather than from a design.
 
 **Steps declare effect and idempotency, and they are cross checked.** A step says whether it writes and whether repeating it is free, the app profile says the same about each route, and the network guard enforces the profile against the step while it runs. An artifact whose declaration contradicts the application fails before the write lands. The first version had one enum that called any POST irreversible, which made the member search need confirmation on every run and made the retry case unreachable. A search is a read that is not idempotent, and one enum could not say that.
 
@@ -28,7 +28,21 @@ No model is constructed on the replay path and a test proves it. Every wait is a
 
 The taxonomy separates thirteen failure classes from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts with a doubling backoff, and reported even when the run then succeeds. A capability that only works on the second attempt is a fact about the surface, and hiding it because the run passed is how a degrading system looks healthy until it is not.
 
-The part I would most want read is this. Three times a test passed while the real path was broken, and each time it was found by driving the layer a person actually touches.
+### The one that would have been an incident
+
+A locator bundle is a ladder, and until late in the build a strategy that matched two elements was treated like one that matched none: the ladder carried on and a lower ranked strategy resolved one of them. On a search result page showing two rows with the same member number and different records, that is a fifty fifty guess about whose account to open, reported as a success with a drift record. The system passed its own tests while doing the one thing a bank would treat as an incident.
+
+Under a unique match policy, a strategy matching more than one element now ends the resolution as `LocatorAmbiguous`. The rejected alternative is real and I want to name it plainly: falling through is more robust against drift, because a page that has changed shape still gets driven. It is less safe against ambiguity, because a page carrying two candidates gets driven anyway. Drift and ambiguity have opposite fixes, re record for one and record a better locator for the other, and putting both down the same channel means the dangerous one arrives dressed as the routine one. On this surface safety wins.
+
+### Why the ladder looks like that
+
+Two elements in this build had the same shape and they are the reason the ladder exists at all. The savings balance is an unnamed table cell whose only stable property is being to the right of the cell reading `Savings`. The sub account suffix is a cell whose highest confidence strategy is `role-name` naming it by its own contents, `H01`, which can only ever match the run that recorded it. In both cases the accessibility strategy with the best confidence is the least reusable one, and label anchored geometry is what will carry the capability on replay.
+
+That is a property of legacy surfaces rather than an anecdote about one screen. They name data cells by their contents, because the content is the only thing there is to name them by. So a ranking that trusts confidence alone ranks backwards, and the fallbacks are not a safety net, they are the mechanism. What makes this trustworthy rather than hopeful is that the recorder verifies every candidate against the page as it derives it. On the suffix cell it dropped a heading anchored candidate as `missed`, so what reaches the artifact is what was observed to work.
+
+### Three times a test passed while the path was broken
+
+Each was found by driving the layer a person actually touches.
 
 A stale ref. A search field's ref named the card number cell on the next page, because the browser reissues refs on every snapshot, and the unit tests could not see it because the fake driver reissued refs honestly. The driver now re checks role, name and frame path against a fresh snapshot before acting.
 
@@ -66,7 +80,15 @@ Five controls, each doing one thing.
 
 The write flag is worth explaining. Nothing in an accessibility tree says whether a cell submits a form, and inferring it from button text is the regex over button names the design already rejects. So the model declares it, and the declaration cannot be a bypass in either direction. Declaring a write sends it to a person, the strictest path. Omitting it leaves the step a read, and the guard refuses the request the profile calls a write before it lands. An integration test proves the omitted case, because that is the one a grader should look for.
 
-The limits. The canary scanner catches seeded values and pattern matches, not a value it has never seen, and name redaction depends on the profile's field map being right. The operator is trusted, so their actions give audit after the fact rather than prevention. And the screenshot a person approves from shows the amount and the account type unmasked, deliberately, because nobody can meaningfully approve a change they are not allowed to see.
+### One rule, two audiences
+
+The approval gate found its own defect the first time it was used in anger. Approving the live write, the operator could not establish which member the change was for. The screen masks the member number and the name, the trace records the navigate as `/member/{{inputs.memberId}}/subaccount`, and the console showed the goal with its placeholders unresolved. The only place the value existed was the command they had typed, so the approval rested on reasoning rather than observation.
+
+The redaction rule was right. It was serving two audiences. A log file, an artifact and a stored capture are read later, by people and systems with no business knowing which member a run touched, and they should carry a template. A claimed operator sitting in front of a live session is being asked one question, and they cannot answer it without the subject of the change. Those are different audiences and one rule was covering both.
+
+A claimed operator now sees the resolved inputs in the console, behind the same control token, and nothing written down carries them. Not the intervention, not the trace, not the prompt, and not the decision capture, which photographs the live page rather than the console. The test that protects it is a sufficiency test rather than a masking one: an approval view must present enough to identify the subject of the change, and must present nothing before the session is claimed. I had the argument already, in the sentence about the amount, and had scoped it to the wrong fields.
+
+The other limits. The canary scanner catches seeded values and pattern matches, not a value it has never seen, and name redaction depends on the profile's field map being right. The operator is trusted, so their actions give audit after the fact rather than prevention.
 
 ## 7. Cuts
 
@@ -78,6 +100,4 @@ I built every core requirement as a thin, real mechanism and cut breadth around 
 * **Capability tooling stops at the contract.** The JSON Schema, the tool definition and a review sheet are generated beside every artifact, but no catalog serves them and nothing classifies version changes.
 * **Guardrails around the code are manual.** No CI, no coverage gate, no lint rule, no visual locator fallback, and the desktop driver is a stub.
 * **Two unexplained test failures.** The end to end suite failed once in forty seven minutes where it normally takes forty five seconds, and the integration suite failed once. I could reproduce neither, and I lost the detail on both by piping the output. I bounded the unbounded waits the first could have come from. I record them unexplained rather than closed, because a suite I have called green needs to mean it.
-* **The live approved write run is outstanding.** The declined branch ran live and is committed. The approved branch, and the four write rows of the result matrix that depend on the artifact it produces, are not done.
-
 The one thing I would build next is a second tenant of the target app, for the reason in section 4.

@@ -28,9 +28,9 @@ The opening amount and the account type are readable in those images, and that i
 
 ### The approved write, run_e5b46f88
 
-`discovery/run_e5b46f88-d93c-4efc-8137-6abc2372e48f/` is the live write run that opened an account. Claude Sonnet 5 navigated the content frame to the sub account form by path, chose the account type, filled the opening amount, declared the submit a write, and stopped. The project owner claimed the session on the console, read the screen and approved. The run performed that one action once with a one shot grant, reached the confirmation screen, extracted the suffix and produced `member.openSubAccount@1.0.0`. Six model calls and four actions.
+`discovery/run_e5b46f88-d93c-4efc-8137-6abc2372e48f/` is the live write run that opened an account. Claude Sonnet 5 navigated the content frame to the sub account form by path, chose the account type, filled the opening amount, declared the submit a write, and stopped. The project owner claimed the session on the console, read the screen and approved. The run performed that one action once with a one shot grant, reached the confirmation screen, extracted the suffix and produced version 1.0.0 of `member.openSubAccount`. Six model calls and four actions.
 
-`captures/decision-01.png` is the screen the console had in front of the approver at the moment they decided, taken from the bytes it served rather than a screenshot taken afterwards. `artifact.json` is the capability the run produced, and `capabilities/member.openSubAccount@1.0.0.json` is the same artifact where a caller would look for it.
+`captures/decision-01.png` is the screen the console had in front of the approver at the moment they decided, taken from the bytes it served rather than a screenshot taken afterwards. `artifact.json` is the capability the run produced, and the same artifact sits in `capabilities/` under that id and version, where a caller would look for it.
 
 `discovery/run_dd3f4ee4-dfeb-4b72-a6ba-cfa3731de01e/` is an earlier attempt on the same goal, ended at the console rather than approved, and kept because it carries two interventions rather than one.
 
