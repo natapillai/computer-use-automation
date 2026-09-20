@@ -13,6 +13,7 @@ import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
+import { looksLikeMachinePath } from './paths.js';
 import { runReplayCommand } from './replayCommand.js';
 
 // The replay command on the scripted app. The bin only wires a real browser into these deps,
@@ -23,6 +24,16 @@ interface Setup {
   readonly extraArgs?: readonly string[];
   readonly argv?: (paths: { capability: string; evidence: string }) => readonly string[];
   readonly stdin?: string | null | 'untouchable';
+}
+
+// Every string a caller could paste into a ticket, wherever it sits in the payload. A line
+// check is not enough, because a pretty printed path sits behind its key and a regex anchored
+// at the start of the line never sees it.
+function strings(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value !== null && typeof value === 'object') return Object.values(value).flatMap(strings);
+  return [];
 }
 
 describe('runReplayCommand', () => {
@@ -95,6 +106,18 @@ describe('runReplayCommand', () => {
     expect(code).toBe(0);
     expect(JSON.parse(stdout)).toMatchObject({ status: 'success', outputs: { savingsBalance: { type: 'money', amountMinor: 425075, currency: 'USD' } } });
     expect(stderr).toBe('');
+  });
+
+  it('prints no machine path, because what it prints gets pasted into a ticket', async () => {
+    const { stdout, stderr, paths } = await run();
+
+    expect(looksLikeMachinePath(paths.capability)).toBe(true);
+    expect(looksLikeMachinePath(paths.evidence)).toBe(true);
+    for (const found of strings(JSON.parse(stdout))) expect(looksLikeMachinePath(found), found).toBe(false);
+    for (const given of [paths.capability, paths.evidence, root]) {
+      expect(stdout).not.toContain(given);
+      expect(stderr).not.toContain(given);
+    }
   });
 
   it('files the evidence under the outcome of the run and holds neither the member id nor the balance', async () => {

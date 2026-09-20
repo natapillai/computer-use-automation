@@ -318,8 +318,9 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
       ? {
           status: 'declared',
           code: decision.code,
+          // The id and the version, never the path. A reviewer finds the file by them, and what
+          // this prints gets pasted into a ticket, where an absolute path carries a username.
           capability: { id: capability.id, version: declaredVersion },
-          path,
           probe: probeSummary,
           verification: verificationSummary,
           evidence: sink.reference,
@@ -333,7 +334,7 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
           evidence: sink.reference,
         };
 
-  await sink.log(refusal === null ? 'info' : 'error', 'review.finished', { ...summary, evidence: `review/${runId}`, ...(refusal === null ? { path: undefined } : {}) });
+  await sink.log(refusal === null ? 'info' : 'error', 'review.finished', { ...summary, evidence: `review/${runId}` });
   await sink.close({
     capability: { id: capability.id, version: declaredVersion ?? capability.version },
     goal: null,

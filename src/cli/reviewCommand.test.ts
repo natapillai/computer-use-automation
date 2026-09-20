@@ -17,6 +17,7 @@ import { createTestClock } from '../runtime/clock.js';
 import { createSequentialIds } from '../runtime/ids.js';
 import { createFakeSurfaceDriver } from '../surface/fake/fakeSurfaceDriver.js';
 import { createGuardedSurface } from '../surface/guardedSurface.js';
+import { looksLikeMachinePath } from './paths.js';
 import { runReviewCommand } from './reviewCommand.js';
 
 // The negative probe review on the scripted app, ADR 0018. The draft under review is the one the
@@ -40,6 +41,16 @@ interface Setup {
   readonly extraArgs?: readonly string[];
   readonly argv?: (paths: Paths) => readonly string[];
   readonly stdin?: string;
+}
+
+// Every string a caller could paste into a ticket, wherever it sits in the payload. A line
+// check is not enough, because a pretty printed path sits behind its key and a regex anchored
+// at the start of the line never sees it.
+function strings(value: unknown): string[] {
+  if (typeof value === 'string') return [value];
+  if (Array.isArray(value)) return value.flatMap(strings);
+  if (value !== null && typeof value === 'object') return Object.values(value).flatMap(strings);
+  return [];
 }
 
 async function filesUnder(directory: string): Promise<string[]> {
@@ -128,6 +139,21 @@ describe('runReviewCommand', () => {
     const reviewed = Capability.parse(JSON.parse(await readFile(join(dirname(paths.capability), 'member.readSavingsBalance@1.1.0.json'), 'utf8')));
     expect(reviewed.outcomes).toMatchObject([{ code: 'MEMBER_NOT_FOUND', terminal: true, provenance: 'manual', detect: { kind: 'elementPresent' } }]);
     expect(reviewed.provenance.derivedFrom).toEqual({ id: 'member.readSavingsBalance', version: '1.0.0' });
+  });
+
+  it('prints no machine path, because what it prints gets pasted into a ticket', async () => {
+    const { stdout, stderr, paths } = await run();
+
+    // Both paths this run was given are absolute, which is the case that found the defect in
+    // the log and then again in the CLI summary. A reviewer needs the version that was written,
+    // and the id and the version are how they find it.
+    expect(looksLikeMachinePath(paths.capability)).toBe(true);
+    expect(looksLikeMachinePath(paths.evidence)).toBe(true);
+    for (const found of strings(JSON.parse(stdout))) expect(looksLikeMachinePath(found), found).toBe(false);
+    for (const given of [paths.capability, paths.evidence, root]) {
+      expect(stdout).not.toContain(given);
+      expect(stderr).not.toContain(given);
+    }
   });
 
   it('writes the probe evidence, including the diff between the two versions', async () => {
