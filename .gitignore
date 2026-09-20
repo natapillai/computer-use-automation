@@ -5,6 +5,9 @@ coverage/
 .env.local
 !.env.example
 evidence/tmp/
+# Where the README's demo path writes, so following it leaves the committed
+# artifacts and the committed evidence untouched.
+out/
 playwright-report/
 test-results/
 *.log
