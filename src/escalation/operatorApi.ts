@@ -57,7 +57,11 @@ export interface OperatorApi {
 type WithId = { Params: { id: string } };
 
 export async function createOperatorApi(options: OperatorApiOptions): Promise<OperatorApi> {
-  const app = Fastify({ logger: false });
+  // forceCloseConnections, because the console page polls a screenshot once a second and one
+  // of those is nearly always in flight when a run finishes. Draining them politely means the
+  // command does not exit until the person who approved the change closes their browser, which
+  // is what a live review spent twenty minutes doing before this line existed.
+  const app = Fastify({ logger: false, forceCloseConnections: true });
 
   // The token the claim handed out. A forged or stale one is refused before anything moves,
   // because the whole point of the handover is that exactly one holder is valid at a time.

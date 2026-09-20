@@ -1,3 +1,7 @@
+import { connect } from 'node:net';
+
+// Written out, because a bash heredoc on this machine eats a backslash pair.
+const CRLF = String.fromCharCode(13, 10);
 import { describe, expect, it } from 'vitest';
 import { createSessionControl } from '../control/controlPlane.js';
 import { createControlTokens } from '../control/controlToken.js';
@@ -12,13 +16,18 @@ import { createRunConsole, type RunConsole } from './runConsole.js';
 
 const CLOCK = '2026-09-17T09:00:00.000Z';
 
-async function console_(announce: (line: string) => void, claimWindow: () => Promise<void>, port = 0): Promise<{ run: RunConsole; tokens: ReturnType<typeof createControlTokens> }> {
+async function console_(
+  announce: (line: string) => void,
+  claimWindow: () => Promise<void>,
+  port = 0,
+  screenshot: () => Promise<Uint8Array> = async () => new Uint8Array([1, 2, 3]),
+): Promise<{ run: RunConsole; tokens: ReturnType<typeof createControlTokens> }> {
   const tokens = createControlTokens('sess_000001', createSequentialIds());
   const control = createSessionControl({ sessionId: 'sess_000001', ids: createSequentialIds(), clock: createTestClock(CLOCK), runId: 'run_000001', tokens });
   control.apply('start');
   const run = await createRunConsole({
     control,
-    screenshot: async () => new Uint8Array([1, 2, 3]),
+    screenshot,
     redactor: createRedactor({ neverPersist: [], redactPatterns: [] }),
     known: [],
     clock: createTestClock(CLOCK),
@@ -121,6 +130,36 @@ describe('createRunConsole', () => {
     } finally {
       await first.run.close();
     }
+  });
+  it('closes while a screenshot poll is still in flight, because an operator leaves the tab open', { timeout: 20_000 }, async () => {
+    let started = (): void => undefined;
+    const inFlight = new Promise<void>((begun) => {
+      started = () => begun();
+    });
+    const { run } = await console_(
+      () => undefined,
+      () => new Promise<void>(() => undefined),
+      0,
+      // A screenshot of a session that is going away, which never answers.
+      () => {
+        started();
+        return new Promise<Uint8Array>(() => undefined);
+      },
+    );
+
+    // A console page polls this once a second, so one is nearly always in flight when a run
+    // finishes. Waiting for it means the command does not exit until the person who approved
+    // the change thinks to close their browser.
+    const url = new URL(run.baseUrl);
+    const held = connect({ host: url.hostname, port: Number(url.port) });
+    await new Promise<void>((ready) => held.once('connect', () => ready()));
+    held.write('GET /sessions/sess_000001/screenshot HTTP/1.1' + CRLF + 'Host: localhost' + CRLF + CRLF);
+    await inFlight;
+
+    const raced = await Promise.race([run.close().then(() => 'closed'), new Promise((late) => setTimeout(() => late('hung'), 5_000))]);
+
+    expect(raced).toBe('closed');
+    held.destroy();
   });
 });
 
