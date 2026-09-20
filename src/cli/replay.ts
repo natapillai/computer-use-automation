@@ -84,7 +84,7 @@ async function main(): Promise<number> {
       ids: systemIds,
       target: { baseUrl: targetBaseUrl },
       environment: { driver: 'web', driverVersion: '1.0.0' },
-      // The operator console of CLAUDE.md section 5, hosted for as long as the run lives.
+      // The operator console of docs/CLAUDE.md section 5, hosted for as long as the run lives.
       console: { port: OPERATOR_PORT, claimTimeoutMs: target.value.interventionClaimTimeoutMs },
     });
   } finally {

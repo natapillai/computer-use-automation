@@ -4,7 +4,7 @@ description: Pick up the next task from the plan and start the TDD cycle
 
 Start the next task.
 
-1. Read `PROGRESS.md` to find the current phase and task.
+1. Read `docs/PROGRESS.md` to find the current phase and task.
 2. Read `docs/PLAN.md` and find the first unticked task in phase order. Do not skip ahead to a task that looks more interesting.
 3. Read every design document the task references. Do not guess at a design that is already written down.
 4. Restate, in three lines, the task ID, its acceptance criteria, and the tests it requires.

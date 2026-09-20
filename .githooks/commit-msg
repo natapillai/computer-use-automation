@@ -1,13 +1,13 @@
 #!/bin/sh
 # Strip AI attribution trailers from every commit message.
 #
-# CLAUDE.md section 11 forbids them. The tooling that adds them is not reliably
+# docs/CLAUDE.md section 11 forbids them. The tooling that adds them is not reliably
 # controlled by settings, because the instruction arrives inside a tool prompt at
 # generation time rather than from configuration. A hook is the only place the rule
 # can be enforced rather than requested, so this is the enforcement and the settings
 # entries are the request.
 #
-# Enabled by core.hooksPath. See README and CLAUDE.md section 11.
+# Enabled by core.hooksPath. See README and docs/CLAUDE.md section 11.
 set -eu
 
 msg="$1"

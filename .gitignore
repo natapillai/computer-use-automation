@@ -15,7 +15,7 @@ test-results/
 Thumbs.db
 
 # The brief is interface.ai's material and this repository is public.
-# Kept on disk, never committed. See CLAUDE.md section 1.
+# Kept on disk, never committed. See docs/CLAUDE.md section 1.
 docs/ASSIGNMENT.md
 
 # Scratch space for anything worth keeping before it is safe to commit. Spike
