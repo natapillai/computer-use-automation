@@ -122,13 +122,21 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     return { control, handover };
   }
 
+  // Claiming is a round trip and the page only holds the token when it lands. A test that acts
+  // on the picture before then is racing the claim, and the page answers a click it cannot send
+  // by telling the person to claim first, so the race reads as a console that never forwarded.
+  async function claim(): Promise<void> {
+    await page.click('#claim');
+    await page.locator('#release:not([disabled])').waitFor();
+  }
+
   it('shows a claimed operator which record the change is for, which is what approving means', async () => {
     const { handover } = await stopFor('PolicyConfirmation');
 
     // Before claiming, the panel says nothing about the subject. Looking is not authorising.
     expect(await page.locator('#subject').innerText()).not.toContain('10001');
 
-    await page.click('#claim');
+    await claim();
     await page.locator('#subject:has-text("10001")').waitFor();
 
     // A sufficiency check rather than a masking one. The screen masks the member number and
@@ -143,7 +151,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
 
   it('turns a click on the picture into a click on the live session, in page space', async () => {
     const { handover } = await stopFor('UnclassifiedCondition');
-    await page.click('#claim');
+    await claim();
 
     // The middle of the shown picture, whatever size the console is drawing it at.
     const box = await page.locator('#canvas').boundingBox();
@@ -161,7 +169,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
 
   it('types into the live session, one keystroke at a time', async () => {
     const { handover } = await stopFor('UnclassifiedCondition');
-    await page.click('#claim');
+    await claim();
     await page.click('#canvas');
 
     await page.keyboard.type('10001');
@@ -176,7 +184,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
 
   it('sends a frame to a path, which is the only way a person reaches a page nothing links to', async () => {
     const { handover } = await stopFor('UnclassifiedCondition');
-    await page.click('#claim');
+    await claim();
 
     await page.fill('#path', '/member/10001/subaccount');
     await page.click('#go');
@@ -188,7 +196,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
 
   it('says why a refused navigation did not happen, rather than doing nothing', async () => {
     const { handover } = await stopFor('UnclassifiedCondition');
-    await page.click('#claim');
+    await claim();
 
     await page.fill('#path', '/admin/users');
     await page.click('#go');
@@ -215,7 +223,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     const { handover } = await stopFor('PolicyConfirmation');
 
     expect(await page.locator('#approve').isVisible()).toBe(true);
-    await page.click('#claim');
+    await claim();
     await page.click('#approve');
 
     const settled = await handover;
@@ -227,7 +235,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
   it('hands the session back without approving anything when the person only releases it', async () => {
     const { handover } = await stopFor('PolicyConfirmation');
 
-    await page.click('#claim');
+    await claim();
     await page.click('#release');
 
     const settled = await handover;
@@ -239,7 +247,7 @@ describe('the operator console page', { timeout: 60_000 }, () => {
     const { handover } = await stopFor('UnclassifiedCondition');
 
     expect(await page.locator('#approve').isVisible()).toBe(false);
-    await page.click('#claim');
+    await claim();
     await page.click('#release');
 
     expect((await handover).kind).toBe('resumed');
