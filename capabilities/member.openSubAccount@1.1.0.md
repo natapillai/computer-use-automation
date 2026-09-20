@@ -1,6 +1,6 @@
 # Open a member sub account
 
-member.openSubAccount version 1.1.0, draft.
+member.openSubAccount version 1.1.0, approved.
 
 Opens a new sub account of a given type for a member, with an opening deposit, and returns the suffix the system assigned. The form is reached by path because MERIDIAN Core links to it from nowhere, so the goal names it.
 
@@ -28,7 +28,7 @@ Opens a new sub account of a given type for a member, with an opening deposit, a
 ## What approving it allows
 
 * Highest effect any step may have: write.
-* May run unattended once approved: no.
+* May run unattended: no.
 * Bounded at 120000ms in total and 20000ms per step.
 
 Discovered by claude-sonnet-5 on run run_e5b46f88-d93c-4efc-8137-6abc2372e48f.

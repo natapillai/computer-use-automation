@@ -28,7 +28,7 @@ No model is constructed on the replay path and a test proves it transitively. Ev
 
 Thirteen hard failure classes stay separate from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts, and reported even when the run succeeds. A capability that only works on the second attempt is a fact about the surface, and hiding it is how a degrading system looks healthy until it is not.
 
-One finding would have been an incident. A locator bundle is a ladder, and a strategy matching two elements was treated like one matching none, so a lower ranked strategy resolved one. On a page showing two rows with the same member number, that is a fifty fifty guess about whose account to open, reported as success. An ambiguous strategy now ends resolution as `LocatorAmbiguous`. Falling through is the real alternative, more robust against drift and less safe against ambiguity. The two have opposite fixes, so one channel means the dangerous case arrives dressed as the routine one.
+One finding would have been an incident. A locator bundle is a ladder, and a strategy matching two elements was treated like one matching none, so a lower ranked strategy resolved one. On a page showing two rows with the same member number, that is a fifty fifty guess about whose account to open, reported as success. An ambiguous strategy now ends resolution as `LocatorAmbiguous`. Falling through is the alternative, more robust against drift and less safe against ambiguity. The two have opposite fixes, so one channel means the dangerous case arrives dressed as the routine one.
 
 The ladder came from the surface. The savings balance is an unnamed cell identified only by sitting right of the cell reading `Savings`, and the sub account suffix is named by its own contents, `H01`. Legacy surfaces name data cells by their contents, so the highest confidence strategy is systematically the least reusable one, and the fallbacks are the mechanism, not a safety net.
 
@@ -58,7 +58,7 @@ Five controls, each doing one thing.
 * An app profile classifying each route by effect and idempotency, enforced per step by a network guard that refuses a write under a step declared a read, before it lands.
 * Redaction at the sink rather than the call site, so nothing written anywhere carries a value.
 * A canary scanner that fails the suite if a seeded value reaches evidence, a capability or a cassette.
-* Human confirmation on every write that is not an approved capability running unattended.
+* Human confirmation on every write, unless the capability is approved and declares unattended replay.
 
 The write flag is worth explaining. Nothing in an accessibility tree says whether a cell submits a form, and inferring it from button text is the regex over button names the design already rejects. So the model declares it, and the declaration cannot be a bypass in either direction. Declaring a write sends it to a person, the strictest path. Omitting it leaves the step a read, and the guard refuses the request the profile calls a write before it lands. An integration test proves the omitted case, because that is the one a grader should look for.
 

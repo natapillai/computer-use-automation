@@ -116,6 +116,13 @@ describe('FileCapabilityStore', () => {
     expect(approved).toMatchObject({ ok: true, capability: { lifecycle: { status: 'approved', approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' } } });
     const after = await readFile(join(directory, FILE), 'utf8');
     expect(JSON.parse(after)).toEqual({ ...JSON.parse(before), lifecycle: { status: 'approved', approvedBy: 'operator-7', approvedAt: '2026-09-16T10:00:00.000Z' } });
+
+    // The sheet is what a reviewer opens, and a sheet saying draft beside an approved
+    // artifact is worse than no sheet. Approving is a write like any other, so it rewrites
+    // what sits beside the file.
+    const sheet = await readFile(join(directory, FILE.replace(/\.json$/, '.md')), 'utf8');
+    expect(sheet).toContain('version 1.0.0, approved');
+    expect(sheet).not.toContain('version 1.0.0, draft');
   });
 
   it('refuses to approve a version that is missing or already approved', async () => {

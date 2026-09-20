@@ -89,7 +89,7 @@ A draft declares no business outcomes, because a run that succeeded never saw on
 '{"memberId":"00000"}' | node --env-file-if-exists=.env --import tsx src/cli/review.ts --capability ./out/capabilities/member.readSavingsBalance@1.0.0.json --decision requests/member.readSavingsBalance.MEMBER_NOT_FOUND.review.json --evidence ./out/evidence
 ```
 
-That declares `MEMBER_NOT_FOUND` and writes `1.1.0` beside the draft. A person then signs it off, which is what makes it replayable unattended.
+That declares `MEMBER_NOT_FOUND` and writes `1.1.0` beside the draft. A person then signs it off, which is one of the two things a write needs before it replays without stopping. The other is the capability declaring `allowUnattendedReplay`, and both are checked, so signing off a capability that does not declare it still stops for a person on every run.
 
 ```
 node --env-file-if-exists=.env --import tsx src/cli/review.ts --capability ./out/capabilities/member.readSavingsBalance@1.1.0.json --approve your-name --evidence ./out/evidence
@@ -117,7 +117,7 @@ The console is on `http://localhost:4020` while a run is live.
 
 ### The write path and the handoff
 
-`member.openSubAccount` opens a sub account, which is the only thing in the fixture application that changes anything. Replaying it as a draft stops before the submit and prints an intervention URL on stderr. Open that URL, claim the session, and you are looking at the live browser. You can click the picture, type into it, send a frame to a path, and then release with or without an approval. An approval is spent as a one shot grant on exactly one action.
+`member.openSubAccount` opens a sub account, which is the only thing in the fixture application that changes anything. Replaying it stops before the submit and prints an intervention URL on stderr, whether it is the `1.0.0` draft or the approved `1.1.0`, because neither declares `allowUnattendedReplay`. Open that URL, claim the session, and you are looking at the live browser. You can click the picture, type into it, send a frame to a path, and then release with or without an approval. An approval is spent as a one shot grant on exactly one action.
 
 ```
 '{"memberId":"10001","accountType":"Holiday Club","openingAmount":"250.00"}' | node --env-file-if-exists=.env --import tsx src/cli/replay.ts --capability ./capabilities/member.openSubAccount@1.0.0.json --evidence ./out/evidence

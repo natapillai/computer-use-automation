@@ -101,7 +101,10 @@ export function reviewSheet(capability: Capability): string {
     '## What approving it allows',
     '',
     `* Highest effect any step may have: ${capability.policy.maxEffect}.`,
-    `* May run unattended once approved: ${capability.policy.allowUnattendedReplay ? 'yes' : 'no'}.`,
+    // Approval and this flag are two conditions, not one, so the sheet states the flag on its
+    // own. A reviewer who reads "once approved" next to an approved artifact cannot tell
+    // whether signing it off was enough.
+    `* May run unattended: ${capability.policy.allowUnattendedReplay ? 'yes' : 'no'}.`,
     `* Bounded at ${capability.policy.maxTotalDurationMs}ms in total and ${capability.policy.maxStepDurationMs}ms per step.`,
     '',
     `Discovered by ${capability.provenance.model ?? 'a person'} on run ${capability.provenance.discoveryRunId}.`,

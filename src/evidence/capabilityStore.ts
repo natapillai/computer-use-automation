@@ -90,6 +90,10 @@ export function createFileCapabilityStore(options: FileCapabilityStoreOptions): 
         return { ok: false, failure: 'CapabilityInvalid', detail: approved.error.issues.map((issue) => `${issue.path.join('.')} ${issue.message}`).join('. ') };
       }
       await writeFile(path, canonicalCapabilityJson(approved.data));
+      // The sheet and the tool definition sit beside the artifact and describe it, so an
+      // approval rewrites them too. A sheet that still says draft next to an approved file
+      // is the exact failure these are written beside the artifact to avoid.
+      await writeSidecars(path, approved.data);
       return { ok: true, path, capability: approved.data };
     },
     read: async (id, version) => {
@@ -121,15 +125,19 @@ export function createFileCapabilityStore(options: FileCapabilityStoreOptions): 
           return { ok: false, failure: 'VersionExists', detail: `${capability.id}@${capability.version} already exists with different content. A change is a new version.` };
         }
       }
-      // Written beside the artifact, and rewritten whenever the artifact is, because a sheet
-      // that describes a version other than the one next to it is worse than no sheet. Neither
-      // is canonical, so neither is exclusive create.
-      await writeFile(path.replace(/\.json$/, '.md'), reviewSheet(capability), 'utf8');
-      await writeFile(path.replace(/\.json$/, '.tool.json'), `${JSON.stringify(toolFor(capability), null, 2)}
-`, 'utf8');
+      await writeSidecars(path, capability);
       return { ok: true, path };
     },
   };
+}
+
+// Written beside the artifact, and rewritten whenever the artifact is, because a sheet that
+// describes a version other than the one next to it is worse than no sheet. Neither is
+// canonical, so neither is exclusive create.
+async function writeSidecars(path: string, capability: Capability): Promise<void> {
+  await writeFile(path.replace(/\.json$/, '.md'), reviewSheet(capability), 'utf8');
+  await writeFile(path.replace(/\.json$/, '.tool.json'), `${JSON.stringify(toolFor(capability), null, 2)}
+`, 'utf8');
 }
 
 function codeOf(error: unknown): unknown {

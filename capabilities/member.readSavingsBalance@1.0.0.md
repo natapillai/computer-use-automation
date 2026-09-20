@@ -25,7 +25,7 @@ Looks up a member by ID and returns the current balance of their primary savings
 ## What approving it allows
 
 * Highest effect any step may have: read.
-* May run unattended once approved: no.
+* May run unattended: no.
 * Bounded at 120000ms in total and 20000ms per step.
 
 Discovered by claude-sonnet-5 on run run_84705a0a-7840-4584-b39a-035d9f9d81f8.
