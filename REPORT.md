@@ -24,15 +24,15 @@ A capability is typed, versioned, parameterized and decoupled from the transcrip
 
 ## 3. Determinism & error handling
 
-No model is constructed on the replay path and a test proves it transitively. Every wait is a bounded condition raced against the surface, never a sleep. All four result shapes carry `recoveries`, `interventions` and `drift` whether anything happened or not.
+No model is constructed on the replay path and a test proves it transitively. Every wait is a bounded condition raced against the surface, never a sleep. All four result shapes carry `recoveries`, `interventions` and `drift` even when nothing happened.
 
-Thirteen hard failure classes stay separate from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts, and reported even when the run succeeds. A capability that only works on the second attempt is a fact about the surface, and hiding it is how a degrading system looks healthy until it is not.
+Thirteen hard failure classes stay separate from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts, and reported even on success. A capability that only works on the second attempt is a fact about the surface, and hiding it is how a degrading system looks healthy until it is not.
 
-One finding would have been an incident. A locator bundle is a ladder, and a strategy matching two elements was treated like one matching none, so a lower ranked strategy resolved one. On a page showing two rows with the same member number, that is a fifty fifty guess about whose account to open, reported as success. An ambiguous strategy now ends resolution as `LocatorAmbiguous`. Falling through is the alternative, more robust against drift and less safe against ambiguity. The two have opposite fixes, so one channel means the dangerous case arrives dressed as the routine one.
+One finding would have been an incident. A locator bundle is a ladder, and a strategy matching two elements was treated like one matching none, so a lower ranked strategy resolved one. Two rows showing the same member number make that a fifty fifty guess about whose account to open, reported as success. It now ends resolution as `LocatorAmbiguous`. Falling through is the alternative, more robust against drift and less safe against ambiguity. They have opposite fixes, so one channel means the dangerous case arrives dressed as the routine one.
 
-The ladder came from the surface. The savings balance is an unnamed cell identified only by sitting right of the cell reading `Savings`, and the sub account suffix is named by its own contents, `H01`. Legacy surfaces name data cells by their contents, so the highest confidence strategy is systematically the least reusable one, and the fallbacks are the mechanism, not a safety net.
+The ladder came from the surface. The savings balance is an unnamed cell known only by sitting right of the cell reading `Savings`, and the sub account suffix is named by its own contents, `H01`. Legacy surfaces name data cells by their contents, so the highest confidence strategy is the least reusable one, and the fallbacks are the mechanism, not a safety net.
 
-Four times a test passed while the real path was broken, each driving the layer beneath what a person touches. A search field's ref named the card number cell on the next page, invisible to unit tests because the fake driver reissued refs honestly. A broken wait passed its gate. The console was tested by posting to an input endpoint its page never called, and my own rehearsal wrote the step the model was meant to choose. I now ask of every test which layer it drives.
+Five times a test passed while the real path was broken, each driving the layer beneath what a person touches. A search field's ref named the card number cell on the next page, invisible to unit tests because the fake driver reissued refs honestly. A broken wait passed its gate. The console was tested by posting to an input endpoint its page never called, and my rehearsal wrote the step the model should have chosen. The fifth landed after I had audited for this, leaving a review sheet reading draft beside an approved capability. I now ask of every test which layer it drives.
 
 ## 4. Heterogeneity & multi-tenant
 
@@ -42,13 +42,13 @@ Multi tenant reuse is designed and not built. Overlays rebind locators and outpu
 
 ## 5. Escalation & handoff
 
-Four triggers stop a run: no progress across consecutive actions, a dialog nobody has classified, the model asking, and a policy confirmation on a write, the one where nothing is wrong and the run may not submit on its own.
+Four triggers stop a run: no progress across consecutive actions, a dialog nobody has classified, the model asking, and a policy confirmation on a write, the one where nothing is wrong and the run may not submit alone.
 
 Control is a state machine over one live session with fencing tokens. One holder is valid at a time and the token rotates on every transition, so a run that lost control cannot assume anything about a page somebody else may have changed. The run hosts the console itself, the honest consequence of one process and a filesystem.
 
-A claimed operator sees a masked screenshot of the live page and can click it, type into it, and send a frame to a path, the last because clicking cannot reach a page nothing links to. All of it runs through the same allowlist and control token as the automation.
+A claimed operator sees a masked screenshot of the live page and can click it, type into it, and send a frame to a path, the last because clicking cannot reach a page nothing links to. All of it runs through the same allowlist and control token.
 
-Coming back is a ladder rather than a resume. The run re observes and asks, in order, for the capability's success condition, a declared outcome, the step's postcondition, an approval, then the precondition. Approving one action is deliberately not finishing the run, because nothing here turns human actions into steps. An approved run still produces its artifact and a run somebody completed by hand does not.
+Coming back is a ladder rather than a resume. The run re observes and asks, in order, for the capability's success condition, a declared outcome, the step's postcondition, an approval, then the precondition. Approving one action is deliberately not finishing the run, because nothing here turns human actions into steps. An approved run produces its artifact and a run somebody finished by hand does not.
 
 ## 6. Safety
 
