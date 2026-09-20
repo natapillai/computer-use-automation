@@ -1,0 +1,6 @@
+{
+  "code": "AMOUNT_BELOW_MINIMUM",
+  "description": "The opening amount is below the minimum this account type allows, so no account was opened.",
+  "terminal": true,
+  "elementText": "The opening amount must be at least $25.00."
+}
