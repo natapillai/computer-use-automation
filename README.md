@@ -4,6 +4,18 @@ A model drives a legacy banking application until a goal is met. The successful 
 
 `REPORT.md` is the write up. This file is how you run it.
 
+## If you have twenty minutes
+
+Five files, in this order.
+
+1. **`REPORT.md`**, the design and the trade offs, about three pages.
+2. **`evidence/discovery/run_e5b46f88-d93c-4efc-8137-6abc2372e48f/`**, a live run of Claude Sonnet 5 against the application that opened a real sub account. Six model calls, four actions, one stop for a person. `captures/decision-01.png` is the screen the approver was looking at when they decided, taken from the bytes the console served rather than from a screenshot afterwards. `artifact.json` is the capability the run produced. The read capability's live run is `run_84705a0a`, and `run_666b7c9f` is the same write with the approval refused, which opened nothing.
+3. **`docs/REQUIREMENTS.md`**, every requirement in the brief mapped to the task that satisfies it and the test file that proves it, including the two rows that are designed and not built.
+4. **`tests/integration/resultMatrix.test.ts`**, thirteen of the fourteen rows of the error taxonomy against the live application, including a business outcome that is not a failure, an approved write running unattended, and a 503 on a submit that posts once and opens nothing.
+5. **`src/replay/imports.test.ts`**, which walks everything the replay path imports and fails if the graph ever reaches a model client. It is the only reason the determinism claim is checkable rather than asserted.
+
+`evidence/README.md` says what is in every run directory and which single file in each is worth opening.
+
 ## What you need
 
 * Node 22.12 or later. The repository pins `^22.12.0`.
@@ -137,7 +149,7 @@ requests/       discovery goals and review decisions, none of which ever holds a
 policy/         the allowlist, the one file that says what may be reached at all
 profiles/       per application route classification and sensitive field maps
 evidence/       committed runs, including ones kept to show defects the system found in its own output
-docs/           the design documents, indexed in CLAUDE.md section 12
+docs/           the design documents. REQUIREMENTS.md is the traceability matrix
 apps/target/    the fixture application
 src/            the system
 ```
