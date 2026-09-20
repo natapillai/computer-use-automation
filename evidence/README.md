@@ -4,6 +4,7 @@ One line per directory, and the one file worth opening in each.
 
 | Directory | What it is | Open this |
 | --- | --- | --- |
+| `discovery/run_1e1026f5` | The only run where a person operated the live session rather than deciding about it. | `humanActions.jsonl`, one navigate and five clicks, one of which carries the locator bundle derived from what they touched |
 | `discovery/run_e5b46f88` | The live write that opened an account, approved on the console. | `captures/decision-01.png`, the screen the approver was looking at when they decided |
 | `discovery/run_666b7c9f` | The same write with the approval refused. | `captures/final.png`, still on the form rather than a confirmation, which is what says the submit never happened |
 | `discovery/run_84705a0a` | The live read discovery, on the fixed pipeline. This is the one the README and `REPORT.md` point at. | `transcript.jsonl`, five model calls with every observation the model was given, redacted |
@@ -18,7 +19,19 @@ One line per directory, and the one file worth opening in each.
 | `replay/escalated/run_d4553686` | `surpriseDialog` on the search, nobody claimed it. | `captures/intervention-01.png`, the dialog still open with its OK button never pressed |
 | `replay/failure/run_9dab6126` | The core banking service stopped answering on the member page. | `captures/failure.png`, the screen the run gave up on, beside a result that says which step, what it expected and why nothing was retried |
 
-The escalated run carries no `humanActions.jsonl`, because nobody came. The handoffs a person actually took are in the two write discoveries at the top.
+## Acting rather than deciding
+
+Four of the handoffs here are decisions. A person claimed the session, read the masked screen, and released it with or without an approval. That proves the control transfer and the approval gate, and a sceptical reader is entitled to say it does not prove anybody could have *done* anything.
+
+`discovery/run_1e1026f5-974d-4647-89ab-0f6b6cd0e4f5/` is the one that does. The goal was the sub account write with the route removed, so Claude Sonnet 5 had to find a form that MERIDIAN Core links to from nowhere. It tried for twelve actions, including two navigates that did not work and a click that changed nothing, and `NoProgress` fired. The project owner claimed the session, sent the content frame to the form themselves, clicked into it, and handed it back. The run re observed, found a page it had never reached on its own, filled the form and stopped again for the write, which they approved.
+
+`humanActions.jsonl` is the record. It carries the navigate, with the path written as `/member/{{inputs.memberId}}/subaccount` rather than the value they typed, and five clicks. One click landed on a real control and carries the locator bundle the recorder derived from it, three ranked strategies and a match policy, the same shape the model's own actions produce. The rest landed on nothing and say so. Nothing in the file carries a typed value.
+
+`captures/decision-01.png` is the screen at the moment they released, showing the empty form, which is what says the navigate moved the live session rather than opening a new one. `captures/decision-02.png` is the screen at the approval, with the account type and the amount the run filled in between.
+
+Seventeen model calls and fifteen actions, against six and four for the same goal when the goal named the route. That difference is what a person cost and what they were worth. No capability was written, because a run somebody rescued does not become an artifact, and that rule is why this directory holds the whole episode and no `artifact.json`.
+
+The escalated replay carries no `humanActions.jsonl`, because nobody came.
 
 The failure run is the richer signal on a hard failure. The result names the step, what it expected and what it observed, and the capture is the page that produced it, which is the part a structured result cannot carry. The step that failed is the one that is not idempotent, so the run refused to retry a load it could not prove was safe to repeat, and the result says so rather than leaving a reader to work it out.
 

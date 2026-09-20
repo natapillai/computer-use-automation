@@ -26,7 +26,7 @@ A capability is typed, versioned, parameterized and decoupled from the transcrip
 
 No model is constructed on the replay path and a test proves it transitively. Every wait is a bounded condition raced against the surface, never a sleep. All four result shapes carry `recoveries`, `interventions` and `drift` even when nothing happened.
 
-Thirteen hard failure classes stay separate from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts, and reported even on success. A capability that only works on the second attempt is a fact about the surface, and hiding it is how a degrading system looks healthy until it is not.
+Thirteen hard failure classes stay separate from business outcomes, recoverable conditions and escalations. A transient 502 or 503 on an idempotent step is recovered by asking for the failed response again, bounded at three attempts, reported even on success. A capability that only works on the second attempt is a fact about the surface, and hiding it is how a degrading system looks healthy until it is not.
 
 One finding would have been an incident. A locator bundle is a ladder, and a strategy matching two elements was treated like one matching none, so a lower ranked strategy resolved one. Two rows showing the same member number make that a fifty fifty guess about whose account to open, reported as success. It now ends resolution as `LocatorAmbiguous`. Falling through is the alternative, more robust against drift and less safe against ambiguity, and they have opposite fixes, so one channel means the dangerous case arrives dressed as the routine one.
 
@@ -36,23 +36,23 @@ Five times a test passed while the real path was broken, each driving the layer 
 
 ## 4. Heterogeneity & multi-tenant
 
-The desktop surface is a stub, and the stub is where the design is argued rather than asserted. It satisfies the interface, refuses every method by name, and carries a documented UI Automation mapping for every verb in the vocabulary. Writing that mapping is what made it worth having. The vocabulary needed nothing added and the only change is where geometry comes from. A `BoundingRectangle` behaves like a layout box, so the anchor relative relations carry over unchanged, which is the part of the locator design that would have been expensive to get wrong.
+The desktop surface is a stub, and the stub is where the design is argued rather than asserted. It satisfies the interface, refuses every method by name, and carries a UI Automation mapping for every verb in the vocabulary. Writing that mapping is what made it worth having. The vocabulary needed nothing added and only the source of geometry changes. A `BoundingRectangle` behaves like a layout box, so the anchor relative relations carry over unchanged, which is the part of the locator design that would have been expensive to get wrong.
 
 Multi tenant reuse is designed and not built. Overlays rebind locators and outputs for one institution and can never touch the contract, so a tenant cannot quietly change what a capability means.
 
-Drift detection is built, because the ladder is already the mechanism. Every resolution a lower ranked strategy wins is reported on the result, naming the strategy that was preferred and the one that worked, so a tenant whose page has moved shows up as a run that succeeded with drift rather than one that broke. That is the signal a fleet would alert on, and an injected relabel produces it live. Managing it is the missing half. Nothing aggregates drift across runs and nothing re records a capability, so a divergence is observed and left to a person. The second tenant is what I would build next, because its differences would force the overlay merge and that aggregation into existence together.
+Drift detection is built, because the ladder is already the mechanism. Every resolution a lower ranked strategy wins is reported on the result, naming the strategy that was preferred and the one that worked, so a tenant whose page has moved shows up as a run that succeeded with drift rather than one that broke. That is the signal a fleet would alert on, and an injected relabel produces it live. Managing it is the missing half. Nothing aggregates drift across runs or re records a capability, so a divergence is observed and left to a person. The second tenant is what I would build next, because its differences would force the overlay merge and that aggregation into existence together.
 
 ## 5. Escalation & handoff
 
-Four triggers stop a run: no progress across consecutive actions, a dialog nobody has classified, the model asking, and a policy confirmation on a write, the one where nothing is wrong and the run may not submit alone.
+Four triggers stop a run: no progress across consecutive actions, a dialog nobody has classified, the model asking, and a policy confirmation on a write, where nothing is wrong and the run may not submit alone.
 
 Control is a state machine over one live session with fencing tokens. One holder is valid at a time and the token rotates on every transition, so a run that lost control cannot assume anything about a page somebody else changed. The run hosts the console itself, the honest consequence of one process and a filesystem.
 
 A claimed operator sees a masked screenshot of the live page and can click it, type into it, and send a frame to a path, the last because clicking cannot reach a page nothing links to.
 
-Coming back is a ladder rather than a resume. The run re observes and asks in order for the capability's success condition, a declared outcome, the step's postcondition, an approval, then the precondition. Approving one action is deliberately not finishing the run, because nothing here turns human actions into steps. An approved run produces its artifact and a run somebody finished by hand does not.
+Coming back is a ladder rather than a resume. The run re observes and asks in order for the capability's success condition, a declared outcome, the step's postcondition, an approval, then the precondition. Approving one action is deliberately not finishing the run, because nothing here turns human actions into steps. An approved run produces its artifact and one somebody finished by hand does not.
 
-Evidence survives the crossing both ways. The screen and the tree a person was shown are written before they are asked, so the intervention points at files that exist, and what they did to the session is appended as its own record, the path they typed templated like any other value.
+Evidence survives the crossing both ways. The screen and tree a person was shown are written before they are asked, and what they did to the session is appended as its own record, the path they typed templated like any other value.
 
 ## 6. Safety
 
@@ -61,16 +61,16 @@ Five controls, each doing one thing.
 * An allowlist of origins and paths, checked before every action and request.
 * An app profile classifying each route by effect and idempotency, enforced per step by a guard that refuses a write under a step declared a read.
 * Redaction at the sink rather than the call site, so nothing written carries a value.
-* A canary scanner that fails the suite if a seeded value reaches evidence, a capability or a cassette. It caught the last one.
+* A canary scanner that fails the suite if a seeded value reaches evidence, a capability or a cassette.
 * Human confirmation on every write, unless the capability is approved and declares unattended replay.
 
 The write flag is worth explaining. Nothing in an accessibility tree says whether a cell submits a form, and inferring it from button text is the regex over button names the design rejects. So the model declares it, and the declaration cannot be a bypass either way. Declaring a write sends it to a person. Omitting it leaves the step a read, and the guard refuses the request the profile calls a write. A test proves the omitted case.
 
-The approval gate found its own defect the first time it was used in anger. Approving the live write, the operator could not say which member the change was for. The screen masks the number and the name, the trace holds a template, and the console showed the goal unresolved. The only place the value existed was the command they had typed, so the approval rested on reasoning rather than observation.
+The approval gate found its own defect the first time it was used in anger. Approving the live write, the operator could not say which member the change was for. The screen masks the number and the name, the trace holds a template, and the console showed the goal unresolved. The only place the value existed was the command they typed, so the approval rested on reasoning rather than observation.
 
-The rule was right and it was serving two audiences. A log, an artifact and a stored capture are read later by people with no business knowing which member a run touched, so they hold a template. A claimed operator is being asked one question and cannot answer it without the subject. One rule covered both. A claimed operator now sees the resolved inputs in the console behind the same control token, and nothing written down carries them, including the capture taken at the moment they decide. The test that holds it there is a sufficiency test rather than a masking one, because an approval view must present enough to identify the subject and nothing before the session is claimed.
+The rule was right and it was serving two audiences. A log, an artifact and a stored capture are read later by people with no business knowing which member a run touched, so they hold a template. A claimed operator is being asked one question and cannot answer it without the subject. One rule covered both. A claimed operator now sees the resolved inputs in the console behind the same control token, and nothing written down carries them, including the capture taken as they decide. The test holding it there is a sufficiency test rather than a masking one, because an approval view must present enough to identify the subject and nothing before the session is claimed.
 
-The limits. It catches seeded values and patterns, not a value it has never seen, and name redaction depends on the profile's field map. The operator is trusted, so their actions give audit after the fact rather than prevention.
+The scanner has earned its place. It caught replay writing a raw member id into a snapshot, committed for days, past patterns that never match five digits. Its limits are real. It catches seeded values and patterns, not a value it has never seen, and name redaction depends on the profile's field map. The operator is trusted, so their actions give audit rather than prevention.
 
 ## 7. Cuts
 

@@ -1,0 +1,1149 @@
+{
+  "root": {
+    "ref": "e1",
+    "role": "generic",
+    "name": "",
+    "state": {
+      "disabled": false,
+      "visible": true,
+      "focused": false
+    },
+    "framePath": [],
+    "box": {
+      "x": 0,
+      "y": 0,
+      "width": 1024,
+      "height": 700
+    },
+    "clickableHint": false,
+    "children": [
+      {
+        "ref": "e2",
+        "role": "iframe",
+        "name": "",
+        "state": {
+          "disabled": false,
+          "visible": true,
+          "focused": false
+        },
+        "framePath": [],
+        "box": {
+          "x": 0,
+          "y": 0,
+          "width": 1024,
+          "height": 26
+        },
+        "clickableHint": false,
+        "children": [
+          {
+            "ref": "f1e2",
+            "role": "table",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": false
+            },
+            "framePath": [
+              "status"
+            ],
+            "box": {
+              "x": 6,
+              "y": 3,
+              "width": 1012,
+              "height": 19
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f1e3",
+                "role": "rowgroup",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "status"
+                ],
+                "box": {
+                  "x": 6,
+                  "y": 3,
+                  "width": 1012,
+                  "height": 19
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f1e4",
+                    "role": "row",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "status"
+                    ],
+                    "box": {
+                      "x": 6,
+                      "y": 3,
+                      "width": 1012,
+                      "height": 19
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f1e5",
+                        "role": "cell",
+                        "name": "MERIDIAN Core 9.4.2",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "status"
+                        ],
+                        "box": {
+                          "x": 6,
+                          "y": 3,
+                          "width": 482,
+                          "height": 19
+                        },
+                        "clickableHint": false,
+                        "children": []
+                      },
+                      {
+                        "ref": "f1e6",
+                        "role": "cell",
+                        "name": "Session active 09:00:00",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "status"
+                        ],
+                        "box": {
+                          "x": 488,
+                          "y": 3,
+                          "width": 530,
+                          "height": 19
+                        },
+                        "clickableHint": false,
+                        "children": []
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "ref": "e3",
+        "role": "generic",
+        "name": "",
+        "state": {
+          "disabled": false,
+          "visible": true,
+          "focused": false
+        },
+        "framePath": [],
+        "box": {
+          "x": 0,
+          "y": 27,
+          "width": 1024,
+          "height": 673
+        },
+        "clickableHint": false,
+        "children": [
+          {
+            "ref": "e4",
+            "role": "iframe",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": false
+            },
+            "framePath": [],
+            "box": {
+              "x": 0,
+              "y": 27,
+              "width": 170,
+              "height": 673
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f2e2",
+                "role": "table",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "nav"
+                ],
+                "box": {
+                  "x": 4,
+                  "y": 4,
+                  "width": 162,
+                  "height": 92
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f2e3",
+                    "role": "rowgroup",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "nav"
+                    ],
+                    "box": {
+                      "x": 4,
+                      "y": 4,
+                      "width": 162,
+                      "height": 92
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f2e4",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 4,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e5",
+                            "role": "cell",
+                            "name": "SERVICING",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 4,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e6",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 27,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e7",
+                            "role": "cell",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 27,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f2e8",
+                                "role": "link",
+                                "name": "Member Search",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "nav"
+                                ],
+                                "box": {
+                                  "x": 6,
+                                  "y": 29,
+                                  "width": 110,
+                                  "height": 19
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e9",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 50,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e10",
+                            "role": "cell",
+                            "name": "Transactions",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 50,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      },
+                      {
+                        "ref": "f2e11",
+                        "role": "row",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "nav"
+                        ],
+                        "box": {
+                          "x": 4,
+                          "y": 73,
+                          "width": 162,
+                          "height": 23
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f2e12",
+                            "role": "cell",
+                            "name": "Reports",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "nav"
+                            ],
+                            "box": {
+                              "x": 4,
+                              "y": 73,
+                              "width": 162,
+                              "height": 23
+                            },
+                            "clickableHint": false,
+                            "children": []
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "ref": "e5",
+            "role": "iframe",
+            "name": "",
+            "state": {
+              "disabled": false,
+              "visible": true,
+              "focused": false
+            },
+            "framePath": [],
+            "box": {
+              "x": 171,
+              "y": 27,
+              "width": 853,
+              "height": 673
+            },
+            "clickableHint": false,
+            "children": [
+              {
+                "ref": "f3e1",
+                "role": "generic",
+                "name": "",
+                "state": {
+                  "disabled": false,
+                  "visible": true,
+                  "focused": false
+                },
+                "framePath": [
+                  "content"
+                ],
+                "box": {
+                  "x": 8,
+                  "y": 8,
+                  "width": 837,
+                  "height": 654
+                },
+                "clickableHint": false,
+                "children": [
+                  {
+                    "ref": "f3e2",
+                    "role": "heading",
+                    "name": "Open Sub Account",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 8,
+                      "width": 837,
+                      "height": 17
+                    },
+                    "clickableHint": false,
+                    "children": []
+                  },
+                  {
+                    "ref": "f3e3",
+                    "role": "table",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 33,
+                      "width": 227,
+                      "height": 50
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f3e4",
+                        "role": "rowgroup",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "content"
+                        ],
+                        "box": {
+                          "x": 8,
+                          "y": 33,
+                          "width": 227,
+                          "height": 50
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f3e5",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 33,
+                              "width": 227,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e6",
+                                "role": "cell",
+                                "name": "Member No:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 33,
+                                  "width": 96,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e7",
+                                "role": "cell",
+                                "name": "{{inputs.memberId}}",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 104,
+                                  "y": 33,
+                                  "width": 131,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e8",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 58,
+                              "width": 227,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e9",
+                                "role": "cell",
+                                "name": "Name:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 58,
+                                  "width": 96,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e10",
+                                "role": "cell",
+                                "name": "[redacted:pii]",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 104,
+                                  "y": 58,
+                                  "width": 131,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  },
+                  {
+                    "ref": "f3e12",
+                    "role": "table",
+                    "name": "",
+                    "state": {
+                      "disabled": false,
+                      "visible": true,
+                      "focused": false
+                    },
+                    "framePath": [
+                      "content"
+                    ],
+                    "box": {
+                      "x": 8,
+                      "y": 83,
+                      "width": 266,
+                      "height": 85
+                    },
+                    "clickableHint": false,
+                    "children": [
+                      {
+                        "ref": "f3e13",
+                        "role": "rowgroup",
+                        "name": "",
+                        "state": {
+                          "disabled": false,
+                          "visible": true,
+                          "focused": false
+                        },
+                        "framePath": [
+                          "content"
+                        ],
+                        "box": {
+                          "x": 8,
+                          "y": 83,
+                          "width": 266,
+                          "height": 85
+                        },
+                        "clickableHint": false,
+                        "children": [
+                          {
+                            "ref": "f3e29",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 83,
+                              "width": 266,
+                              "height": 25
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e15",
+                                "role": "cell",
+                                "name": "Account Type:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 83,
+                                  "width": 134,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e30",
+                                "role": "cell",
+                                "name": "{{inputs.accountType}}",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 142,
+                                  "y": 83,
+                                  "width": 133,
+                                  "height": 25
+                                },
+                                "clickableHint": false,
+                                "children": [
+                                  {
+                                    "ref": "f3e17",
+                                    "role": "combobox",
+                                    "name": "",
+                                    "value": "{{inputs.accountType}}",
+                                    "state": {
+                                      "disabled": false,
+                                      "visible": true,
+                                      "focused": false
+                                    },
+                                    "framePath": [
+                                      "content"
+                                    ],
+                                    "box": {
+                                      "x": 145,
+                                      "y": 86,
+                                      "width": 98,
+                                      "height": 19
+                                    },
+                                    "clickableHint": false,
+                                    "children": [
+                                      {
+                                        "ref": "f3e17~0",
+                                        "role": "option",
+                                        "name": "Select",
+                                        "state": {
+                                          "disabled": false,
+                                          "visible": false,
+                                          "focused": false
+                                        },
+                                        "framePath": [
+                                          "content"
+                                        ],
+                                        "box": {
+                                          "x": 0,
+                                          "y": 0,
+                                          "width": 0,
+                                          "height": 0
+                                        },
+                                        "clickableHint": false,
+                                        "children": []
+                                      },
+                                      {
+                                        "ref": "f3e17~1",
+                                        "role": "option",
+                                        "name": "Savings",
+                                        "state": {
+                                          "disabled": false,
+                                          "visible": false,
+                                          "focused": false
+                                        },
+                                        "framePath": [
+                                          "content"
+                                        ],
+                                        "box": {
+                                          "x": 0,
+                                          "y": 0,
+                                          "width": 0,
+                                          "height": 0
+                                        },
+                                        "clickableHint": false,
+                                        "children": []
+                                      },
+                                      {
+                                        "ref": "f3e17~2",
+                                        "role": "option",
+                                        "name": "Checking",
+                                        "state": {
+                                          "disabled": false,
+                                          "visible": false,
+                                          "focused": false
+                                        },
+                                        "framePath": [
+                                          "content"
+                                        ],
+                                        "box": {
+                                          "x": 0,
+                                          "y": 0,
+                                          "width": 0,
+                                          "height": 0
+                                        },
+                                        "clickableHint": false,
+                                        "children": []
+                                      },
+                                      {
+                                        "ref": "f3e17~3",
+                                        "role": "option",
+                                        "name": "{{inputs.accountType}}",
+                                        "state": {
+                                          "disabled": false,
+                                          "visible": false,
+                                          "focused": false
+                                        },
+                                        "framePath": [
+                                          "content"
+                                        ],
+                                        "box": {
+                                          "x": 0,
+                                          "y": 0,
+                                          "width": 0,
+                                          "height": 0
+                                        },
+                                        "clickableHint": false,
+                                        "children": []
+                                      }
+                                    ],
+                                    "derivedLabel": "Account Type:"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e31",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 108,
+                              "width": 266,
+                              "height": 27
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e19",
+                                "role": "cell",
+                                "name": "Opening Amount:",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 108,
+                                  "width": 134,
+                                  "height": 27
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e32",
+                                "role": "cell",
+                                "name": "",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 142,
+                                  "y": 108,
+                                  "width": 133,
+                                  "height": 27
+                                },
+                                "clickableHint": false,
+                                "children": [
+                                  {
+                                    "ref": "f3e21",
+                                    "role": "textbox",
+                                    "name": "",
+                                    "value": "{{inputs.openingAmount}}",
+                                    "state": {
+                                      "disabled": false,
+                                      "visible": true,
+                                      "focused": true
+                                    },
+                                    "framePath": [
+                                      "content"
+                                    ],
+                                    "box": {
+                                      "x": 145,
+                                      "y": 111,
+                                      "width": 121,
+                                      "height": 21
+                                    },
+                                    "clickableHint": false,
+                                    "children": [],
+                                    "derivedLabel": "Opening Amount:"
+                                  }
+                                ]
+                              }
+                            ]
+                          },
+                          {
+                            "ref": "f3e22",
+                            "role": "row",
+                            "name": "",
+                            "state": {
+                              "disabled": false,
+                              "visible": true,
+                              "focused": false
+                            },
+                            "framePath": [
+                              "content"
+                            ],
+                            "box": {
+                              "x": 8,
+                              "y": 135,
+                              "width": 266,
+                              "height": 33
+                            },
+                            "clickableHint": false,
+                            "children": [
+                              {
+                                "ref": "f3e23",
+                                "role": "cell",
+                                "name": "",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 8,
+                                  "y": 135,
+                                  "width": 134,
+                                  "height": 33
+                                },
+                                "clickableHint": false,
+                                "children": []
+                              },
+                              {
+                                "ref": "f3e24",
+                                "role": "cell",
+                                "name": "",
+                                "state": {
+                                  "disabled": false,
+                                  "visible": true,
+                                  "focused": false
+                                },
+                                "framePath": [
+                                  "content"
+                                ],
+                                "box": {
+                                  "x": 142,
+                                  "y": 135,
+                                  "width": 133,
+                                  "height": 33
+                                },
+                                "clickableHint": false,
+                                "children": [
+                                  {
+                                    "ref": "f3e25",
+                                    "role": "table",
+                                    "name": "",
+                                    "state": {
+                                      "disabled": false,
+                                      "visible": true,
+                                      "focused": false
+                                    },
+                                    "framePath": [
+                                      "content"
+                                    ],
+                                    "box": {
+                                      "x": 145,
+                                      "y": 138,
+                                      "width": 127,
+                                      "height": 27
+                                    },
+                                    "clickableHint": false,
+                                    "children": [
+                                      {
+                                        "ref": "f3e26",
+                                        "role": "rowgroup",
+                                        "name": "",
+                                        "state": {
+                                          "disabled": false,
+                                          "visible": true,
+                                          "focused": false
+                                        },
+                                        "framePath": [
+                                          "content"
+                                        ],
+                                        "box": {
+                                          "x": 145,
+                                          "y": 138,
+                                          "width": 127,
+                                          "height": 27
+                                        },
+                                        "clickableHint": false,
+                                        "children": [
+                                          {
+                                            "ref": "f3e27",
+                                            "role": "row",
+                                            "name": "",
+                                            "state": {
+                                              "disabled": false,
+                                              "visible": true,
+                                              "focused": false
+                                            },
+                                            "framePath": [
+                                              "content"
+                                            ],
+                                            "box": {
+                                              "x": 145,
+                                              "y": 138,
+                                              "width": 127,
+                                              "height": 27
+                                            },
+                                            "clickableHint": false,
+                                            "children": [
+                                              {
+                                                "ref": "f3e28",
+                                                "role": "cell",
+                                                "name": "Open Account",
+                                                "state": {
+                                                  "disabled": false,
+                                                  "visible": true,
+                                                  "focused": false
+                                                },
+                                                "framePath": [
+                                                  "content"
+                                                ],
+                                                "box": {
+                                                  "x": 145,
+                                                  "y": 138,
+                                                  "width": 127,
+                                                  "height": 27
+                                                },
+                                                "clickableHint": true,
+                                                "children": []
+                                              }
+                                            ]
+                                          }
+                                        ]
+                                      }
+                                    ]
+                                  }
+                                ]
+                              }
+                            ]
+                          }
+                        ]
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "frames": [
+    {
+      "framePath": [],
+      "url": "http://localhost:4010/servicing",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "status"
+      ],
+      "url": "http://localhost:4010/servicing/status",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "nav"
+      ],
+      "url": "http://localhost:4010/servicing/nav",
+      "lastStatus": 200
+    },
+    {
+      "framePath": [
+        "content"
+      ],
+      "url": "http://localhost:4010/member/{{inputs.memberId}}/subaccount",
+      "lastStatus": 200
+    }
+  ],
+  "dialogOpen": false
+}

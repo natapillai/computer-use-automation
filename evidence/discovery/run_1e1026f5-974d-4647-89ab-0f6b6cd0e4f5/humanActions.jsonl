@@ -1,0 +1,6 @@
+{"at":"2026-09-20T22:27:36.956Z","kind":"navigate","target":null,"url":"http://localhost:4010/servicing","path":"/member/{{inputs.memberId}}/subaccount","framePath":["content"]}
+{"at":"2026-09-20T22:28:10.074Z","kind":"click","target":null,"url":"http://localhost:4010/servicing"}
+{"at":"2026-09-20T22:28:10.581Z","kind":"click","target":{"describedAs":"cell Select","bundle":{"framePath":["content"],"strategies":[{"kind":"role-name","role":"cell","name":"Select","exact":true,"confidence":0.9},{"kind":"anchor-relative","anchor":{"kind":"text","text":"Account Type:","exact":true,"confidence":0.75},"relation":"rightOf","role":"cell","confidence":0.75},{"kind":"text","text":"Select","exact":true,"confidence":0.7}],"matchPolicy":"unique","describedAs":"cell Select"}},"url":"http://localhost:4010/servicing"}
+{"at":"2026-09-20T22:28:11.008Z","kind":"click","target":null,"url":"http://localhost:4010/servicing"}
+{"at":"2026-09-20T22:28:12.073Z","kind":"click","target":null,"url":"http://localhost:4010/servicing"}
+{"at":"2026-09-20T22:28:39.714Z","kind":"click","target":null,"url":"http://localhost:4010/servicing"}

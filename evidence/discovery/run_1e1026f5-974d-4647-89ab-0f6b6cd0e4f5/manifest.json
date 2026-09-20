@@ -1,0 +1,109 @@
+{
+  "runId": "run_1e1026f5-974d-4647-89ab-0f6b6cd0e4f5",
+  "phase": "discovery",
+  "startedAt": "2026-09-20T22:21:53.937Z",
+  "endedAt": "2026-09-20T22:30:12.768Z",
+  "capability": null,
+  "goal": "open a {{inputs.accountType}} sub account for the member whose member ID is {{inputs.memberId}}, with an opening amount of {{inputs.openingAmount}}. Record the suffix the system assigns as the output suffix.",
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "done",
+    "code": "HumanCompleted",
+    "summary": "The model finished and no capability was written, HumanCompleted."
+  },
+  "counts": {
+    "steps": 0,
+    "modelCalls": 17,
+    "actions": 15,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 2
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "trace.jsonl",
+      "kind": "trace",
+      "description": "Every observation, decision, authorization, action and derivation of the run"
+    },
+    {
+      "path": "captures/step-00-initial.png",
+      "kind": "screenshot",
+      "description": "The initial screen with member data masked"
+    },
+    {
+      "path": "captures/step-00-initial.a11y.json",
+      "kind": "snapshot",
+      "description": "The initial accessibility tree with member data masked"
+    },
+    {
+      "path": "transcript.jsonl",
+      "kind": "transcript",
+      "description": "The model exchange, redacted"
+    },
+    {
+      "path": "captures/intervention-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was shown at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/intervention-01.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree a person was shown at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/decision-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was looking at when they answered handoff 1"
+    },
+    {
+      "path": "captures/intervention-02.png",
+      "kind": "screenshot",
+      "description": "The screen a person was shown at handoff 2, with member data masked"
+    },
+    {
+      "path": "captures/intervention-02.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree a person was shown at handoff 2, with member data masked"
+    },
+    {
+      "path": "captures/decision-02.png",
+      "kind": "screenshot",
+      "description": "The screen a person was looking at when they answered handoff 2"
+    },
+    {
+      "path": "captures/final.png",
+      "kind": "screenshot",
+      "description": "The final screen with member data masked"
+    },
+    {
+      "path": "captures/final.a11y.json",
+      "kind": "snapshot",
+      "description": "The final accessibility tree with member data masked"
+    },
+    {
+      "path": "humanActions.jsonl",
+      "kind": "humanActions",
+      "description": "What a person did while they held the session"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": "claude-sonnet-5",
+    "promptVersion": "1.0.0"
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {
+      "known": 8
+    }
+  }
+}
