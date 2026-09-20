@@ -19,6 +19,21 @@ describe('artifactJsonSchema', () => {
     const properties = Reflect.get(schema, 'properties');
     expect(Object.keys(properties as object)).toEqual(expect.arrayContaining(['id', 'version', 'steps', 'outputs', 'outcomes', 'policy', 'lifecycle']));
   });
+
+  it('matches the copy committed at docs/capability.schema.json, so a reader has it without running anything', async () => {
+    const { readFile } = await import('node:fs/promises');
+
+    // The committed copy is what a reviewer or a calling agent actually opens, and a generated
+    // file nobody regenerates is a stale file. This fails the moment the schema moves, which is
+    // the only thing that keeps the two the same. It is not written beside the artifacts,
+    // because Zod emits Number.MAX_SAFE_INTEGER as an integer bound and seventeen digits trip
+    // the evidence scanner's account number rule. Loosening that rule to publish a convenience
+    // file is the wrong way round.
+    const committed = await readFile('docs/capability.schema.json', 'utf8');
+
+    expect(committed).toBe(`${JSON.stringify(artifactJsonSchema(), null, 2)}
+`);
+  });
 });
 
 describe('toolFor', () => {
