@@ -280,7 +280,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
         throw new Stop(successResult(base(), outputs));
       }
       case 'outcome':
-        throw businessOutcome(resumption.code);
+        throw await businessOutcome(resumption.code);
       case 'satisfiedByHuman':
         return;
       case 'approved':
@@ -421,12 +421,42 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
     }
   };
 
-  const businessOutcome = (code: string): Stop => {
+  // An outcome may declare fields, each read from the page by its own derived bundle exactly
+  // as an output is. That is what makes a refusal a typed result rather than a sentence a
+  // caller has to parse. A declared field that cannot be read fails the run, because a result
+  // that silently drops half of what it promised is worse than one that says it could not.
+  const businessOutcome = async (code: string): Promise<Stop> => {
     const declared = capability.outcomes.find((outcome) => outcome.code === code);
     if (declared === undefined) {
       return fail({ class: 'Internal', expected: `Outcome ${code} is declared by the capability.`, observed: `Outcome ${code} fired but is not declared.`, retryable: false });
     }
-    return new Stop(businessOutcomeResult(base(), { code: declared.code, description: declared.description, terminal: declared.terminal }));
+
+    const data: Record<string, TypedValue> = {};
+    if (declared.data !== undefined && declared.data.length > 0) {
+      const observation = await surface.observe();
+      for (const spec of declared.data) {
+        const target = templated(templateBundle(spec.source.target, values(), allowedEnv), `the source of ${declared.code} field ${spec.name}`);
+        const extraction = await extractOutput(spec, target, observation, surface);
+        if (extraction.ok) data[spec.name] = extraction.value;
+        else if (spec.required) {
+          return fail({
+            class: 'OutputUnresolvable',
+            expected: `${declared.code} declares ${spec.name}, which can be read from ${target.describedAs}.`,
+            observed: extraction.reason,
+            retryable: false,
+          });
+        }
+      }
+    }
+
+    return new Stop(
+      businessOutcomeResult(base(), {
+        code: declared.code,
+        description: declared.description,
+        terminal: declared.terminal,
+        ...(Object.keys(data).length === 0 ? {} : { data }),
+      }),
+    );
   };
 
   // Asking for a response again. A frame is sent to the url it is already on, which goes
@@ -537,7 +567,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
 
     const { entrant } = settled;
     if (entrant.kind === 'outcome' || (entrant.kind === 'rule' && entrant.classify === 'business_outcome')) {
-      throw businessOutcome(entrant.code);
+      throw await businessOutcome(entrant.code);
     }
     // A transient load is a response that failed, so the recovery is to ask for that response
     // again. Repeating the action would be wrong here. An action that navigates cannot be
@@ -578,7 +608,7 @@ export async function replay(capability: Capability, supplied: Readonly<Record<s
         throw fail({ class: 'CheckpointFailed', expected: step.postcondition.description, observed: 'The step did not reach its postcondition after the surface recovered.', retryable: false });
       }
       if (settled.entrant.kind === 'outcome' || (settled.entrant.kind === 'rule' && settled.entrant.classify === 'business_outcome')) {
-        throw businessOutcome(settled.entrant.code);
+        throw await businessOutcome(settled.entrant.code);
       }
     }
     const decided = settled.kind === 'fired' ? settled.entrant : entrant;

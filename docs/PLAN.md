@@ -165,10 +165,10 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
 * [x] **S5-T05** Fault arming, `surpriseDialog`, and `UnexpectedDialog` escalation.
   * Accept: `POST /__control__/fault` arms a route scoped fault with a count. `surpriseDialog` renders an HTML modal. A native dialog handler is registered that neither accepts nor dismisses. An unexpected dialog is escalated and never clicked.
   * Test: integration, no click dispatched, a screenshot captured, and an intervention raised.
-* [ ] **S5-T06** Sub account write flow, `flaky503`, and `member.openSubAccount`.
+* [x] **S5-T06** Sub account write flow, `flaky503`, and `member.openSubAccount`.
   * Accept: the form, field validation and confirmation screen in the app. A discovery run that the request permits to write is offered a `submits` flag, which raises the step's effect and sends it to a person before it reaches the surface. The capability confirms during a draft replay and runs unattended once approved with `allowUnattendedReplay`. The submit is not idempotent, so a 503 on it is never retried and the run ends as `SurfaceUnavailable` marked retryable, with exactly one submission recorded by the app. An invalid opening amount returns a field error, declared as a business outcome carrying its message as structured data.
   * Test: integration, an undeclared write refused by the network guard, confirm then proceed, approved and unattended, exactly one submission under `flaky503` on the submit, and an invalid amount returned as `business_outcome`.
-  * Done so far: the app flow, the discovery write path and its handback, and the whole thread through the discover command in `tests/integration/discoverWrite.command.test.ts`. What remains is the live run and the replay tests against the artifact it produces.
+  * Note: the live run produced `capabilities/member.openSubAccount@1.0.0.json`, and the four replay rows in `tests/integration/resultMatrix.test.ts` run against that artifact rather than a hand written one. Declaring the field message as structured data needed the executor to read an outcome's declared `data` specs, which the schema and the redaction projection already carried and nothing populated.
 * [x] **S5-T07** Full handoff cycle, the operator console hosted by both CLIs. **Gate, Skeleton 3.**
   * Accept: `npm run replay` hosts the console on :4020 and `npm run discover` on :4021, for as long as the run lives. A run that stops prints the intervention URL on stderr and waits there. The headless operator is given that URL and nothing else, and drives claim, screenshot, a forwarded click on the live session and release over HTTP. The result carries every episode in `interventions[]`, the screen and tree a person was shown are filed as evidence, and what they did is in `humanActions.jsonl`.
   * Test: integration, `tests/integration/handoff.test.ts`, the resumed cycle and the aborted one.
@@ -190,11 +190,11 @@ Ends at gate S5-T07, where a human takes the live session, acts, hands back, and
   * Accept: `ReplayResult` always carries `recoveries`, `interventions` and `drift`, including on success. `src/replay` imports no model client.
   * Test: unit, `src/core/outcome/result.test.ts` covers all four result shapes carrying the three arrays, `src/replay/executor.test.ts` covers a successful run reporting its retries, and `src/replay/imports.test.ts` walks the graph transitively.
   * Note: the import walk was mutation checked by adding a model import three levels deep, in `src/core/outcome/result.ts`, and it failed.
-* [x] **S6-T04** The result matrix, the nine rows that do not need the write capability.
+* [x] **S6-T04** The result matrix.
   * Accept: one integration test per row of `docs/ERROR_TAXONOMY.md` section 8. `relabel` carries drift and is reported as a success with a drift record.
   * Test: integration, `tests/integration/resultMatrix.test.ts`, each row asserts its exact status and code.
   * Note: building it found three defects. ADR 0019, where an ambiguous strategy was rescued by a lower ranked one. The recovery retried the action rather than the failed load, which cannot work for a step that navigates. And focus was in the fingerprint, so every click looked like the page had changed and a hang read as `CheckpointFailed` rather than `Timeout`.
-  * [ ] The four write rows, which need `member.openSubAccount` from the live run. Not skipped in the file, because a skipped test reads as a passing one.
+  * Note: thirteen of the fourteen rows are here. Ambiguous locator, action needs a second matching control on the page, which no fault produces, and `tests/contract/surfaceDriver.contract.ts` proves it against this same Playwright driver.
 
 ---
 

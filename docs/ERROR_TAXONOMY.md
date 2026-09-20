@@ -199,7 +199,7 @@ The one sanctioned delay is `Clock.delay`, which exists for retry backoff, is in
 
 ## 8. Test matrix
 
-Every row is an integration test against the local target app, collected in S6-T04 and first proven by the task named in the last column. Faults are armed through `POST /__control__/fault` with a route scope and a count, never by a query parameter, because replay controls its own URLs and a fault that fires on an unspecified first request is a coin toss rather than a test.
+Every row but one is an integration test against the local target app, collected in S6-T04 and first proven by the task named in the last column. Ambiguous locator, action is the exception. It needs a second matching control on the page, which no fault produces, so the driver contract suite proves it against the same Playwright driver instead. Faults are armed through `POST /__control__/fault` with a route scope and a count, never by a query parameter, because replay controls its own URLs and a fault that fires on an unspecified first request is a coin toss rather than a test.
 
 | Scenario | Injection | Expected result | First proven |
 | --- | --- | --- | --- |
