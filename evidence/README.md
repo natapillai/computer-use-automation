@@ -4,7 +4,25 @@ Two live discovery runs are kept on purpose. `discovery/run_56fc6b06-577b-4f04-8
 
 The pair is the point. The first run is the evidence path being exercised rather than asserted, because the system's own output is what surfaced the defects, and keeping it costs a reader nothing while replacing it silently would have cost the proof.
 
-S8-T03 expands this file with a line per directory and the single most interesting file in each.
+## Where to look
+
+One line per directory, and the one file worth opening in each.
+
+| Directory | What it is | Open this |
+| --- | --- | --- |
+| `discovery/run_84705a0a` | The live read discovery, on the fixed pipeline. This is the one the README and `REPORT.md` point at. | `transcript.jsonl`, five model calls with every observation the model was given, redacted |
+| `discovery/run_56fc6b06` | The first live read discovery, kept unedited. | `log.jsonl`, which carries both defects the run found in the system's own output |
+| `discovery/run_e5b46f88` | The live write that opened an account, approved on the console. | `captures/decision-01.png`, the screen the approver was looking at when they decided |
+| `discovery/run_666b7c9f` | The same write with the approval refused. | `captures/final.png`, still on the form rather than a confirmation, which is what says the submit never happened |
+| `discovery/run_adf04d79` | The first live write attempt, which had nowhere to go. | `log.jsonl`, the second intervention raised rather than a failure reported |
+| `discovery/run_dd3f4ee4` | An earlier write attempt ended at the console. | `trace.jsonl`, two interventions in one run |
+| `discovery/run_28c9652e` | A run abandoned before the model acted. | `captures/step-00-initial.png`, the masked first screen |
+| `review/run_be7fd34c` | The negative probe that declared `MEMBER_NOT_FOUND`. | `artifact.diff.json`, exactly what the review added between 1.0.0 and 1.1.0 |
+| `replay/success` | The deterministic thread, no model loaded. | `log.jsonl`, the typed money output and the steps that produced it |
+| `replay/businessOutcome` | The same capability, member `00000`. | `log.jsonl`, a typed outcome and exit code 0 |
+| `replay/escalated` | `surpriseDialog` on the search, nobody claimed it. | `captures/intervention-01.png`, the dialog still open with its OK button never pressed |
+
+The escalated run carries no `humanActions.jsonl`, because nobody came. The handoffs a person actually took are in the two write discoveries above.
 
 ## The write run, 2026-09-18
 

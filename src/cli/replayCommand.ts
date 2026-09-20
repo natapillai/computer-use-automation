@@ -176,7 +176,7 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
         await leased.lease.release();
       }
       // What a person did while they held the session, which never amends the artifact.
-      for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'trace', 'What a person did while they held the session', record);
+      for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'humanActions', 'What a person did while they held the session', record);
     }
   }
 

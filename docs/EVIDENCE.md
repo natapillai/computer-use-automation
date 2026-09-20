@@ -28,9 +28,8 @@ evidence/
   replay/
     success/<runId>/
     businessOutcome/<runId>/             MEMBER_NOT_FOUND
-    escalated/<runId>/                   surpriseDialog, includes the handoff
-      intervention.json
-      humanActions.jsonl
+    escalated/<runId>/                   surpriseDialog, the screen a person was shown
+      humanActions.jsonl                 only when somebody claimed it and acted
 ```
 
 ## 2. The manifest

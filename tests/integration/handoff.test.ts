@@ -203,6 +203,11 @@ describe('the full handoff cycle', { timeout: 120_000 }, () => {
     const actions = await readFile(join(directory, 'humanActions.jsonl'), 'utf8');
     expect(actions).toContain('"kind":"click"');
     expect(actions).toContain('OK');
+
+    // The manifest is the index a person reads first, so what a person did is listed as that
+    // rather than as one more trace file among the machine's own.
+    const manifest = JSON.parse(await readFile(join(directory, 'manifest.json'), 'utf8')) as { files: { path: string; kind: string }[] };
+    expect(manifest.files).toContainEqual(expect.objectContaining({ path: 'humanActions.jsonl', kind: 'humanActions' }));
   });
 
   it('ends the run at once when the person refuses it, and says how the session ended', async () => {

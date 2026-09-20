@@ -299,7 +299,7 @@ export async function runDiscoverCommand(deps: DiscoverCommandDeps): Promise<num
       await leased.lease.release();
     }
     // What a person did while they held the session, which never becomes a step.
-    for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'trace', 'What a person did while they held the session', record);
+    for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'humanActions', 'What a person did while they held the session', record);
   }
 
   // An extracted value is member data, so every later write hides it.

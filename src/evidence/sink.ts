@@ -9,7 +9,7 @@ import type { Clock } from '../runtime/clock.js';
 // arrive already masked, because the unmasked buffer must never exist.
 
 export type EvidencePhase = 'discovery' | 'review' | 'replay';
-export type EvidenceKind = 'log' | 'trace' | 'transcript' | 'artifact' | 'screenshot' | 'snapshot' | 'intervention' | 'humanActions' | 'diff';
+export type EvidenceKind = 'log' | 'trace' | 'transcript' | 'artifact' | 'screenshot' | 'snapshot' | 'humanActions' | 'diff';
 
 export interface ManifestFile {
   readonly path: string;

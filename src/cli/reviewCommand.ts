@@ -334,6 +334,11 @@ export async function runReviewCommand(deps: ReviewCommandDeps): Promise<number>
           evidence: sink.reference,
         };
 
+  // A review of a write is a live session that stops for a person, twice, so what they did
+  // while they held it belongs in this run's evidence exactly as it does for a discovery or a
+  // replay. The records were collected and dropped on the floor before this line.
+  for (const record of humanActions) await sink.appendJsonLine('humanActions.jsonl', 'humanActions', 'What a person did while they held the session', record);
+
   await sink.log(refusal === null ? 'info' : 'error', 'review.finished', { ...summary, evidence: `review/${runId}` });
   await sink.close({
     capability: { id: capability.id, version: declaredVersion ?? capability.version },

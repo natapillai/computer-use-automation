@@ -1,0 +1,55 @@
+{
+  "runId": "run_d4553686-c20b-4f11-8147-4e7cb057b926",
+  "phase": "replay",
+  "startedAt": "2026-09-20T00:11:41.803Z",
+  "endedAt": "2026-09-20T00:12:13.433Z",
+  "capability": {
+    "id": "member.readSavingsBalance",
+    "version": "1.0.0"
+  },
+  "goal": null,
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "escalated",
+    "code": "UnclassifiedCondition",
+    "summary": "Escalated with UnclassifiedCondition."
+  },
+  "counts": {
+    "steps": 3,
+    "modelCalls": 0,
+    "actions": 2,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 1
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "captures/intervention-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was shown at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/intervention-01.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree at handoff 1, with member data masked"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": null,
+    "promptVersion": null
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {}
+  }
+}

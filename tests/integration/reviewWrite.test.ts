@@ -78,7 +78,17 @@ describe('reviewing a capability that writes', { timeout: 180_000 }, () => {
         err.push(text);
         const url = /(http:\/\/\S+\/interventions\/\S+)/.exec(text)?.[1];
         if (url === undefined) return;
-        working = working.then(() => handleIntervention(url, { finish: { release: true, approve: true } }));
+        // The first person to hold the session looks at the screen before approving. A review of
+        // a write is a live session like any other, so what they do has to be on the record.
+        working = working.then(() =>
+          handleIntervention(url, {
+            work: async (session) => {
+              await session.screenshot();
+              await session.press('Shift');
+            },
+            finish: { release: true, approve: true },
+          }),
+        );
       },
       makeStore: (where) => createFileCapabilityStore({ directory: where, redactor }),
       loadProfile: async () => ({ ok: true, profile }),
@@ -120,6 +130,14 @@ describe('reviewing a capability that writes', { timeout: 180_000 }, () => {
     const reviewed = Capability.parse(JSON.parse(await readFile(join(directory, 'member.openSubAccount@1.1.0.json'), 'utf8')));
     expect(reviewed.outcomes.map((outcome) => outcome.code)).toEqual(['AMOUNT_BELOW_MINIMUM']);
     expect(reviewed.outcomes[0]?.terminal).toBe(true);
+
+    // What the operator did while they held the session is on the record, in the review's own
+    // evidence, the same as it is for a discovery or a replay. Nothing wrote this before.
+    const { readdir } = await import('node:fs/promises');
+    const reviews = await readdir(join(root, 'evidence', 'review'));
+    const runDirectory = join(root, 'evidence', 'review', reviews[0] ?? '');
+    const actions = await readFile(join(runDirectory, 'humanActions.jsonl'), 'utf8');
+    expect(actions).toContain('"kind":"press"');
 
     // The probe and the verification both submitted, and neither opened an account, because
     // the application refused the amount. That is what makes this a business outcome.
