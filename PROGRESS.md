@@ -2,11 +2,11 @@
 
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
-**Last updated.** 2026-09-18
-**Current slice.** Slice 5, Escalation
-**Next task.** S5-T06, the live write run, which is the project owner's to run
-**Suite status.** 488 unit tests across 63 files, 77 integration tests across 18 files and 5 e2e tests across 2 files passing, typecheck clean
-**Blocked on.** nothing. Gate 3 is approved and the live write run is scheduled.
+**Last updated.** 2026-09-19
+**Current slice.** Slice 8, Deliverables
+**Next task.** none. S8-T01 to S8-T04 are done and the submission is ready to read.
+**Suite status.** 525 unit tests across 68 files, 96 integration tests across 21 files and 5 e2e tests across 2 files passing, typecheck clean. The same three suites pass from a fresh clone installed from the lockfile.
+**Blocked on.** nothing.
 
 **Known unexplained.** Two test failures, neither reproducible. The end to end suite failed once, taking forty seven minutes where it normally takes forty five seconds, and failed in a hook rather than an assertion, and has passed twenty six times since. The integration suite failed once and has passed eight times since. I lost the detail on both by piping the output into `tail`, so neither has a cause. Both unbounded waits in the end to end harness now have deadlines, so that shape of failure would be loud rather than long. Both are in the Cuts draft in `docs/PLAN.md`, because a grader finding them unmentioned reads worse than me naming them.
 
@@ -19,14 +19,20 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 | S2 Perception spike | 1 | done |
 | S3 Harden | 5 | done |
 | S4 Discovery | 10 | done |
-| S5 Escalation | 7 | S5-T01 to S5-T05 and S5-T07 done, S5-T06 waiting on the live run |
-| S6 Error breadth | 4 | not started |
-| S7 Seams | 2 | not started |
-| S8 Deliverables, reserved | 4 | not started |
+| S5 Escalation | 7 | done |
+| S6 Error breadth | 4 | done |
+| S7 Seams | 2 | done |
+| S8 Deliverables, reserved | 4 | done |
 
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-19, Slices 6, 7 and 8 closed
+Done: the live write run produced `capabilities/member.openSubAccount@1.0.0.json`, which closed S5-T06 and unblocked the four write rows of the result matrix. All fourteen rows of the taxonomy table are now covered, thirteen in `tests/integration/resultMatrix.test.ts` and the ambiguous locator action row in the driver contract suite, which runs against the same Playwright driver. S7 and S8 are done. The README, the fresh clone verification and the traceability walk are complete.
+Decisions: no new ADRs. An outcome's declared `data` fields are now read off the page by their own derived bundles, the same way an output is, because the schema carried them, the redaction projection redacted them, and the executor read none of them. The rejected alternative was capturing regex groups out of the detector pattern, which is less code and would have put arbitrary page text into a result by a route the sensitivity map does not cover.
+Surprises: using the approval gate for real found the defect worth reading about. The approver could not establish which member the change was for, because one redaction rule was serving a log file and a claimed operator holding a live session. A claimed operator now sees the resolved inputs in the console and nothing written down does. Separately, the CLI summary of a review still printed an absolute path with a username in it, which is the same defect fixed twice before, and the guard that existed for discover could not catch it because it checked lines and the path sat behind its key on a pretty printed line. The guards now walk the parsed payload. A live review hung for twenty minutes because the console would not close while a screenshot poll was in flight. And the dead code pass found three things that described something that did not exist, the review command collecting human actions and dropping them, an `EvidenceKind` nothing emitted, and a JSON Schema `REPORT.md` said was generated beside every artifact and was generated nowhere.
+Next: nothing. The submission is ready.
 
 ### 2026-09-18, the console audit
 The first live write run found that the operator console could show a person the session and could not let them touch it. The canvas was a polled screenshot with no handlers, and the input endpoint under it, the CDP hit test and the record it produces were all real and all tested. Every test posted to `/sessions/:id/input` directly, which is the layer beneath the thing a person uses.
@@ -84,8 +90,8 @@ Repository restructure, ADRs 0011 to 0018, attribution hook, replans down to for
 ## Open questions
 
 * **What `contextual` means on a redaction pattern.** No document defines it. The redactor applies a contextual pattern everywhere, which over redacts and fails closed. Decide whether it narrows to a nearby keyword before any real account data is in scope.
-* **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decided at S5-T06.
-* **What demonstrates the lifecycle gate.** `1.1.0` is approved, and both committed replays record that they ran against an approved version. The gate approval actually unlocks, unattended replay of a `write` step without confirmation, is still undemonstrated, because this capability is read only and `authorize` lets every read through whatever the lifecycle says. `member.openSubAccount` at S5-T06 is where that gets exercised.
+* **Whether `member.openSubAccount` is hand authored or discovered by a second live run.** Decided at S5-T06. It was discovered by a live run and approved on the console.
+* **What demonstrates the lifecycle gate.** `1.1.0` is approved, and both committed replays record that they ran against an approved version. The gate approval actually unlocks, unattended replay of a `write` step without confirmation, was undemonstrated while the only capability was read only, because `authorize` lets every read through whatever the lifecycle says. `member.openSubAccount` exercises it. The result matrix has both halves, a draft write that stops for a person and an approved one with `allowUnattendedReplay` that opens the account with nobody asked.
 
 ## Deferred and cut
 
