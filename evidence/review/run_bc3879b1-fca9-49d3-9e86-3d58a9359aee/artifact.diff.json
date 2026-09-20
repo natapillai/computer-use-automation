@@ -1,0 +1,55 @@
+{
+  "from": "1.0.0",
+  "to": "1.1.0",
+  "changes": [
+    {
+      "path": "version",
+      "kind": "changed",
+      "before": "1.0.0",
+      "after": "1.1.0"
+    },
+    {
+      "path": "outcomes.0",
+      "kind": "added",
+      "after": {
+        "code": "AMOUNT_BELOW_MINIMUM",
+        "description": "The opening amount is below the minimum this account type allows, so no account was opened.",
+        "terminal": true,
+        "detect": {
+          "kind": "elementPresent",
+          "target": {
+            "framePath": [
+              "content"
+            ],
+            "strategies": [
+              {
+                "kind": "role-name",
+                "role": "cell",
+                "name": "The opening amount must be at least $25.00.",
+                "exact": true,
+                "confidence": 0.9
+              },
+              {
+                "kind": "text",
+                "text": "The opening amount must be at least $25.00.",
+                "exact": true,
+                "confidence": 0.7
+              }
+            ],
+            "matchPolicy": "unique",
+            "describedAs": "cell The opening amount must be at least $25.00."
+          }
+        },
+        "provenance": "manual"
+      }
+    },
+    {
+      "path": "provenance.derivedFrom",
+      "kind": "added",
+      "after": {
+        "id": "member.openSubAccount",
+        "version": "1.0.0"
+      }
+    }
+  ]
+}

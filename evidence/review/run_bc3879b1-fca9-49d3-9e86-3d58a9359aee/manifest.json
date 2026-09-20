@@ -1,0 +1,72 @@
+{
+  "runId": "run_bc3879b1-fca9-49d3-9e86-3d58a9359aee",
+  "phase": "review",
+  "startedAt": "2026-09-20T16:17:11.501Z",
+  "endedAt": "2026-09-20T16:19:10.695Z",
+  "capability": {
+    "id": "member.openSubAccount",
+    "version": "1.1.0"
+  },
+  "goal": null,
+  "target": {
+    "appId": "meridian-core",
+    "baseUrl": "http://localhost:4010"
+  },
+  "result": {
+    "status": "declared",
+    "code": "AMOUNT_BELOW_MINIMUM",
+    "summary": "Declared AMOUNT_BELOW_MINIMUM and wrote version 1.1.0."
+  },
+  "counts": {
+    "steps": 4,
+    "modelCalls": 0,
+    "actions": 4,
+    "recoveries": 0,
+    "drift": 0,
+    "escalations": 0
+  },
+  "files": [
+    {
+      "path": "log.jsonl",
+      "kind": "log",
+      "description": "The structured application log"
+    },
+    {
+      "path": "captures/intervention-01.png",
+      "kind": "screenshot",
+      "description": "The screen a person was shown at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/intervention-01.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree at handoff 1, with member data masked"
+    },
+    {
+      "path": "captures/stop.png",
+      "kind": "screenshot",
+      "description": "The screen the probe stopped on, with member data masked"
+    },
+    {
+      "path": "captures/stop.a11y.json",
+      "kind": "snapshot",
+      "description": "The accessibility tree of the screen the probe stopped on, with member data masked"
+    },
+    {
+      "path": "artifact.diff.json",
+      "kind": "diff",
+      "description": "What the review added between 1.0.0 and 1.1.0"
+    }
+  ],
+  "environment": {
+    "driver": "web",
+    "driverVersion": "1.0.0",
+    "model": null,
+    "promptVersion": null
+  },
+  "redaction": {
+    "applied": true,
+    "patternsMatched": {
+      "known": 3
+    }
+  }
+}
