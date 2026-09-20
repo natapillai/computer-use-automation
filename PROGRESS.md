@@ -2,7 +2,7 @@
 
 Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks per task.
 
-**Last updated.** 2026-09-19
+**Last updated.** 2026-09-20
 **Current slice.** Slice 8, Deliverables
 **Next task.** none. S8-T01 to S8-T04 are done and the submission is ready to read.
 **Suite status.** 525 unit tests across 68 files, 96 integration tests across 21 files and 5 e2e tests across 2 files passing, typecheck clean. The same three suites pass from a fresh clone installed from the lockfile.
@@ -27,6 +27,12 @@ Living state, updated once per slice. `docs/PLAN.md` holds the tasks and ticks p
 ## Session log
 
 Newest first. Earlier detail lives in git history.
+
+### 2026-09-20, the submission
+Done: the live review of the write capability. The project owner ran it, approved both stops, and `member.openSubAccount@1.1.0.json` now declares `AMOUNT_BELOW_MINIMUM` with a detector derived from the message on the screen the probe stopped on. The negative probe mechanism has two live flows behind it rather than one, a read and a write. The console panel showed the resolved inputs on that first claim, so the approval gate fix from section 6 is demonstrated on a live session and not only in a test. `REPORT.md` is trimmed to 2200 words, from 2804, with sections 1, 2, 4 and 6 untouched. `evidence/README.md` leads with the index. The README opens with a twenty minute reading order, because nothing was telling a grader that the live run, the traceability matrix and the import graph test existed.
+Decisions: the reviewed write capability is committed as a draft rather than approved, because nobody has signed it off and the lifecycle field should say what is true.
+Surprises: a repository wide grep for secret shapes read `.env` and printed a live API key into a session transcript, which broke non negotiable 9. The key is rotated. A secret scan now runs over `git ls-files` only, because the tracked set is the only thing a cloner receives and including the rest is the one way the scan can leak.
+Next: nothing. The submission is ready to send.
 
 ### 2026-09-19, Slices 6, 7 and 8 closed
 Done: the live write run produced `capabilities/member.openSubAccount@1.0.0.json`, which closed S5-T06 and unblocked the four write rows of the result matrix. All fourteen rows of the taxonomy table are now covered, thirteen in `tests/integration/resultMatrix.test.ts` and the ambiguous locator action row in the driver contract suite, which runs against the same Playwright driver. S7 and S8 are done. The README, the fresh clone verification and the traceability walk are complete.

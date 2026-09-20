@@ -13,9 +13,9 @@ One line per directory, and the one file worth opening in each.
 | `discovery/run_28c9652e` | A run abandoned before the model acted. | `captures/step-00-initial.png`, the masked first screen |
 | `review/run_bc3879b1` | The negative probe on the write capability, which declared `AMOUNT_BELOW_MINIMUM`. | `captures/stop.png`, the screen the probe stopped on and the message the detector was derived from |
 | `review/run_be7fd34c` | The same mechanism on the read capability, which declared `MEMBER_NOT_FOUND`. | `artifact.diff.json`, exactly what the review added between 1.0.0 and 1.1.0 |
-| `replay/success` | The deterministic thread, no model loaded. | `log.jsonl`, the typed money output and the steps that produced it |
-| `replay/businessOutcome` | The same capability, member `00000`. | `log.jsonl`, a typed outcome and exit code 0 |
-| `replay/escalated` | `surpriseDialog` on the search, nobody claimed it. | `captures/intervention-01.png`, the dialog still open with its OK button never pressed |
+| `replay/success/run_44fa5a49` | The deterministic thread, no model loaded. | `log.jsonl`, the typed money output and the steps that produced it |
+| `replay/businessOutcome/run_1749a087` | The same capability, member `00000`. | `log.jsonl`, a typed outcome and exit code 0 |
+| `replay/escalated/run_d4553686` | `surpriseDialog` on the search, nobody claimed it. | `captures/intervention-01.png`, the dialog still open with its OK button never pressed |
 
 The escalated run carries no `humanActions.jsonl`, because nobody came. The handoffs a person actually took are in the two write discoveries at the top.
 
