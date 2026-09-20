@@ -1,0 +1,34 @@
+{
+  "id": "member.openSubAccount",
+  "name": "Open a member sub account, without being told the route",
+  "description": "The same goal as member.openSubAccount.json with the route removed. MERIDIAN Core links to the sub account form from nowhere, so a model that is not told where it is has no way to reach it and gets stuck. This request exists to exercise the handoff for real, where a person takes the live session, navigates the frame themselves, and hands it back. A run a person rescues produces no capability, which is the point of keeping the two requests separate.",
+  "goal": "open a {{inputs.accountType}} sub account for the member whose member ID is {{inputs.memberId}}, with an opening amount of {{inputs.openingAmount}}. Record the suffix the system assigns as the output suffix.",
+  "app": { "appId": "meridian-core", "vendor": "meridian", "entryPath": "/servicing" },
+  "allowWrites": true,
+  "inputs": [
+    {
+      "name": "memberId",
+      "type": "string",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "Institution member number",
+      "constraints": { "pattern": "^[0-9]{5,10}$" }
+    },
+    {
+      "name": "accountType",
+      "type": "enum",
+      "enumValues": ["Savings", "Holiday Club", "Christmas Club"],
+      "required": true,
+      "sensitivity": "internal",
+      "description": "The kind of sub account to open"
+    },
+    {
+      "name": "openingAmount",
+      "type": "string",
+      "required": true,
+      "sensitivity": "pii",
+      "description": "The opening deposit, at least $25.00",
+      "constraints": { "pattern": "^[0-9]+\\.[0-9]{2}$" }
+    }
+  ]
+}

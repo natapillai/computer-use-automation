@@ -31,15 +31,27 @@ export function interventionCaptures(options: InterventionCaptureOptions): () =>
   return async () => {
     taken += 1;
     const name = `intervention-${String(taken).padStart(2, '0')}`;
-    const observation = await options.observe();
-    const sensitive = sensitiveFields(options.profile, observation);
-
-    await options.sink.writeScreenshot(`captures/${name}.png`, `The screen a person was shown at handoff ${taken}, with member data masked`, await options.screenshot([...sensitive.keys()]));
-    await options.sink.writeJson(`captures/${name}.a11y.json`, 'snapshot', `The accessibility tree at handoff ${taken}, with member data masked`, {
-      ...observation,
-      root: maskTree(observation.root, { sensitive, inputs: options.inputs, redactor: options.redactor }),
-    });
-
-    return { screenshotRef: `captures/${name}.png`, snapshotRef: `captures/${name}.a11y.json` };
+    return captureScreen(options, name, `a person was shown at handoff ${taken}`);
   };
+}
+
+// The screen a run failed on. A structured result says what was expected and what was
+// observed, which is enough to know a run broke and rarely enough to see why. This is the
+// richer signal, and it is taken after the executor has given up, so the page is still
+// exactly where it stopped.
+export async function captureFailure(options: InterventionCaptureOptions): Promise<InterventionRefs> {
+  return captureScreen(options, 'failure', 'the run failed on');
+}
+
+async function captureScreen(options: InterventionCaptureOptions, name: string, what: string): Promise<InterventionRefs> {
+  const observation = await options.observe();
+  const sensitive = sensitiveFields(options.profile, observation);
+
+  await options.sink.writeScreenshot(`captures/${name}.png`, `The screen ${what}, with member data masked`, await options.screenshot([...sensitive.keys()]));
+  await options.sink.writeJson(`captures/${name}.a11y.json`, 'snapshot', `The accessibility tree ${what}, with member data masked`, {
+    ...observation,
+    root: maskTree(observation.root, { sensitive, inputs: options.inputs, redactor: options.redactor }),
+  });
+
+  return { screenshotRef: `captures/${name}.png`, snapshotRef: `captures/${name}.a11y.json` };
 }

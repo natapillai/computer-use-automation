@@ -56,8 +56,9 @@ describe('the committed discovery requests', () => {
     }
   });
 
-  it('gives a request that may write a goal that names where the form is', async () => {
+  it('gives a request that may write a goal that names where the form is, unless it exists to get stuck', async () => {
     const { goals } = await requestFiles();
+    const withoutARoute: string[] = [];
 
     for (const name of goals) {
       const parsed = DiscoveryRequest.safeParse(await read(name));
@@ -65,7 +66,17 @@ describe('the committed discovery requests', () => {
 
       // Nothing in MERIDIAN Core links to the sub account form, so a run told only to open an
       // account has no route to one. The first live write run spent itself finding that out.
+      if (name.endsWith('.stuck.json')) {
+        withoutARoute.push(name);
+        expect(parsed.data.goal, name).not.toMatch(/\/subaccount/);
+        continue;
+      }
       expect(parsed.data.goal, name).toMatch(/\{\{inputs\.\w+\}\}\/subaccount|\/subaccount/);
     }
+
+    // The exception is named, singular, and has to keep being deliberate. A stuck request
+    // exists to prove the handoff, so its goal must stay routeless, and nothing else may
+    // quietly become routeless by dropping the suffix into its file name.
+    expect(withoutARoute).toEqual(['member.openSubAccount.stuck.json']);
   });
 });

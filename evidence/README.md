@@ -16,8 +16,11 @@ One line per directory, and the one file worth opening in each.
 | `replay/success/run_44fa5a49` | The deterministic thread, no model loaded. | `log.jsonl`, the typed money output and the steps that produced it |
 | `replay/businessOutcome/run_1749a087` | The same capability, member `00000`. | `log.jsonl`, a typed outcome and exit code 0 |
 | `replay/escalated/run_d4553686` | `surpriseDialog` on the search, nobody claimed it. | `captures/intervention-01.png`, the dialog still open with its OK button never pressed |
+| `replay/failure/run_9dab6126` | The core banking service stopped answering on the member page. | `captures/failure.png`, the screen the run gave up on, beside a result that says which step, what it expected and why nothing was retried |
 
 The escalated run carries no `humanActions.jsonl`, because nobody came. The handoffs a person actually took are in the two write discoveries at the top.
+
+The failure run is the richer signal on a hard failure. The result names the step, what it expected and what it observed, and the capture is the page that produced it, which is the part a structured result cannot carry. The step that failed is the one that is not idempotent, so the run refused to retry a load it could not prove was safe to repeat, and the result says so rather than leaving a reader to work it out.
 
 ## Why the first run is kept
 

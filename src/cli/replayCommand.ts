@@ -12,7 +12,7 @@ import type { GrantLedger } from '../core/policy/authorize.js';
 import type { HumanActionRecord, HumanInputPort } from '../escalation/humanInput.js';
 import { createRunConsole } from '../escalation/runConsole.js';
 import type { CapabilityStore } from '../evidence/capabilityStore.js';
-import { interventionCaptures } from '../evidence/interventionCapture.js';
+import { captureFailure, interventionCaptures } from '../evidence/interventionCapture.js';
 import { maskedScreenshot } from '../evidence/maskedScreenshot.js';
 import { createEvidenceSink } from '../evidence/sink.js';
 import { replay } from '../replay/executor.js';
@@ -121,6 +121,18 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
 
   let result: ReplayResult;
   const validated = validateInputs(capability.inputs, supplied);
+  // Provenance, registered the moment the values are known to be valid and before anything
+  // can write one. Discovery and review both do this and replay did not, so a supplied member
+  // id survived into everything the sink wrote that the result projection does not own.
+  // Patterns are the net for values nobody declared, and five digits match none of them.
+  if (validated.ok) {
+    sink.addKnown({
+      known: capability.inputs.flatMap((spec) => {
+        const value = validated.values[spec.name];
+        return (spec.sensitivity === 'pii' || spec.sensitivity === 'secret') && value !== undefined && value !== '' ? [{ value: String(value), replacement: `{{inputs.${spec.name}}}` }] : [];
+      }),
+    });
+  }
   if (!validated.ok) {
     result = failureResult(base(), {
       class: 'InputValidation',
@@ -160,6 +172,7 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
         announce: (line) => deps.stderr(`A person is needed. ${line}
 `),
       });
+      const capture = { sink, profile: profile.profile, redactor: deps.redactor, inputs, observe: () => surface.observe(), screenshot: (refs: readonly string[]) => surface.screenshot(refs) };
       try {
         result = await replay(capability, supplied, {
           surface,
@@ -169,8 +182,12 @@ export async function runReplayCommand(deps: ReplayCommandDeps): Promise<number>
           profile: profile.profile,
           escalation: console_.escalation,
           grants,
-          capture: interventionCaptures({ sink, profile: profile.profile, redactor: deps.redactor, inputs, observe: () => surface.observe(), screenshot: (refs) => surface.screenshot(refs) }),
+          capture: interventionCaptures(capture),
         });
+        // Taken here rather than inside the executor, because the executor unwinds a failure
+        // through a throw and the page it failed on is still on screen when replay returns.
+        // A business outcome is an answer and gets nothing, which keeps the common path cheap.
+        if (result.status === 'failure') await captureFailure(capture);
       } finally {
         await console_.close();
         await leased.lease.release();

@@ -131,6 +131,23 @@ describe('runReplayCommand', () => {
     expect(evidence.text).toContain('"capability":{"id":"member.readSavingsBalance","version":"1.0.0","status":"draft"}');
   });
 
+  it('gives the sink the supplied inputs, so everything it writes is templated and not just pattern matched', async () => {
+    // Discovery and review both register provenance and replay did not, so a member id the
+    // caller supplied survived into anything the sink wrote that the result projection does
+    // not own. A five digit id matches no pattern, so patterns were never going to catch it.
+    // Found by the canary scanner on a failure capture, which is the first replay artifact
+    // to carry a page URL.
+    // A failure on the member detail screen, whose frame URL carries the member id the caller
+    // supplied, which is the shape the scanner caught. The balance is unreadable as money, so
+    // the run gets that far and then cannot produce its output.
+    const { paths } = await run({ script: { balance: 'see teller' } });
+    const evidence = await evidenceText(paths.evidence);
+
+    expect(evidence.files).toContain('replay/failure/run_000001/captures/failure.a11y.json');
+    expect(evidence.text).toContain('/member/{{inputs.memberId}}');
+    expect(evidence.text).not.toContain('10001');
+  });
+
   it('files a business outcome and a failure in their own directories, so evidence reads by outcome', async () => {
     const outcome = await run({ script: { searchLeadsTo: 'noRecords', memberId: '00000' }, stdin: '{"memberId":"00000"}' });
     const failure = await run({ script: { searchLeadsTo: 'wrongPage' } });
@@ -138,9 +155,15 @@ describe('runReplayCommand', () => {
     // Both runs share one evidence root here, which is also how the two directories are proven
     // not to collide when two runs carry the same run id.
     expect([outcome.code, failure.code]).toEqual([0, 1]);
+    // A failure carries the screen and the tree it failed on. A structured result says what
+    // was expected and what was observed, and the capture is what lets somebody who was not
+    // there see the page that produced it. A business outcome is an answer, not a defect, so
+    // it gets no capture and stays cheap.
     expect((await evidenceText(failure.paths.evidence)).files).toEqual([
       'replay/businessOutcome/run_000001/log.jsonl',
       'replay/businessOutcome/run_000001/manifest.json',
+      'replay/failure/run_000001/captures/failure.a11y.json',
+      'replay/failure/run_000001/captures/failure.png',
       'replay/failure/run_000001/log.jsonl',
       'replay/failure/run_000001/manifest.json',
     ]);
